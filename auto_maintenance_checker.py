@@ -58,27 +58,30 @@ def get_positions():
         return []
 
 def maintain_anchor(inst_id, pos_side, pos_size):
-    """执行维护锚点单"""
+    """执行维护锚点单（自动维护模式，会调整保证金）"""
     try:
-        log(f"🔧 开始维护: {inst_id} {pos_side} {pos_size}")
+        log(f"🔧 开始自动维护: {inst_id} {pos_side} {pos_size}")
         response = requests.post(
             f"{BASE_URL}/api/anchor/maintain-anchor",
             json={
                 'inst_id': inst_id,
                 'pos_side': pos_side,
-                'pos_size': pos_size
+                'pos_size': pos_size,
+                'auto_adjust': True  # 自动维护模式，启用保证金自动调整
             },
             timeout=30
         )
         data = response.json()
         if data.get('success'):
-            log(f"✅ 维护成功: {inst_id}")
+            log(f"✅ 自动维护成功: {inst_id}")
+            if data.get('data', {}).get('adjustment_order_id'):
+                log(f"   📊 已自动调整保证金，平仓数量: {data['data'].get('adjustment_size', 0)}")
             return True
         else:
-            log(f"❌ 维护失败: {data.get('message')}")
+            log(f"❌ 自动维护失败: {data.get('message')}")
             return False
     except Exception as e:
-        log(f"❌ 维护操作异常: {e}")
+        log(f"❌ 自动维护操作异常: {e}")
         return False
 
 def adjust_margin(inst_id, pos_side, margin, target_margin=0.8):

@@ -13182,6 +13182,7 @@ def maintain_anchor_order():
         inst_id = data.get('inst_id')
         pos_side = data.get('pos_side')  # 'short' or 'long'
         pos_size = float(data.get('pos_size'))
+        auto_adjust = data.get('auto_adjust', False)  # 是否自动调整保证金（只用于自动维护-10%）
         
         # 检查今日维护次数
         import json as json_lib_check
@@ -13612,96 +13613,102 @@ def maintain_anchor_order():
             # 不影响主流程，继续返回成功
         
         # 检查剩余持仓的保证金，如果大于2U则继续平仓到0.6-1U之间
+        # 注意：只在自动维护（auto_adjust=True）时才执行此检查
+        # 超级维护不做此限制
         adjustment_order_id = None
         adjustment_size = 0
-        try:
-            print(f"🔍 检查剩余持仓保证金...")
-            
-            # 等待3秒让持仓数据更新
-            import time
-            time.sleep(3)
-            
-            # 查询当前持仓
-            position_path = f'/api/v5/account/positions?instType=SWAP&instId={inst_id}'
-            headers = get_headers('GET', position_path)
-            pos_response = requests.get(
-                OKEX_REST_URL + position_path,
-                headers=headers,
-                timeout=10
-            )
-            pos_data = pos_response.json()
-            
-            if pos_data.get('code') == '0' and pos_data.get('data'):
-                for position in pos_data['data']:
-                    if position.get('posSide') == pos_side:
-                        current_pos_size = abs(float(position.get('pos', 0)))
-                        current_margin = float(position.get('margin', 0))
-                        mark_price = float(position.get('markPx', 0))
-                        lever = int(position.get('lever', 10))
-                        
-                        print(f"📊 当前持仓: 数量={current_pos_size}, 保证金={current_margin:.4f}u, 标记价格={mark_price}")
-                        
-                        if current_margin > 2.0 and current_pos_size > 0:
-                            print(f"⚠️  保证金 {current_margin:.4f}u > 2u，需要调整")
+        
+        if auto_adjust:  # 只有自动维护才调整保证金
+            try:
+                print(f"🔍 检查剩余持仓保证金...")
+                
+                # 等待3秒让持仓数据更新
+                import time
+                time.sleep(3)
+                
+                # 查询当前持仓
+                position_path = f'/api/v5/account/positions?instType=SWAP&instId={inst_id}'
+                headers = get_headers('GET', position_path)
+                pos_response = requests.get(
+                    OKEX_REST_URL + position_path,
+                    headers=headers,
+                    timeout=10
+                )
+                pos_data = pos_response.json()
+                
+                if pos_data.get('code') == '0' and pos_data.get('data'):
+                    for position in pos_data['data']:
+                        if position.get('posSide') == pos_side:
+                            current_pos_size = abs(float(position.get('pos', 0)))
+                            current_margin = float(position.get('margin', 0))
+                            mark_price = float(position.get('markPx', 0))
+                            lever = int(position.get('lever', 10))
                             
-                            # 目标保证金设为0.8U（在0.6-1U之间）
-                            target_margin = 0.8
+                            print(f"📊 当前持仓: 数量={current_pos_size}, 保证金={current_margin:.4f}u, 标记价格={mark_price}")
                             
-                            # 计算需要的持仓量：margin = pos_size * mark_price / lever
-                            # target_pos_size = target_margin * lever / mark_price
-                            target_pos_size = (target_margin * lever) / mark_price
-                            
-                            # 计算需要平仓的数量
-                            adjustment_size_raw = current_pos_size - target_pos_size
-                            
-                            # 获取合约面值
-                            inst_path = f'/api/v5/public/instruments?instType=SWAP&instId={inst_id}'
-                            inst_resp = requests.get(OKEX_REST_URL + inst_path, timeout=10)
-                            inst_data = inst_resp.json()
-                            lot_size = 1
-                            if inst_data.get('code') == '0' and inst_data.get('data'):
-                                lot_size = float(inst_data['data'][0].get('ctVal', 1))
-                            
-                            # 向下取整到lot_size的整数倍
-                            adjustment_size = int(adjustment_size_raw / lot_size) * lot_size
-                            
-                            if adjustment_size > 0:
-                                print(f"📉 计划平仓: {adjustment_size} (目标保证金: {target_margin}u)")
+                            if current_margin > 2.0 and current_pos_size > 0:
+                                print(f"⚠️  保证金 {current_margin:.4f}u > 2u，需要调整")
                                 
-                                # 执行平仓
-                                close_side = 'buy' if pos_side == 'short' else 'sell'
-                                adjustment_body = {
-                                    'instId': inst_id,
-                                    'tdMode': 'isolated',
-                                    'side': close_side,
-                                    'posSide': pos_side,
-                                    'ordType': 'market',
-                                    'sz': str(adjustment_size)
-                                }
+                                # 目标保证金设为0.8U（在0.6-1U之间）
+                                target_margin = 0.8
                                 
-                                headers = get_headers('POST', order_path, adjustment_body)
-                                adj_response = requests.post(
-                                    OKEX_REST_URL + order_path,
-                                    headers=headers,
-                                    json=adjustment_body,
-                                    timeout=10
-                                )
-                                adj_data = adj_response.json()
+                                # 计算需要的持仓量：margin = pos_size * mark_price / lever
+                                # target_pos_size = target_margin * lever / mark_price
+                                target_pos_size = (target_margin * lever) / mark_price
                                 
-                                if adj_data.get('code') == '0':
-                                    adjustment_order_id = adj_data['data'][0]['ordId']
-                                    print(f"✅ 调整平仓成功: 订单ID {adjustment_order_id}, 平仓数量 {adjustment_size}")
+                                # 计算需要平仓的数量
+                                adjustment_size_raw = current_pos_size - target_pos_size
+                                
+                                # 获取合约面值
+                                inst_path = f'/api/v5/public/instruments?instType=SWAP&instId={inst_id}'
+                                inst_resp = requests.get(OKEX_REST_URL + inst_path, timeout=10)
+                                inst_data = inst_resp.json()
+                                lot_size = 1
+                                if inst_data.get('code') == '0' and inst_data.get('data'):
+                                    lot_size = float(inst_data['data'][0].get('ctVal', 1))
+                                
+                                # 向下取整到lot_size的整数倍
+                                adjustment_size = int(adjustment_size_raw / lot_size) * lot_size
+                                
+                                if adjustment_size > 0:
+                                    print(f"📉 计划平仓: {adjustment_size} (目标保证金: {target_margin}u)")
+                                    
+                                    # 执行平仓
+                                    close_side = 'buy' if pos_side == 'short' else 'sell'
+                                    adjustment_body = {
+                                        'instId': inst_id,
+                                        'tdMode': 'isolated',
+                                        'side': close_side,
+                                        'posSide': pos_side,
+                                        'ordType': 'market',
+                                        'sz': str(adjustment_size)
+                                    }
+                                    
+                                    headers = get_headers('POST', order_path, adjustment_body)
+                                    adj_response = requests.post(
+                                        OKEX_REST_URL + order_path,
+                                        headers=headers,
+                                        json=adjustment_body,
+                                        timeout=10
+                                    )
+                                    adj_data = adj_response.json()
+                                    
+                                    if adj_data.get('code') == '0':
+                                        adjustment_order_id = adj_data['data'][0]['ordId']
+                                        print(f"✅ 调整平仓成功: 订单ID {adjustment_order_id}, 平仓数量 {adjustment_size}")
+                                    else:
+                                        print(f"❌ 调整平仓失败: {adj_data.get('msg')}")
                                 else:
-                                    print(f"❌ 调整平仓失败: {adj_data.get('msg')}")
+                                    print(f"⚠️  计算的平仓数量 <= 0，跳过调整")
                             else:
-                                print(f"⚠️  计算的平仓数量 <= 0，跳过调整")
-                        else:
-                            print(f"✅ 保证金 {current_margin:.4f}u <= 2u，无需调整")
-                        break
-        except Exception as adj_error:
-            print(f"⚠️  保证金调整失败: {adj_error}")
-            import traceback
-            print(traceback.format_exc())
+                                print(f"✅ 保证金 {current_margin:.4f}u <= 2u，无需调整")
+                            break
+            except Exception as adj_error:
+                print(f"⚠️  保证金调整失败: {adj_error}")
+                import traceback
+                print(traceback.format_exc())
+        else:
+            print(f"ℹ️  手动维护/超级维护模式，跳过保证金自动调整")
         
         response_data = {
             'open_order_id': open_order_id,
