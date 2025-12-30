@@ -702,6 +702,51 @@
             </div>
         </div>
 
+        <!-- 子账户持仓情况 -->
+        <div class="card" style="border: 2px solid #667eea;">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card-title" style="color: white;">
+                    <span>👥</span>
+                    子账户持仓情况
+                    <span id="subAccountStats" style="margin-left: 15px; font-size: 14px; font-weight: normal; opacity: 0.9;">
+                        <!-- 统计信息将在这里动态显示 -->
+                    </span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="font-size: 13px; opacity: 0.9;">
+                        账户数量: <strong id="subAccountCount">--</strong>
+                    </div>
+                    <div class="update-time" id="subAccountPositionTime" style="font-size: 14px; opacity: 0.9; color: white;">
+                        最后更新: --
+                    </div>
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="subAccountPositionTable">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <th style="color: white;">账户名</th>
+                            <th style="color: white;">编号</th>
+                            <th style="color: white;">币种</th>
+                            <th style="color: white;">方向</th>
+                            <th style="color: white;">持仓量</th>
+                            <th style="color: white;">开仓均价</th>
+                            <th style="color: white;">标记价格</th>
+                            <th style="color: white;">杠杆</th>
+                            <th style="color: white;">未实现盈亏</th>
+                            <th style="color: white;">保证金</th>
+                            <th style="color: white;">收益率</th>
+                            <th style="color: white;">维护次数</th>
+                            <th style="color: white;">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subAccountPositionBody">
+                        <tr><td colspan="13" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
 
         <!-- 历史监控记录 -->
         <div class="card">
@@ -885,6 +930,19 @@
                 
                 if (positionsData.success) {
                     renderCurrentPositions(positionsData.positions);
+                }
+
+                // 加载子账户持仓
+                const subAccountRes = await fetch('/api/anchor-system/sub-account-positions');
+                const subAccountData = await subAccountRes.json();
+                
+                if (subAccountData.success) {
+                    renderSubAccountPositions(subAccountData.positions);
+                    
+                    // 更新子账户时间
+                    const now = new Date();
+                    document.getElementById('subAccountPositionTime').textContent = 
+                        `最后更新: ${now.toLocaleString('zh-CN')}`;
                 }
 
                 // 加载当前预警（实盘模式）
@@ -1470,6 +1528,93 @@
                     <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
                 </tr>
             `).join('');
+        }
+
+        // 渲染子账户持仓
+        function renderSubAccountPositions(data) {
+            const tbody = document.getElementById('subAccountPositionBody');
+            const statsSpan = document.getElementById('subAccountStats');
+            const accountCountSpan = document.getElementById('subAccountCount');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="13" class="empty">暂无子账户持仓</td></tr>';
+                statsSpan.innerHTML = '';
+                accountCountSpan.textContent = '0';
+                return;
+            }
+
+            // 统计账户数
+            const accounts = new Set(data.map(p => p.account_name));
+            accountCountSpan.textContent = accounts.size;
+            
+            // 统计总盈亏
+            const totalUpl = data.reduce((sum, p) => sum + (p.upl || 0), 0);
+            const totalMargin = data.reduce((sum, p) => sum + (p.margin || 0), 0);
+            const avgProfitRate = totalMargin > 0 ? (totalUpl / totalMargin * 100) : 0;
+            
+            const uplColor = totalUpl >= 0 ? '#48bb78' : '#f56565';
+            const rateColor = avgProfitRate >= 0 ? '#48bb78' : '#f56565';
+            
+            statsSpan.innerHTML = `
+                <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 8px;">
+                    总持仓: ${data.length}
+                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 8px;">
+                    总盈亏: <strong style="color: ${uplColor};">${totalUpl >= 0 ? '+' : ''}$${totalUpl.toFixed(2)}</strong>
+                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 8px;">
+                    平均收益率: <strong style="color: ${rateColor};">${avgProfitRate >= 0 ? '+' : ''}${avgProfitRate.toFixed(2)}%</strong>
+                </span>
+            `;
+
+            // 币种编号映射
+            const coinNumbers = {
+                'CFX-USDT-SWAP': 'NO.1',
+                'FIL-USDT-SWAP': 'NO.2',
+                'CRO-USDT-SWAP': 'NO.3',
+                'UNI-USDT-SWAP': 'NO.4',
+                'CRV-USDT-SWAP': 'NO.5',
+                'LDO-USDT-SWAP': 'NO.6'
+            };
+            
+            tbody.innerHTML = data.map((item, index) => {
+                const profitColor = (item.profit_rate || 0) >= 0 ? '#48bb78' : '#f56565';
+                const uplColor = (item.upl || 0) >= 0 ? '#48bb78' : '#f56565';
+                const coinNumber = coinNumbers[item.inst_id] || '--';
+                const maxMaintenanceCount = 3;  // 子账号最多3次维护
+                
+                return `
+                <tr>
+                    <td style="font-weight: 700; color: #667eea; font-size: 14px;">${item.account_name}</td>
+                    <td style="font-weight: 600; color: #667eea;">${coinNumber}</td>
+                    <td style="font-weight: 600;">${item.inst_id}</td>
+                    <td>
+                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                            ${item.pos_side === 'short' ? '做空' : '做多'}
+                        </span>
+                    </td>
+                    <td style="color: #3182ce; font-weight: 600;">${Math.abs(item.pos_size || 0).toFixed(4)}</td>
+                    <td style="color: #3182ce;">$${(item.avg_price || 0).toFixed(4)}</td>
+                    <td style="color: #805ad5;">$${(item.mark_price || 0).toFixed(4)}</td>
+                    <td style="color: #ed8936; font-weight: 600;">${item.leverage}x</td>
+                    <td style="color: ${uplColor}; font-weight: 700; font-size: 14px;">
+                        ${(item.upl || 0) >= 0 ? '+' : ''}$${(item.upl || 0).toFixed(4)}
+                    </td>
+                    <td style="color: #718096;">$${(item.margin || 0).toFixed(4)}</td>
+                    <td style="color: ${profitColor}; font-weight: 700; font-size: 16px;">
+                        ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
+                    </td>
+                    <td style="font-weight: 700; color: #667eea; font-size: 14px;">
+                        ${item.maintenance_count || 0}/${maxMaintenanceCount}次
+                    </td>
+                    <td>
+                        <span class="badge badge-profit">
+                            ${item.status || '正常'}
+                        </span>
+                    </td>
+                </tr>
+                `;
+            }).join('');
         }
 
         // 渲染维护锚点单成交记录

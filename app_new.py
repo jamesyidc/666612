@@ -12877,6 +12877,131 @@ def get_today_statistics():
         
         try:
             import json as json_lib
+
+@app.route('/api/anchor-system/sub-account-positions')
+def get_sub_account_positions():
+    """获取子账号持仓"""
+    try:
+        import json as json_lib
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        from datetime import datetime
+        
+        # 加载子账号配置
+        with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+            config = json_lib.load(f)
+        
+        all_positions = []
+        
+        # 遍历所有子账号
+        for sub_account in config.get('sub_accounts', []):
+            if not sub_account.get('enabled'):
+                continue
+            
+            account_name = sub_account['account_name']
+            api_key = sub_account['api_key']
+            secret_key = sub_account['secret_key']
+            passphrase = sub_account['passphrase']
+            
+            try:
+                # 生成OKEx签名
+                request_path = '/api/v5/account/positions'
+                timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                message = timestamp + 'GET' + request_path
+                mac = hmac.new(
+                    secret_key.encode('utf-8'),
+                    message.encode('utf-8'),
+                    hashlib.sha256
+                )
+                signature = base64.b64encode(mac.digest()).decode('utf-8')
+                
+                headers = {
+                    'OK-ACCESS-KEY': api_key,
+                    'OK-ACCESS-SIGN': signature,
+                    'OK-ACCESS-TIMESTAMP': timestamp,
+                    'OK-ACCESS-PASSPHRASE': passphrase,
+                    'Content-Type': 'application/json'
+                }
+                
+                # 获取持仓
+                url = f"https://www.okx.com{request_path}"
+                params = {'instType': 'SWAP'}
+                response = requests.get(url, headers=headers, params=params, timeout=10)
+                
+                if response.status_code != 200:
+                    continue
+                
+                data = response.json()
+                if data.get('code') != '0':
+                    continue
+                
+                # 处理持仓数据
+                for pos in data.get('data', []):
+                    pos_size = float(pos.get('pos', 0))
+                    if pos_size == 0:
+                        continue
+                    
+                    avg_px = float(pos.get('avgPx', 0))
+                    mark_px = float(pos.get('markPx', 0))
+                    upl = float(pos.get('upl', 0))
+                    notional_usd = float(pos.get('notionalUsd', 0))
+                    margin = float(pos.get('margin', 0))
+                    leverage = pos.get('lever', '10')
+                    
+                    # 计算盈亏率
+                    if notional_usd != 0:
+                        profit_rate = (upl / abs(notional_usd)) * 100
+                    else:
+                        profit_rate = 0
+                    
+                    # 获取维护次数
+                    maintenance_count = 0
+                    try:
+                        with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
+                            counts = json_lib.load(f)
+                        today = datetime.now().strftime('%Y-%m-%d')
+                        key = f"{account_name}:{pos['instId']}:{pos['posSide']}:{today}"
+                        maintenance_count = counts.get(key, 0)
+                    except:
+                        pass
+                    
+                    all_positions.append({
+                        'account_name': account_name,
+                        'inst_id': pos['instId'],
+                        'pos_side': pos['posSide'],
+                        'pos_size': abs(pos_size),
+                        'avg_price': avg_px,
+                        'mark_price': mark_px,
+                        'leverage': leverage,
+                        'margin': margin,
+                        'upl': upl,
+                        'profit_rate': profit_rate,
+                        'notional_usd': abs(notional_usd),
+                        'maintenance_count': maintenance_count,
+                        'status': '正常',
+                        'is_sub_account': True
+                    })
+            
+            except Exception as e:
+                print(f"获取子账号 {account_name} 持仓失败: {e}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'positions': all_positions,
+            'total': len(all_positions)
+        })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
             import os
             if os.path.exists(maintenance_file):
                 with open(maintenance_file, 'r', encoding='utf-8') as f:
