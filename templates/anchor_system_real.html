@@ -573,8 +573,20 @@
                         <!-- 统计信息将在这里动态显示 -->
                     </span>
                 </div>
-                <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
-                    最后更新: --
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="autoMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🟢 自动维护多单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="autoMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🔴 自动维护空单-10%</span>
+                        </label>
+                    </div>
+                    <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
+                        最后更新: --
+                    </div>
                 </div>
             </div>
             <div class="table-container">
@@ -591,12 +603,13 @@
                             <th>未实现盈亏</th>
                             <th>保证金</th>
                             <th>收益率</th>
+                            <th>今日维护</th>
                             <th>状态</th>
                             <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="currentPositionBody">
-                        <tr><td colspan="12" class="loading">加载中...</td></tr>
+                        <tr><td colspan="13" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -674,6 +687,16 @@
         // 加载数据
         async function loadData() {
             try {
+                // 加载自动维护配置
+                const configRes = await fetch('/api/anchor/auto-maintenance-config');
+                const configData = await configRes.json();
+                
+                if (configData.success) {
+                    const config = configData.config;
+                    document.getElementById('autoMaintainLong').checked = config.auto_maintain_long_enabled || false;
+                    document.getElementById('autoMaintainShort').checked = config.auto_maintain_short_enabled || false;
+                }
+
                 // 加载状态
                 const statusRes = await fetch('/api/anchor-system/status');
                 const statusData = await statusRes.json();
@@ -991,7 +1014,7 @@
             const statsDiv = document.getElementById('positionStats');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="empty">当前无持仓</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
                 // 清空盈利统计显示
                 document.getElementById('profit70Plus').textContent = '0';
@@ -1153,6 +1176,14 @@
                     <td>${item.margin.toFixed(4)} USDT</td>
                     <td style="color: ${item.profit_rate >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
                         ${item.profit_rate >= 0 ? '+' : ''}${item.profit_rate.toFixed(2)}%
+                    </td>
+                    <td>
+                        <span style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;
+                                     background: ${(item.maintenance_count_today || 0) > 0 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#e2e8f0'};
+                                     color: ${(item.maintenance_count_today || 0) > 0 ? 'white' : '#718096'};
+                                     box-shadow: ${(item.maintenance_count_today || 0) > 0 ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'};">
+                            ${(item.maintenance_count_today || 0)}次
+                        </span>
                     </td>
                     <td>
                         <span class="badge ${
@@ -1455,6 +1486,65 @@
             // 初始加载数据
             loadData();
             
+            // 自动维护开关事件监听
+            document.getElementById('autoMaintainLong').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🟢 自动维护多单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            auto_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(enabled ? '✅ 多单自动维护已开启' : '❌ 多单自动维护已关闭', enabled ? 'success' : 'info');
+                    } else {
+                        showToast('⚠️ 配置保存失败', 'error');
+                        e.target.checked = !enabled; // 回滚
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    showToast('⚠️ 配置保存失败', 'error');
+                    e.target.checked = !enabled; // 回滚
+                }
+            });
+            
+            document.getElementById('autoMaintainShort').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🔴 自动维护空单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            auto_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(enabled ? '✅ 空单自动维护已开启' : '❌ 空单自动维护已关闭', enabled ? 'success' : 'info');
+                    } else {
+                        showToast('⚠️ 配置保存失败', 'error');
+                        e.target.checked = !enabled; // 回滚
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    showToast('⚠️ 配置保存失败', 'error');
+                    e.target.checked = !enabled; // 回滚
+                }
+            });
+            
             // 自动刷新数据（每30秒）
             setInterval(() => {
                 console.log('⏰ 自动刷新数据...', new Date().toLocaleString('zh-CN'));
@@ -1469,6 +1559,37 @@
             
             console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间）');
         });
+        
+        // Toast提示函数
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                color: white;
+                z-index: 10000;
+                animation: slideIn 0.3s ease-out;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                background: ${type === 'success' ? 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' : 
+                             type === 'error' ? 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)' : 
+                             'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
         
         // 维护锚点单函数
         async function maintainAnchor(instId, posSide, posSize) {

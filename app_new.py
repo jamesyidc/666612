@@ -12718,6 +12718,28 @@ def get_current_positions():
         # 将数据库记录转换为字典
         db_positions_dict = {(row['inst_id'], row['pos_side']): row for row in db_positions}
         
+        # 获取今日维护次数统计
+        import json as json_lib
+        from datetime import datetime
+        from collections import defaultdict
+        
+        maintenance_file = 'maintenance_orders.json'
+        maintenance_counts = defaultdict(int)
+        
+        if os.path.exists(maintenance_file):
+            try:
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    maintenance_records = json_lib.load(f)
+                
+                today = datetime.now().strftime('%Y-%m-%d')
+                for record in maintenance_records:
+                    created_at = record.get('created_at', '')
+                    if created_at.startswith(today):
+                        inst_id = record.get('inst_id', '')
+                        maintenance_counts[inst_id] += 1
+            except Exception as e:
+                print(f"读取维护记录失败: {e}")
+        
         position_list = []
         for pos in okex_positions:
             inst_id = pos.get('instId')
@@ -12797,7 +12819,8 @@ def get_current_positions():
                 'profit_rate': profit_rate,
                 'status': status,
                 'status_class': status_class,
-                'is_anchor': is_anchor
+                'is_anchor': is_anchor,
+                'maintenance_count_today': maintenance_counts.get(inst_id, 0)
             })
         
         return jsonify({
@@ -13505,6 +13528,135 @@ def test_api_permission():
         return jsonify({
             'success': False,
             'message': f'测试失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor/auto-maintenance-config', methods=['GET', 'POST'])
+def auto_maintenance_config():
+    """获取或设置自动维护配置"""
+    try:
+        import json as json_lib
+        import os
+        
+        config_file = 'auto_maintenance_config.json'
+        
+        if request.method == 'GET':
+            # 读取配置
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            else:
+                # 默认配置
+                config = {
+                    'auto_maintain_long_enabled': False,
+                    'auto_maintain_short_enabled': False,
+                    'loss_threshold': -10,
+                    'margin_min': 0.6,
+                    'margin_max': 1.0,
+                    'last_check_time': None
+                }
+                # 保存默认配置
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json_lib.dump(config, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'success': True,
+                'config': config
+            })
+        
+        elif request.method == 'POST':
+            # 更新配置
+            data = request.get_json()
+            
+            # 读取现有配置
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            else:
+                config = {
+                    'auto_maintain_long_enabled': False,
+                    'auto_maintain_short_enabled': False,
+                    'loss_threshold': -10,
+                    'margin_min': 0.6,
+                    'margin_max': 1.0,
+                    'last_check_time': None
+                }
+            
+            # 更新指定的字段
+            if 'auto_maintain_long_enabled' in data:
+                config['auto_maintain_long_enabled'] = data['auto_maintain_long_enabled']
+            if 'auto_maintain_short_enabled' in data:
+                config['auto_maintain_short_enabled'] = data['auto_maintain_short_enabled']
+            if 'loss_threshold' in data:
+                config['loss_threshold'] = data['loss_threshold']
+            if 'margin_min' in data:
+                config['margin_min'] = data['margin_min']
+            if 'margin_max' in data:
+                config['margin_max'] = data['margin_max']
+            
+            # 保存配置
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(config, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'success': True,
+                'message': '配置已更新',
+                'config': config
+            })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'操作失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor/maintenance-stats', methods=['GET'])
+def get_maintenance_stats():
+    """获取维护次数统计（按自然日和币种）"""
+    try:
+        import json as json_lib
+        import os
+        from datetime import datetime
+        from collections import defaultdict
+        
+        maintenance_file = 'maintenance_orders.json'
+        
+        if not os.path.exists(maintenance_file):
+            return jsonify({
+                'success': True,
+                'stats': {},
+                'today_date': datetime.now().strftime('%Y-%m-%d')
+            })
+        
+        # 读取维护记录
+        with open(maintenance_file, 'r', encoding='utf-8') as f:
+            records = json_lib.load(f)
+        
+        # 今天的日期
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # 统计今天每个币种的维护次数
+        stats = defaultdict(int)
+        
+        for record in records:
+            created_at = record.get('created_at', '')
+            if created_at.startswith(today):
+                inst_id = record.get('inst_id', '')
+                stats[inst_id] += 1
+        
+        return jsonify({
+            'success': True,
+            'stats': dict(stats),
+            'today_date': today
+        })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
             'traceback': traceback.format_exc()
         })
 
