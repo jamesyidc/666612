@@ -14238,6 +14238,8 @@ def auto_maintenance_config():
                 config = {
                     'auto_maintain_long_enabled': False,
                     'auto_maintain_short_enabled': False,
+                    'super_maintain_long_enabled': False,
+                    'super_maintain_short_enabled': False,
                     'loss_threshold': -10,
                     'margin_min': 0.6,
                     'margin_max': 1.0,
@@ -14264,6 +14266,8 @@ def auto_maintenance_config():
                 config = {
                     'auto_maintain_long_enabled': False,
                     'auto_maintain_short_enabled': False,
+                    'super_maintain_long_enabled': False,
+                    'super_maintain_short_enabled': False,
                     'loss_threshold': -10,
                     'margin_min': 0.6,
                     'margin_max': 1.0,
@@ -14275,6 +14279,10 @@ def auto_maintenance_config():
                 config['auto_maintain_long_enabled'] = data['auto_maintain_long_enabled']
             if 'auto_maintain_short_enabled' in data:
                 config['auto_maintain_short_enabled'] = data['auto_maintain_short_enabled']
+            if 'super_maintain_long_enabled' in data:
+                config['super_maintain_long_enabled'] = data['super_maintain_long_enabled']
+            if 'super_maintain_short_enabled' in data:
+                config['super_maintain_short_enabled'] = data['super_maintain_short_enabled']
             if 'loss_threshold' in data:
                 config['loss_threshold'] = data['loss_threshold']
             if 'margin_min' in data:
