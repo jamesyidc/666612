@@ -14507,7 +14507,7 @@ def auto_maintenance_config():
         })
 
 @app.route('/api/sub-account/config', methods=['GET', 'POST'])
-def sub_account_config():
+def sub_account_config_v2():
     """获取或设置子账户配置"""
     try:
         import json as json_lib
