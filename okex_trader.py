@@ -259,7 +259,7 @@ class OKExTrader:
         
         order_data = {
             'instId': inst_id,
-            'tdMode': 'cross',  # 全仓模式
+            'tdMode': 'isolated',  # 逐仓模式
             'side': side,
             'posSide': pos_side,
             'ordType': 'market' if price is None else 'limit',

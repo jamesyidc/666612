@@ -13191,7 +13191,7 @@ def maintain_anchor_order():
         
         open_order_body = {
             'instId': inst_id,
-            'tdMode': 'cross',  # 全仓模式
+            'tdMode': 'isolated',  # 逐仓模式
             'side': side,
             'posSide': pos_side,
             'ordType': 'market',  # 市价单
@@ -13286,7 +13286,7 @@ def maintain_anchor_order():
         
         close_order_body = {
             'instId': inst_id,
-            'tdMode': 'cross',
+            'tdMode': 'isolated',  # 逐仓模式
             'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
