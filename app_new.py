@@ -7122,14 +7122,14 @@ def api_escape_top_signals_stats():
 
 @app.route('/api/escape-top-signals/history-timeseries')
 def api_escape_top_signals_history_timeseries():
-    """获取逃顶信号的历史时间序列数据（每5分钟统计一次）"""
+    """获取逃顶信号的历史时间序列数据（每5分钟统计一次）- 北京时间"""
     try:
         hours = request.args.get('hours', 24, type=int)
         
         conn = sqlite3.connect('crypto_data.db', timeout=30.0)
         cursor = conn.cursor()
         
-        # 按5分钟间隔统计逃顶信号数量
+        # 按5分钟间隔统计逃顶信号数量（数据库已存储北京时间）
         cursor.execute('''
             SELECT 
                 strftime('%Y-%m-%d %H:%M', datetime(record_time, '-' || (strftime('%M', record_time) % 5) || ' minutes')) as time_slot,
@@ -7153,7 +7153,8 @@ def api_escape_top_signals_history_timeseries():
         return jsonify({
             'success': True,
             'data': timeseries,
-            'count': len(timeseries)
+            'count': len(timeseries),
+            'timezone': '北京时间 (UTC+8)'
         })
         
     except Exception as e:
