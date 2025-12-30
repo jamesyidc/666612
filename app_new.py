@@ -13192,10 +13192,23 @@ def maintain_anchor_order():
         
         open_result = open_response.json()
         
+        # 记录详细的响应日志
+        print(f"📝 OKEx开仓响应: {open_result}")
+        
         if open_result.get('code') != '0':
+            error_msg = open_result.get('msg', '未知错误')
+            error_code = open_result.get('code', '未知代码')
+            print(f"❌ OKEx API错误 - Code: {error_code}, Message: {error_msg}")
+            
+            # 提供更友好的错误提示
+            if 'permission' in error_msg.lower():
+                error_msg = f"{error_msg}\n\n💡 解决方案：\n1. 登录OKEx后台 (www.okx.com)\n2. 进入API管理页面\n3. 确认API密钥已勾选「交易」权限\n4. 如未勾选，需要重新创建API密钥"
+            
             return jsonify({
                 'success': False,
-                'message': f"开仓失败: {open_result.get('msg', '未知错误')}"
+                'message': f"开仓失败: {error_msg}",
+                'error_code': error_code,
+                'full_response': open_result
             })
         
         open_order_id = open_result['data'][0]['ordId']
@@ -13254,6 +13267,87 @@ def maintain_anchor_order():
         return jsonify({
             'success': False,
             'message': f'执行失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor/test-api-permission', methods=['GET'])
+def test_api_permission():
+    """测试API密钥权限"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        from okex_api_config import OKEX_API_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE, OKEX_REST_URL
+        
+        # 生成签名
+        def generate_signature(timestamp, method, request_path, body=''):
+            if body:
+                body = json_lib.dumps(body)
+            message = timestamp + method + request_path + body
+            mac = hmac.new(
+                bytes(OKEX_SECRET_KEY, encoding='utf8'),
+                bytes(message, encoding='utf-8'),
+                digestmod=hashlib.sha256
+            )
+            return base64.b64encode(mac.digest()).decode()
+        
+        def get_headers(method, request_path, body=''):
+            timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            sign = generate_signature(timestamp, method, request_path, body)
+            return {
+                'OK-ACCESS-KEY': OKEX_API_KEY,
+                'OK-ACCESS-SIGN': sign,
+                'OK-ACCESS-TIMESTAMP': timestamp,
+                'OK-ACCESS-PASSPHRASE': OKEX_PASSPHRASE,
+                'Content-Type': 'application/json'
+            }
+        
+        # 测试1：读取账户余额
+        balance_path = '/api/v5/account/balance'
+        headers = get_headers('GET', balance_path)
+        balance_response = requests.get(
+            OKEX_REST_URL + balance_path,
+            headers=headers,
+            timeout=10
+        )
+        balance_result = balance_response.json()
+        
+        # 测试2：读取持仓信息
+        position_path = '/api/v5/account/positions'
+        headers = get_headers('GET', position_path)
+        position_response = requests.get(
+            OKEX_REST_URL + position_path,
+            headers=headers,
+            timeout=10
+        )
+        position_result = position_response.json()
+        
+        return jsonify({
+            'success': True,
+            'api_key': OKEX_API_KEY[:10] + '...',
+            'tests': {
+                'balance': {
+                    'code': balance_result.get('code'),
+                    'msg': balance_result.get('msg'),
+                    'has_permission': balance_result.get('code') == '0'
+                },
+                'positions': {
+                    'code': position_result.get('code'),
+                    'msg': position_result.get('msg'),
+                    'has_permission': position_result.get('code') == '0'
+                }
+            },
+            'message': '如果has_permission都是True，说明API密钥可以读取数据。如果交易失败，需要在OKEx后台勾选「交易」权限。'
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'测试失败: {str(e)}',
             'traceback': traceback.format_exc()
         })
 
