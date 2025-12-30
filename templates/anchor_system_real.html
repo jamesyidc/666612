@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- Version: 2025-12-31-01:15 强制黑色字体 -->
     <title>🔴 实盘锚点系统 - OKEx持仓监控</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
@@ -756,7 +760,7 @@
                             <th style="color: white; width: 8%;">操作</th>
                         </tr>
                     </thead>
-                    <tbody id="subAccountPositionBody">
+                    <tbody id="subAccountPositionBody" style="color: #000 !important;">
                         <tr><td colspan="14" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
@@ -1611,23 +1615,23 @@
                 const maintenanceCount = item.maintenance_count || 0;
                 
                 return `
-                <tr>
-                    <td style="font-weight: 700; color: #000; font-size: 14px;">${item.account_name}</td>
-                    <td style="font-weight: 700; color: #000;">${coinNumber}</td>
-                    <td style="font-weight: 600; color: #000;">${item.inst_id}</td>
+                <tr style="color: #000 !important;">
+                    <td style="font-weight: 700; color: #000 !important; font-size: 14px;">${item.account_name}</td>
+                    <td style="font-weight: 700; color: #000 !important;">${coinNumber}</td>
+                    <td style="font-weight: 600; color: #000 !important;">${item.inst_id}</td>
                     <td>
                         <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
                             ${item.pos_side === 'short' ? '做空' : '做多'}
                         </span>
                     </td>
-                    <td style="color: #000;">${Math.abs(item.pos_size || 0).toFixed(4)}</td>
-                    <td style="color: #000;">$${(item.avg_price || 0).toFixed(4)}</td>
-                    <td style="color: #000;">$${(item.mark_price || 0).toFixed(4)}</td>
-                    <td style="color: #000;">${item.leverage}x</td>
+                    <td style="color: #000 !important;">${Math.abs(item.pos_size || 0).toFixed(4)}</td>
+                    <td style="color: #000 !important;">$${(item.avg_price || 0).toFixed(4)}</td>
+                    <td style="color: #000 !important;">$${(item.mark_price || 0).toFixed(4)}</td>
+                    <td style="color: #000 !important;">${item.leverage}x</td>
                     <td style="color: ${uplColor}; font-weight: 600;">
                         ${(item.upl || 0) >= 0 ? '+' : ''}${(item.upl || 0).toFixed(4)} USDT
                     </td>
-                    <td style="color: #000;">${(item.margin || 0).toFixed(4)} USDT</td>
+                    <td style="color: #000 !important;">${(item.margin || 0).toFixed(4)} USDT</td>
                     <td style="color: ${profitColor}; font-weight: 700; font-size: 16px;">
                         ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
                     </td>
