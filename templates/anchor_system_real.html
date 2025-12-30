@@ -425,6 +425,34 @@
             </div>
         </div>
 
+        <!-- 历史极值统计 -->
+        <div class="stats-grid" style="margin-bottom: 30px;">
+            <div class="stat-card" style="border: 2px solid #48bb78; background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-label" style="color: #22543d;">多单盈利</div>
+                <div class="stat-value" id="longProfitCount" style="color: #22543d; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #22543d;">实时统计</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #fc8181; background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-label" style="color: #742a2a;">多单亏损</div>
+                <div class="stat-value" id="longLossCount" style="color: #742a2a; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #742a2a;">实时统计</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #48bb78; background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-label" style="color: #22543d;">空单盈利</div>
+                <div class="stat-value" id="shortProfitCount" style="color: #22543d; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #22543d;">实时统计</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #fc8181; background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-label" style="color: #742a2a;">空单亏损</div>
+                <div class="stat-value" id="shortLossCount" style="color: #742a2a; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #742a2a;">实时统计</div>
+            </div>
+        </div>
+
         <!-- 统计卡片 -->
         <div class="stats-grid">
             <div class="stat-card">
@@ -867,7 +895,7 @@
                         const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
                         const endTime = now.toISOString().slice(0, 19).replace('T', ' ');
                         
-                        const shortStatsRes = await fetch(`/api/anchor/snapshots/statistics?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}&limit=100`);
+                        const shortStatsRes = await fetch(`/api/anchor/snapshots/statistics?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}&limit=200`);
                         const shortStatsData = await shortStatsRes.json();
                         
                         if (shortStatsData.success && shortStatsData.snapshots && shortStatsData.snapshots.length > 0) {
@@ -881,7 +909,7 @@
                                 }
                             });
                             
-                            // 更新页面
+                            // 更新空单盈利分级
                             if (latestStats['short_profit_lte_20']) {
                                 document.getElementById('todayProfitBelow20').textContent = latestStats['short_profit_lte_20'].stat_value || 0;
                             }
@@ -893,11 +921,32 @@
                             if (latestStats['short_loss']) {
                                 document.getElementById('todayLossCount').textContent = latestStats['short_loss'].stat_value || 0;
                             }
+                            
+                            // 更新历史极值统计
+                            if (latestStats['long_profit_count']) {
+                                document.getElementById('longProfitCount').textContent = latestStats['long_profit_count'].stat_value || 0;
+                            }
+                            
+                            if (latestStats['long_loss_count']) {
+                                document.getElementById('longLossCount').textContent = latestStats['long_loss_count'].stat_value || 0;
+                            }
+                            
+                            if (latestStats['short_profit_count']) {
+                                document.getElementById('shortProfitCount').textContent = latestStats['short_profit_count'].stat_value || 0;
+                            }
+                            
+                            if (latestStats['short_loss_count']) {
+                                document.getElementById('shortLossCount').textContent = latestStats['short_loss_count'].stat_value || 0;
+                            }
                         } else {
                             // 如果没有快照数据，设置为0
                             document.getElementById('todayProfitBelow20').textContent = '0';
                             document.getElementById('todayProfitBelow10').textContent = '0';
                             document.getElementById('todayLossCount').textContent = '0';
+                            document.getElementById('longProfitCount').textContent = '0';
+                            document.getElementById('longLossCount').textContent = '0';
+                            document.getElementById('shortProfitCount').textContent = '0';
+                            document.getElementById('shortLossCount').textContent = '0';
                         }
                     } catch (error) {
                         console.error('加载空单盈利统计失败:', error);
@@ -905,6 +954,10 @@
                         document.getElementById('todayProfitBelow20').textContent = '0';
                         document.getElementById('todayProfitBelow10').textContent = '0';
                         document.getElementById('todayLossCount').textContent = '0';
+                        document.getElementById('longProfitCount').textContent = '0';
+                        document.getElementById('longLossCount').textContent = '0';
+                        document.getElementById('shortProfitCount').textContent = '0';
+                        document.getElementById('shortLossCount').textContent = '0';
                     }
                 }
 

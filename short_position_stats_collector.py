@@ -44,7 +44,8 @@ def get_short_position_stats():
         
         positions = data.get('positions', [])
         
-        # 筛选空单持仓
+        # 筛选多单和空单持仓
+        long_positions = [p for p in positions if p.get('pos_side') == 'long']
         short_positions = [p for p in positions if p.get('pos_side') == 'short']
         
         # 统计各级别数量
@@ -55,14 +56,23 @@ def get_short_position_stats():
             'profit_lte_20': 0,  # ≤20%
             'profit_lte_10': 0,  # ≤10%
             'loss': 0,           # <0%
-            'total_short': len(short_positions)
+            'total_short': len(short_positions),
+            # 历史极值统计
+            'long_profit_count': 0,   # 多单盈利数量
+            'long_loss_count': 0,     # 多单亏损数量
+            'short_profit_count': 0,  # 空单盈利数量
+            'short_loss_count': 0,    # 空单亏损数量
         }
         
+        # 统计空单盈利分级
         for pos in short_positions:
             profit_rate = pos.get('profit_rate', 0)
             
             if profit_rate < 0:
                 stats['loss'] += 1
+                stats['short_loss_count'] += 1
+            else:
+                stats['short_profit_count'] += 1
             
             if profit_rate <= 10:
                 stats['profit_lte_10'] += 1
@@ -78,6 +88,15 @@ def get_short_position_stats():
             
             if profit_rate >= 70:
                 stats['profit_gte_70'] += 1
+        
+        # 统计多单盈亏
+        for pos in long_positions:
+            profit_rate = pos.get('profit_rate', 0)
+            
+            if profit_rate < 0:
+                stats['long_loss_count'] += 1
+            else:
+                stats['long_profit_count'] += 1
         
         return stats
     
@@ -100,6 +119,7 @@ def save_stats_to_db(stats):
         
         # 保存各项统计
         stats_items = [
+            # 空单盈利分级
             ('short_profit_gte_70', stats['profit_gte_70'], '空单盈利≥70%'),
             ('short_profit_gte_60', stats['profit_gte_60'], '空单盈利≥60%'),
             ('short_profit_gte_50', stats['profit_gte_50'], '空单盈利≥50%'),
@@ -107,6 +127,11 @@ def save_stats_to_db(stats):
             ('short_profit_lte_10', stats['profit_lte_10'], '空单盈利≤10%'),
             ('short_loss', stats['loss'], '空单亏损'),
             ('total_short_positions', stats['total_short'], '空单总数'),
+            # 历史极值统计
+            ('long_profit_count', stats['long_profit_count'], '多单盈利'),
+            ('long_loss_count', stats['long_loss_count'], '多单亏损'),
+            ('short_profit_count', stats['short_profit_count'], '空单盈利'),
+            ('short_loss_count', stats['short_loss_count'], '空单亏损'),
         ]
         
         for stat_type, stat_value, stat_label in stats_items:
@@ -156,6 +181,11 @@ def main():
                 print(f"   盈利≤20%: {stats['profit_lte_20']}")
                 print(f"   盈利≤10%: {stats['profit_lte_10']}")
                 print(f"   亏损(<0%): {stats['loss']}")
+                print(f"   ---")
+                print(f"   🟢 多单盈利: {stats['long_profit_count']}")
+                print(f"   🔴 多单亏损: {stats['long_loss_count']}")
+                print(f"   🟢 空单盈利: {stats['short_profit_count']}")
+                print(f"   🔴 空单亏损: {stats['short_loss_count']}")
             else:
                 print("⚠️ 本次收集失败，等待下次重试...")
             
