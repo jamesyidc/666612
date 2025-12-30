@@ -592,10 +592,11 @@
                             <th>保证金</th>
                             <th>收益率</th>
                             <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="currentPositionBody">
-                        <tr><td colspan="10" class="loading">加载中...</td></tr>
+                        <tr><td colspan="12" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -950,7 +951,7 @@
             const statsDiv = document.getElementById('positionStats');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="empty">当前无持仓</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
                 // 清空盈利统计显示
                 document.getElementById('profit70Plus').textContent = '0';
@@ -1121,6 +1122,24 @@
                         }">
                             ${item.status}
                         </span>
+                    </td>
+                    <td>
+                        <button class="btn-maintain-anchor" 
+                                onclick="maintainAnchor('${item.inst_id}', '${item.pos_side}', ${item.pos_size})"
+                                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                       color: white;
+                                       border: none;
+                                       padding: 6px 12px;
+                                       border-radius: 6px;
+                                       cursor: pointer;
+                                       font-size: 12px;
+                                       font-weight: 600;
+                                       transition: all 0.3s;
+                                       box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);"
+                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.4)';"
+                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.3)';">
+                            🔧 维护锚点单
+                        </button>
                     </td>
                 </tr>
             `;
@@ -1377,6 +1396,62 @@
             
             console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间）');
         });
+        
+        // 维护锚点单函数
+        async function maintainAnchor(instId, posSide, posSize) {
+            if (!confirm(`确认执行维护锚点单操作？\n\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n持仓量: ${posSize}\n\n将以市价买入10倍底仓数量（10倍杠杆），然后立即平掉92%`)) {
+                return;
+            }
+            
+            try {
+                // 显示加载状态
+                const loadingToast = document.createElement('div');
+                loadingToast.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    color: white;
+                    padding: 20px 40px;
+                    border-radius: 12px;
+                    z-index: 10000;
+                    font-size: 16px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                `;
+                loadingToast.textContent = '⏳ 正在执行维护锚点单操作...';
+                document.body.appendChild(loadingToast);
+                
+                const response = await fetch('/api/anchor/maintain-anchor', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inst_id: instId,
+                        pos_side: posSide,
+                        pos_size: posSize
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // 移除加载提示
+                document.body.removeChild(loadingToast);
+                
+                if (result.success) {
+                    alert(`✅ 维护锚点单执行成功！\n\n${result.message}\n\n详情:\n开仓订单ID: ${result.data.open_order_id}\n平仓订单ID: ${result.data.close_order_id}\n开仓数量: ${result.data.open_size}\n平仓数量: ${result.data.close_size}`);
+                    
+                    // 刷新持仓数据
+                    loadData();
+                } else {
+                    alert(`❌ 维护锚点单执行失败\n\n${result.message}`);
+                }
+            } catch (error) {
+                console.error('维护锚点单错误:', error);
+                alert(`❌ 请求失败: ${error.message}`);
+            }
+        }
     </script>
 </body>
 </html>

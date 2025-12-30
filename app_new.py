@@ -13123,6 +13123,140 @@ def get_anchor_warnings():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor/maintain-anchor', methods=['POST'])
+def maintain_anchor_order():
+    """维护锚点单：以市价买入10倍底仓数量（10倍杠杆），然后立即平掉92%"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        from okex_api_config import OKEX_API_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE, OKEX_REST_URL
+        
+        data = request.json
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')  # 'short' or 'long'
+        pos_size = float(data.get('pos_size'))
+        
+        # 计算10倍数量
+        order_size = pos_size * 10
+        
+        # 生成签名
+        def generate_signature(timestamp, method, request_path, body=''):
+            if body:
+                body = json_lib.dumps(body)
+            message = timestamp + method + request_path + body
+            mac = hmac.new(
+                bytes(OKEX_SECRET_KEY, encoding='utf8'),
+                bytes(message, encoding='utf-8'),
+                digestmod=hashlib.sha256
+            )
+            return base64.b64encode(mac.digest()).decode()
+        
+        def get_headers(method, request_path, body=''):
+            timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            sign = generate_signature(timestamp, method, request_path, body)
+            return {
+                'OK-ACCESS-KEY': OKEX_API_KEY,
+                'OK-ACCESS-SIGN': sign,
+                'OK-ACCESS-TIMESTAMP': timestamp,
+                'OK-ACCESS-PASSPHRASE': OKEX_PASSPHRASE,
+                'Content-Type': 'application/json'
+            }
+        
+        # 第一步：开仓 - 买入10倍数量（市价单）
+        order_path = '/api/v5/trade/order'
+        
+        # 确定开仓方向：如果当前是空单，就开空单；如果是多单，就开多单
+        side = 'sell' if pos_side == 'short' else 'buy'
+        
+        open_order_body = {
+            'instId': inst_id,
+            'tdMode': 'cross',  # 全仓模式
+            'side': side,
+            'posSide': pos_side,
+            'ordType': 'market',  # 市价单
+            'sz': str(order_size),
+            'lever': '10'  # 10倍杠杆
+        }
+        
+        headers = get_headers('POST', order_path, open_order_body)
+        open_response = requests.post(
+            OKEX_REST_URL + order_path,
+            headers=headers,
+            json=open_order_body,
+            timeout=10
+        )
+        
+        open_result = open_response.json()
+        
+        if open_result.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f"开仓失败: {open_result.get('msg', '未知错误')}"
+            })
+        
+        open_order_id = open_result['data'][0]['ordId']
+        
+        # 等待一小会儿确保订单执行
+        import time
+        time.sleep(0.5)
+        
+        # 第二步：平掉92% - 计算平仓数量
+        close_size = order_size * 0.92
+        
+        # 平仓方向与开仓相反
+        close_side = 'buy' if pos_side == 'short' else 'sell'
+        
+        close_order_body = {
+            'instId': inst_id,
+            'tdMode': 'cross',
+            'side': close_side,
+            'posSide': pos_side,
+            'ordType': 'market',
+            'sz': str(close_size)
+        }
+        
+        headers = get_headers('POST', order_path, close_order_body)
+        close_response = requests.post(
+            OKEX_REST_URL + order_path,
+            headers=headers,
+            json=close_order_body,
+            timeout=10
+        )
+        
+        close_result = close_response.json()
+        
+        if close_result.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f"平仓失败: {close_result.get('msg', '未知错误')} (开仓订单ID: {open_order_id})"
+            })
+        
+        close_order_id = close_result['data'][0]['ordId']
+        
+        return jsonify({
+            'success': True,
+            'message': '维护锚点单执行成功',
+            'data': {
+                'open_order_id': open_order_id,
+                'close_order_id': close_order_id,
+                'open_size': order_size,
+                'close_size': close_size,
+                'remaining_size': order_size - close_size
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'执行失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/trading/positions/opens')
 def get_trading_positions_opens():
     """获取开仓持仓 - Trading Manager专用，支持维护价格表"""
