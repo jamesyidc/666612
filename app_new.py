@@ -7132,7 +7132,11 @@ def api_escape_top_signals_history_timeseries():
         # 按5分钟间隔统计逃顶信号数量（数据库已存储北京时间）
         cursor.execute('''
             SELECT 
-                strftime('%Y-%m-%d %H:%M', datetime(record_time, '-' || (strftime('%M', record_time) % 5) || ' minutes')) as time_slot,
+                datetime(
+                    strftime('%Y-%m-%d %H:', record_time) || 
+                    printf('%02d', (CAST(strftime('%M', record_time) AS INTEGER) / 5) * 5) ||
+                    ':00'
+                ) as time_slot,
                 COUNT(DISTINCT symbol) as unique_symbols
             FROM support_resistance_levels
             WHERE datetime(record_time) >= datetime('now', ? || ' hours')
@@ -7144,7 +7148,7 @@ def api_escape_top_signals_history_timeseries():
         timeseries = []
         for row in cursor.fetchall():
             timeseries.append({
-                'time': row[0] + ':00',  # 添加秒数
+                'time': row[0],  # 已经包含完整时间格式
                 'count': row[1]
             })
         
