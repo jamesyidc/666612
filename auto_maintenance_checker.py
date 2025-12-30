@@ -19,6 +19,20 @@ def log(message):
     """打印带时间戳的日志"""
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 
+def get_maintenance_count_today(inst_id, pos_side):
+    """获取今天的维护次数"""
+    try:
+        response = requests.get(f"{BASE_URL}/api/anchor/maintenance-stats", timeout=5)
+        data = response.json()
+        if data.get('success'):
+            stats = data.get('stats', {})
+            key = f"{inst_id}:{pos_side}"
+            return stats.get(key, 0)
+        return 0
+    except Exception as e:
+        log(f"❌ 获取维护次数失败: {e}")
+        return 0
+
 def get_config():
     """获取自动维护配置"""
     try:
@@ -159,10 +173,18 @@ def check_and_maintain():
                 should_maintain = True
             
             if should_maintain:
+                # 检查今天的维护次数
+                today_count = get_maintenance_count_today(inst_id, pos_side)
+                log(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/3")
+                
+                if today_count >= 3:
+                    log(f"⚠️  已达到每日维护上限(3次)，跳过本次维护")
+                    continue
+                
                 # 执行维护
                 success = maintain_anchor(inst_id, pos_side, pos_size)
                 if success:
-                    log(f"✅ 自动维护完成: {inst_id}")
+                    log(f"✅ 自动维护完成: {inst_id} (今日第{today_count + 1}次)")
                     time.sleep(2)  # 稍作延迟
             
             # 检查2：保证金是否超出范围

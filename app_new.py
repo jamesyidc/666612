@@ -13183,6 +13183,40 @@ def maintain_anchor_order():
         pos_side = data.get('pos_side')  # 'short' or 'long'
         pos_size = float(data.get('pos_size'))
         
+        # 检查今日维护次数
+        import json as json_lib_check
+        import os
+        from collections import defaultdict
+        
+        maintenance_file = 'maintenance_orders.json'
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # 统计今天的维护次数
+        today_count = 0
+        if os.path.exists(maintenance_file):
+            try:
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    records = json_lib_check.load(f)
+                
+                for record in records:
+                    created_at = record.get('created_at', '')
+                    if created_at.startswith(today):
+                        if record.get('inst_id') == inst_id and record.get('pos_side') == pos_side:
+                            today_count += 1
+            except Exception as e:
+                print(f"读取维护记录失败: {e}")
+        
+        print(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/3")
+        
+        # 检查是否超过每日上限
+        if today_count >= 3:
+            return jsonify({
+                'success': False,
+                'message': f'今日维护次数已达上限(3次)，请明天再试',
+                'today_count': today_count,
+                'max_count': 3
+            })
+        
         # 计算10倍数量
         order_size = pos_size * 10
         

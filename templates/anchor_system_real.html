@@ -1664,8 +1664,29 @@ ${closeDetails}
         
         // 维护锚点单函数
         async function maintainAnchor(instId, posSide, posSize) {
-            if (!confirm(`确认执行维护锚点单操作？\n\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n持仓量: ${posSize}\n\n将以市价买入10倍底仓数量（10倍杠杆），然后立即平掉92%`)) {
-                return;
+            try {
+                // 先查询今日维护次数
+                const statsRes = await fetch('/api/anchor/maintenance-stats');
+                const statsData = await statsRes.json();
+                
+                let todayCount = 0;
+                if (statsData.success) {
+                    const key = `${instId}:${posSide}`;
+                    todayCount = statsData.stats[key] || 0;
+                }
+                
+                // 检查是否超过上限
+                if (todayCount >= 3) {
+                    alert(`⚠️ 今日维护次数已达上限\n\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n今日已维护: ${todayCount}/3次\n\n请明天再试！`);
+                    return;
+                }
+                
+                if (!confirm(`确认执行维护锚点单操作？\n\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n持仓量: ${posSize}\n今日已维护: ${todayCount}/3次\n\n将以市价买入10倍底仓数量（10倍杠杆），然后立即平掉92%`)) {
+                    return;
+                }
+            } catch (error) {
+                console.error('查询维护次数失败:', error);
+                // 继续执行，不阻塞
             }
             
             try {
