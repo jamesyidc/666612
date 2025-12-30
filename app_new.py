@@ -7045,23 +7045,23 @@ def api_escape_top_signals_history(symbol):
 
 @app.route('/api/escape-top-signals/stats')
 def api_escape_top_signals_stats():
-    """获取逃顶信号统计数据 - 直接从support_resistance_levels查询"""
+    """获取逃顶信号统计数据 - 返回真实的逃顶事件次数"""
     try:
         hours = request.args.get('hours', 24, type=int)
         
         conn = sqlite3.connect('crypto_data.db', timeout=30.0)
         cursor = conn.cursor()
         
-        # 总信号数（有逃顶倾向的记录数）
+        # 真实的逃顶事件次数（分数>=8的记录数）
         cursor.execute('''
             SELECT COUNT(*) as total
             FROM support_resistance_levels
             WHERE datetime(record_time) >= datetime('now', ? || ' hours')
-              AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
+              AND (alert_scenario_3 + alert_scenario_4) >= 8
         ''', (f'-{hours}',))
-        total = cursor.fetchone()[0]
+        total_escape_events = cursor.fetchone()[0]
         
-        # 触发信号的币种数（总分>=8的不同币种数）
+        # 触发信号的币种数
         cursor.execute('''
             SELECT COUNT(DISTINCT symbol) as coin_count
             FROM support_resistance_levels
@@ -7107,7 +7107,7 @@ def api_escape_top_signals_stats():
         return jsonify({
             'success': True,
             'stats': {
-                'total_signals': total,
+                'total_signals': total_escape_events,  # 真实的逃顶事件次数
                 'active_coins': coin_count,
                 'avg_escape_score': round(avg_score, 2),
                 'by_symbol': by_symbol
