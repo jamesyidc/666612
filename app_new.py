@@ -7175,6 +7175,48 @@ def api_escape_top_signals_history_timeseries():
             'data': []
         })
 
+@app.route('/api/escape-event-stats/timeseries')
+def api_escape_event_stats_timeseries():
+    """获取逃顶事件统计的时间序列数据"""
+    try:
+        hours = request.args.get('hours', 24, type=int)
+        
+        conn = sqlite3.connect('crypto_data.db', timeout=30.0)
+        cursor = conn.cursor()
+        
+        # 查询统计数据
+        cursor.execute('''
+            SELECT 
+                datetime(record_time, '+8 hours') as beijing_time,
+                event_count
+            FROM escape_event_stats
+            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
+            ORDER BY record_time ASC
+        ''', (f'-{hours}',))
+        
+        timeseries = []
+        for row in cursor.fetchall():
+            timeseries.append({
+                'time': row[0],
+                'count': row[1]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': timeseries,
+            'count': len(timeseries),
+            'timezone': '北京时间 (UTC+8)'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'data': []
+        })
+
 # =====================================================
 # OKEx K线指标系统 API路由
 # =====================================================
