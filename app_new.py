@@ -12736,7 +12736,10 @@ def get_current_positions():
                     created_at = record.get('created_at', '')
                     if created_at.startswith(today):
                         inst_id = record.get('inst_id', '')
-                        maintenance_counts[inst_id] += 1
+                        pos_side = record.get('pos_side', '')
+                        # 使用 (inst_id, pos_side) 作为key，区分多单和空单
+                        key = (inst_id, pos_side)
+                        maintenance_counts[key] += 1
             except Exception as e:
                 print(f"读取维护记录失败: {e}")
         
@@ -12820,7 +12823,7 @@ def get_current_positions():
                 'status': status,
                 'status_class': status_class,
                 'is_anchor': is_anchor,
-                'maintenance_count_today': maintenance_counts.get(inst_id, 0)
+                'maintenance_count_today': maintenance_counts.get((inst_id, pos_side), 0)
             })
         
         return jsonify({
@@ -13760,7 +13763,7 @@ def auto_maintenance_config():
 
 @app.route('/api/anchor/maintenance-stats', methods=['GET'])
 def get_maintenance_stats():
-    """获取维护次数统计（按自然日和币种）"""
+    """获取维护次数统计（按自然日、币种和方向）"""
     try:
         import json as json_lib
         import os
@@ -13783,14 +13786,17 @@ def get_maintenance_stats():
         # 今天的日期
         today = datetime.now().strftime('%Y-%m-%d')
         
-        # 统计今天每个币种的维护次数
+        # 统计今天每个币种+方向的维护次数
         stats = defaultdict(int)
         
         for record in records:
             created_at = record.get('created_at', '')
             if created_at.startswith(today):
                 inst_id = record.get('inst_id', '')
-                stats[inst_id] += 1
+                pos_side = record.get('pos_side', '')
+                # 使用 "inst_id:pos_side" 作为key
+                key = f"{inst_id}:{pos_side}"
+                stats[key] += 1
         
         return jsonify({
             'success': True,
