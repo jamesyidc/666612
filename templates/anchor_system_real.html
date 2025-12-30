@@ -633,6 +633,38 @@
                 </table>
             </div>
         </div>
+
+        <!-- 维护锚点单成交记录 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>🔧</span>
+                    维护锚点单成交记录
+                </div>
+                <span style="color: #718096; font-size: 14px;">最近50条记录</span>
+            </div>
+            <div class="table-container">
+                <table id="maintenanceTable">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>币种</th>
+                            <th>方向</th>
+                            <th>原始仓位</th>
+                            <th>开仓数量</th>
+                            <th>平仓数量</th>
+                            <th>剩余数量</th>
+                            <th>开仓订单ID</th>
+                            <th>平仓订单ID</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="maintenanceBody">
+                        <tr><td colspan="10" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -713,6 +745,14 @@
                 
                 if (warningsData.success) {
                     renderWarnings(warningsData.warnings);
+                }
+
+                // 加载维护锚点单成交记录
+                const maintenanceRes = await fetch('/api/anchor/maintenance-orders?limit=50');
+                const maintenanceData = await maintenanceRes.json();
+                
+                if (maintenanceData.success) {
+                    renderMaintenanceOrders(maintenanceData.data);
                 }
 
                 // 更新时间
@@ -1190,6 +1230,39 @@
                     </td>
                     <td style="max-width: 300px; white-space: normal;">${item.alert_message}</td>
                     <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染维护锚点单成交记录
+        function renderMaintenanceOrders(data) {
+            const tbody = document.getElementById('maintenanceBody');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">暂无维护记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
+                    <td style="font-weight: 600;">${item.inst_id}</td>
+                    <td>
+                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                            ${item.pos_side === 'short' ? '做空' : '做多'}
+                        </span>
+                    </td>
+                    <td>${item.original_size.toFixed(4)}</td>
+                    <td style="color: #3182ce; font-weight: 600;">${item.open_size.toFixed(4)}</td>
+                    <td style="color: #e53e3e; font-weight: 600;">${item.close_size.toFixed(4)}</td>
+                    <td style="color: #48bb78; font-weight: 600;">${item.remaining_size.toFixed(4)}</td>
+                    <td style="font-size: 11px; font-family: monospace;">${item.open_order_id}</td>
+                    <td style="font-size: 11px; font-family: monospace;">${item.close_order_id}</td>
+                    <td>
+                        <span class="badge badge-profit">
+                            ${item.status === 'success' ? '成功' : '失败'}
+                        </span>
+                    </td>
                 </tr>
             `).join('');
         }

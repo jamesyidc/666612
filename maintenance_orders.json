@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "inst_id": "DOT-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 0.1,
+    "open_order_id": "3174274038115590144",
+    "open_size": 1.0,
+    "close_order_id": "3174274162736750592",
+    "close_size": 1.0,
+    "remaining_size": 0.0,
+    "created_at": "2025-12-30 13:59:02",
+    "status": "success"
+  }
+]

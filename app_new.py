@@ -13321,6 +13321,51 @@ def maintain_anchor_order():
         
         close_order_id = close_result['data'][0]['ordId']
         
+        # 保存维护记录到JSON文件
+        try:
+            import json as json_lib
+            import os
+            from datetime import datetime
+            
+            maintenance_file = 'maintenance_orders.json'
+            
+            # 读取现有记录
+            if os.path.exists(maintenance_file):
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    records = json_lib.load(f)
+            else:
+                records = []
+            
+            # 添加新记录
+            new_record = {
+                'id': len(records) + 1,
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'original_size': pos_size,
+                'open_order_id': open_order_id,
+                'open_size': order_size,
+                'close_order_id': close_order_id,
+                'close_size': close_size,
+                'remaining_size': order_size - close_size,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'status': 'success'
+            }
+            
+            records.insert(0, new_record)  # 最新的记录放在前面
+            
+            # 只保留最近100条记录
+            if len(records) > 100:
+                records = records[:100]
+            
+            # 保存到文件
+            with open(maintenance_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(records, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 维护记录已保存: ID {new_record['id']}")
+        except Exception as save_error:
+            print(f"⚠️  保存维护记录失败: {save_error}")
+            # 不影响主流程，继续返回成功
+        
         return jsonify({
             'success': True,
             'message': '维护锚点单执行成功',
@@ -13338,6 +13383,47 @@ def maintain_anchor_order():
         return jsonify({
             'success': False,
             'message': f'执行失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor/maintenance-orders', methods=['GET'])
+def get_maintenance_orders():
+    """查询维护锚点单记录"""
+    try:
+        import json as json_lib
+        import os
+        
+        maintenance_file = 'maintenance_orders.json'
+        
+        # 读取记录
+        if os.path.exists(maintenance_file):
+            with open(maintenance_file, 'r', encoding='utf-8') as f:
+                records = json_lib.load(f)
+        else:
+            records = []
+        
+        # 获取查询参数
+        limit = request.args.get('limit', 50, type=int)
+        inst_id = request.args.get('inst_id', None)
+        
+        # 过滤
+        if inst_id:
+            records = [r for r in records if r['inst_id'] == inst_id]
+        
+        # 限制数量
+        records = records[:limit]
+        
+        return jsonify({
+            'success': True,
+            'data': records,
+            'total': len(records)
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
             'traceback': traceback.format_exc()
         })
 
