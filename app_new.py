@@ -13212,13 +13212,57 @@ def maintain_anchor_order():
             })
         
         open_order_id = open_result['data'][0]['ordId']
+        print(f"✅ 开仓订单提交成功，订单ID: {open_order_id}")
         
-        # 等待一小会儿确保订单执行
+        # 等待订单成交（增加等待时间到3秒）
         import time
-        time.sleep(0.5)
+        print(f"⏳ 等待3秒确保订单成交...")
+        time.sleep(3)
         
-        # 第二步：平掉92% - 计算平仓数量
-        close_size = order_size * 0.92
+        # 查询订单状态
+        order_detail_path = f'/api/v5/trade/order?instId={inst_id}&ordId={open_order_id}'
+        headers = get_headers('GET', order_detail_path)
+        order_detail_response = requests.get(
+            OKEX_REST_URL + order_detail_path,
+            headers=headers,
+            timeout=10
+        )
+        order_detail = order_detail_response.json()
+        print(f"📝 开仓订单状态: {order_detail}")
+        
+        # 检查订单是否完全成交
+        if order_detail.get('code') == '0' and order_detail.get('data'):
+            order_state = order_detail['data'][0].get('state', '')
+            if order_state != 'filled':
+                print(f"⚠️ 订单未完全成交，状态: {order_state}")
+                # 继续尝试平仓
+        
+        # 获取交易对的最小交易单位
+        instruments_path = f'/api/v5/public/instruments?instType=SWAP&instId={inst_id}'
+        instruments_response = requests.get(
+            OKEX_REST_URL + instruments_path,
+            timeout=10
+        )
+        instruments_data = instruments_response.json()
+        
+        # 获取lot size（合约面值）
+        lot_size = 1  # 默认
+        if instruments_data.get('code') == '0' and instruments_data.get('data'):
+            lot_size_str = instruments_data['data'][0].get('ctVal', '1')
+            lot_size = float(lot_size_str)
+            print(f"📊 {inst_id} 的合约面值: {lot_size}")
+        
+        # 第二步：平掉92% - 计算平仓数量，并按lot size取整
+        close_size_raw = order_size * 0.92
+        # 向下取整到lot size的倍数
+        import math
+        close_size = math.floor(close_size_raw / lot_size) * lot_size
+        
+        # 确保至少保留1个lot size
+        if close_size < lot_size:
+            close_size = lot_size
+        
+        print(f"📊 准备平仓: {close_size} (原始: {close_size_raw}, lot_size: {lot_size})")
         
         # 平仓方向与开仓相反
         close_side = 'buy' if pos_side == 'short' else 'sell'
@@ -13232,6 +13276,8 @@ def maintain_anchor_order():
             'sz': str(close_size)
         }
         
+        print(f"📝 平仓请求参数: {close_order_body}")
+        
         headers = get_headers('POST', order_path, close_order_body)
         close_response = requests.post(
             OKEX_REST_URL + order_path,
@@ -13241,11 +13287,19 @@ def maintain_anchor_order():
         )
         
         close_result = close_response.json()
+        print(f"📝 OKEx平仓响应: {close_result}")
         
         if close_result.get('code') != '0':
+            error_msg = close_result.get('msg', '未知错误')
+            error_code = close_result.get('code', '未知代码')
+            print(f"❌ 平仓失败 - Code: {error_code}, Message: {error_msg}")
+            
             return jsonify({
                 'success': False,
-                'message': f"平仓失败: {close_result.get('msg', '未知错误')} (开仓订单ID: {open_order_id})"
+                'message': f"平仓失败: {error_msg} (开仓订单ID: {open_order_id})",
+                'error_code': error_code,
+                'open_order_id': open_order_id,
+                'full_response': close_result
             })
         
         close_order_id = close_result['data'][0]['ordId']
