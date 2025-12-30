@@ -1196,6 +1196,34 @@
             </p>
         </div>
         
+        <!-- 24小时逃顶信号统计图 -->
+        <div class="timeline-section" style="margin-top: 30px;">
+            <div class="timeline-header">
+                <div>
+                    <h2 style="font-size: 20px; margin-bottom: 5px;">🚨 24小时逃顶信号统计</h2>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 13px;">实时监控24小时内的逃顶信号趋势（逃顶分数 ≥ 8）</p>
+                </div>
+                <div class="stat-badges" id="escapeStatBadges" style="display: flex; gap: 15px; align-items: center;">
+                    <div style="background: rgba(239,68,68,0.2); padding: 8px 15px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.5);">
+                        <span style="color: rgba(255,255,255,0.7); font-size: 12px;">活跃币种</span>
+                        <strong style="color: #ef4444; font-size: 18px; margin-left: 8px;" id="escapeActiveCoins">-</strong>
+                    </div>
+                    <div style="background: rgba(251,191,36,0.2); padding: 8px 15px; border-radius: 6px; border: 1px solid rgba(251,191,36,0.5);">
+                        <span style="color: rgba(255,255,255,0.7); font-size: 12px;">平均分数</span>
+                        <strong style="color: #fbbf24; font-size: 18px; margin-left: 8px;" id="escapeAvgScore">-</strong>
+                    </div>
+                    <div style="background: rgba(59,130,246,0.2); padding: 8px 15px; border-radius: 6px; border: 1px solid rgba(59,130,246,0.5);">
+                        <span style="color: rgba(255,255,255,0.7); font-size: 12px;">最高分数</span>
+                        <strong style="color: #3b82f6; font-size: 18px; margin-left: 8px;" id="escapeMaxScore">-</strong>
+                    </div>
+                </div>
+            </div>
+            <div id="escapeSignalChart" class="trend-chart-container"></div>
+            <p style="color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 10px; text-align: center;">
+                💡 提示: 鼠标悬停查看详细信息 | 自动刷新数据
+            </p>
+        </div>
+        
         <!-- 每日时间轴 -->
         <div class="timeline-section" style="margin-top: 30px;">
             <div class="timeline-header">
@@ -1532,6 +1560,7 @@
         let currentDate = getBeijingDate();
         let globalTrendChart; // 全局趋势图
         let pagedTrendChart; // 12小时分页趋势图
+        let escapeSignalChart; // 24小时逃顶信号统计图
         
         // 设置状态（从localStorage加载）
         let signalSettings = {
@@ -2501,6 +2530,213 @@
             console.log('✅ 分页图表更新完成', markLineData.length > 0 ? `(含${markLineData.length}条日期分割线)` : '');
         }
         
+        // 初始化24小时逃顶信号统计图
+        function initEscapeSignalChart() {
+            if (typeof echarts === 'undefined') {
+                console.error('❌ ECharts库未加载');
+                return;
+            }
+            
+            const chartDom = document.getElementById('escapeSignalChart');
+            if (!chartDom) {
+                console.error('❌ 找不到逃顶信号图表容器');
+                return;
+            }
+            
+            escapeSignalChart = echarts.init(chartDom);
+            
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    textStyle: { color: '#fff' },
+                    formatter: function(params) {
+                        let result = '<div style="font-weight: bold; margin-bottom: 5px;">' + params[0].axisValue + '</div>';
+                        params.forEach(item => {
+                            result += item.marker + item.seriesName + ': <b>' + item.value + '</b><br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ['信号数量', '平均分数', '最高分数'],
+                    textStyle: { color: '#fff' },
+                    top: 10
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: [],
+                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                    axisLabel: { color: '#fff', rotate: 30 }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '信号数量',
+                        position: 'left',
+                        nameTextStyle: { color: '#fff' },
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                        axisLabel: { color: '#fff' },
+                        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+                    },
+                    {
+                        type: 'value',
+                        name: '逃顶分数',
+                        position: 'right',
+                        nameTextStyle: { color: '#fff' },
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                        axisLabel: { color: '#fff' },
+                        splitLine: { show: false }
+                    }
+                ],
+                series: [
+                    {
+                        name: '信号数量',
+                        type: 'bar',
+                        yAxisIndex: 0,
+                        data: [],
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: '#fbbf24' },
+                                { offset: 1, color: '#f59e0b' }
+                            ])
+                        }
+                    },
+                    {
+                        name: '平均分数',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: [],
+                        smooth: true,
+                        lineStyle: { color: '#3b82f6', width: 2 },
+                        itemStyle: { color: '#3b82f6' }
+                    },
+                    {
+                        name: '最高分数',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: [],
+                        smooth: true,
+                        lineStyle: { color: '#ef4444', width: 2, type: 'dashed' },
+                        itemStyle: { color: '#ef4444' },
+                        markLine: {
+                            data: [{
+                                yAxis: 8,
+                                label: {
+                                    formatter: '逃顶阈值: 8',
+                                    position: 'insideEndTop'
+                                },
+                                lineStyle: {
+                                    color: '#ef4444',
+                                    type: 'solid',
+                                    width: 2
+                                }
+                            }]
+                        }
+                    }
+                ]
+            };
+            
+            escapeSignalChart.setOption(option);
+            console.log('✅ 逃顶信号统计图初始化完成');
+        }
+        
+        // 加载24小时逃顶信号数据
+        async function loadEscapeSignalData() {
+            try {
+                const response = await fetch('/api/escape-top-signals/latest');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.message || '加载失败');
+                }
+                
+                const statsResponse = await fetch('/api/escape-top-signals/stats');
+                const statsResult = await statsResponse.json();
+                
+                // 更新统计徽章
+                if (statsResult.success) {
+                    document.getElementById('escapeActiveCoins').textContent = statsResult.stats.active_coins;
+                    document.getElementById('escapeAvgScore').textContent = 
+                        statsResult.stats.avg_escape_score ? statsResult.stats.avg_escape_score.toFixed(2) : '0.00';
+                    
+                    const maxScore = result.data.length > 0 ? 
+                        Math.max(...result.data.map(d => d.total_escape_score)) : 0;
+                    document.getElementById('escapeMaxScore').textContent = maxScore;
+                }
+                
+                // 处理图表数据
+                if (result.data.length === 0) {
+                    console.log('⚠️ 暂无逃顶信号数据');
+                    escapeSignalChart.setOption({
+                        xAxis: { data: [] },
+                        series: [
+                            { data: [] },
+                            { data: [] },
+                            { data: [] }
+                        ]
+                    });
+                    return;
+                }
+                
+                // 按时间汇总数据
+                const timeMap = {};
+                result.data.forEach(item => {
+                    const time = item.signal_time;
+                    if (!timeMap[time]) {
+                        timeMap[time] = {
+                            count: 0,
+                            totalScore: 0,
+                            maxScore: 0
+                        };
+                    }
+                    timeMap[time].count++;
+                    timeMap[time].totalScore += item.total_escape_score;
+                    timeMap[time].maxScore = Math.max(timeMap[time].maxScore, item.total_escape_score);
+                });
+                
+                // 按时间排序
+                const times = Object.keys(timeMap).sort();
+                const counts = times.map(t => timeMap[t].count);
+                const avgScores = times.map(t => (timeMap[t].totalScore / timeMap[t].count).toFixed(2));
+                const maxScores = times.map(t => timeMap[t].maxScore);
+                
+                // 格式化时间显示（只显示时分）
+                const timeLabels = times.map(t => t.substring(11, 16)); // HH:MM
+                
+                // 更新图表
+                escapeSignalChart.setOption({
+                    xAxis: { data: timeLabels },
+                    series: [
+                        { data: counts },
+                        { data: avgScores },
+                        { data: maxScores }
+                    ]
+                });
+                
+                console.log('✅ 逃顶信号数据加载完成:', {
+                    时间点: times.length,
+                    活跃币种: statsResult.stats.active_coins,
+                    最高分数: maxScore
+                });
+                
+            } catch (error) {
+                console.error('❌ 加载逃顶信号数据失败:', error);
+                document.getElementById('escapeActiveCoins').textContent = '?';
+                document.getElementById('escapeAvgScore').textContent = '?';
+                document.getElementById('escapeMaxScore').textContent = '?';
+            }
+        }
+        
         // 显示分页图表的快照详情
         function showPagedSnapshotDetail(dataIndex) {
             console.log('🔍 显示分页快照详情，索引:', dataIndex);
@@ -3027,6 +3263,23 @@
                 console.log('✅ 12小时分页图初始化成功');
             } catch (error) {
                 console.error('❌ 12小时分页图初始化失败:', error);
+            }
+            
+            // 初始化24小时逃顶信号统计图
+            console.log('🚨 初始化24小时逃顶信号统计图...');
+            try {
+                initEscapeSignalChart();
+                console.log('✅ 逃顶信号统计图初始化成功');
+            } catch (error) {
+                console.error('❌ 逃顶信号统计图初始化失败:', error);
+            }
+            
+            // 加载逃顶信号数据
+            console.log('📡 加载逃顶信号数据...');
+            try {
+                loadEscapeSignalData();
+            } catch (error) {
+                console.error('❌ 加载逃顶信号数据失败:', error);
             }
             
             // 日期选择器控制分页图表
@@ -3590,6 +3843,7 @@
         setInterval(function() {
             loadGlobalTrendData(); // 全局趋势图每3分钟刷新
             loadDailyTimeline(currentDate); // 当日时间轴每3分钟刷新
+            loadEscapeSignalData(); // 逃顶信号数据每3分钟刷新
         }, 180000);
         
         // 自动检测最新信号（每30秒检测一次）
