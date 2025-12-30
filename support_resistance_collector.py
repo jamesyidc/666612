@@ -353,6 +353,10 @@ def save_to_database(data: Dict) -> bool:
         conn.execute("PRAGMA busy_timeout = 60000")
         cursor = conn.cursor()
         
+        # 使用 Python UTC 时间而不是 SQLite datetime函数
+        from datetime import datetime as dt_class
+        utc_now = dt_class.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        
         cursor.execute('''
             INSERT INTO support_resistance_levels (
                 symbol, current_price,
@@ -367,7 +371,7 @@ def save_to_database(data: Dict) -> bool:
                 alert_triggered,
                 baseline_price_24h, price_change_24h, change_percent_24h,
                 record_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['symbol'], data['current_price'],
             data['support_line_1'], data['support_line_2'],
@@ -381,7 +385,8 @@ def save_to_database(data: Dict) -> bool:
             int(data['alert_7d_low']), int(data['alert_7d_high']),
             int(data['alert_48h_low']), int(data['alert_48h_high']),
             int(data['alert_triggered']),
-            data['baseline_price_24h'], data['price_change_24h'], data['change_percent_24h']
+            data['baseline_price_24h'], data['price_change_24h'], data['change_percent_24h'],
+            utc_now
         ))
         
         conn.commit()
