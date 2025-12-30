@@ -392,6 +392,10 @@
                     <span>🔄</span>
                     刷新数据
                 </button>
+                <button class="btn btn-primary" onclick="window.open('/anchor-snapshots', '_blank')">
+                    <span>📊</span>
+                    历史数据
+                </button>
                 <a href="/" class="btn btn-secondary" style="text-decoration: none;">
                     <span>🏠</span>
                     返回首页
@@ -401,30 +405,6 @@
 
         <!-- 今日维护统计 -->
         <div class="stats-grid" style="margin-bottom: 30px;">
-            <div class="stat-card" style="border: 2px solid #48bb78; background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);">
-                <div class="stat-icon">🟢</div>
-                <div class="stat-label" style="color: #22543d;">自动维护多单-10%</div>
-                <div class="stat-value" id="autoMaintainLongCount" style="color: #22543d; font-size: 42px; font-weight: 800;">0</div>
-                <div class="stat-subvalue" style="color: #22543d;">1小时内: --</div>
-            </div>
-            <div class="stat-card" style="border: 2px solid #f56565; background: linear-gradient(135deg, #fed7d7 0%, #fc8181 100%);">
-                <div class="stat-icon">🔴</div>
-                <div class="stat-label" style="color: #742a2a;">自动维护空单-10%</div>
-                <div class="stat-value" id="autoMaintainShortCount" style="color: #742a2a; font-size: 42px; font-weight: 800;">0</div>
-                <div class="stat-subvalue" style="color: #742a2a;">1小时内: --</div>
-            </div>
-            <div class="stat-card" style="border: 2px solid #ed8936; background: linear-gradient(135deg, #feebc8 0%, #fbd38d 100%);">
-                <div class="stat-icon">💫</div>
-                <div class="stat-label" style="color: #7c2d12;">超级维护多单</div>
-                <div class="stat-value" id="superMaintainLongCount" style="color: #7c2d12; font-size: 42px; font-weight: 800;">0</div>
-                <div class="stat-subvalue" style="color: #7c2d12;">1小时内: --</div>
-            </div>
-            <div class="stat-card" style="border: 2px solid #f687b3; background: linear-gradient(135deg, #fed7e2 0%, #fbb6ce 100%);">
-                <div class="stat-icon">🚀</div>
-                <div class="stat-label" style="color: #702459;">超级维护空单</div>
-                <div class="stat-value" id="superMaintainShortCount" style="color: #702459; font-size: 42px; font-weight: 800;">0</div>
-                <div class="stat-subvalue" style="color: #702459;">1小时内: --</div>
-            </div>
             <div class="stat-card" style="border: 2px solid #4299e1; background: linear-gradient(135deg, #bee3f8 0%, #90cdf4 100%);">
                 <div class="stat-icon">📉</div>
                 <div class="stat-label" style="color: #2c5282;">空单盈利≤20%</div>
@@ -645,9 +625,6 @@
                     </span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 20px;">
-                    <button onclick="window.open('/anchor-snapshots', '_blank')" class="history-data-btn">
-                        📊 历史数据
-                    </button>
                     <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                         <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
                             <input type="checkbox" id="autoMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
@@ -883,16 +860,52 @@
                 
                 if (todayStatsData.success) {
                     const stats = todayStatsData.statistics;
-                    document.getElementById('autoMaintainLongCount').textContent = stats.auto_maintain_long || 0;
-                    document.getElementById('autoMaintainShortCount').textContent = stats.auto_maintain_short || 0;
-                    document.getElementById('superMaintainLongCount').textContent = stats.super_maintain_long || 0;
-                    document.getElementById('superMaintainShortCount').textContent = stats.super_maintain_short || 0;
                     
-                    // 这里可以加载空单盈利统计（需要额外API）
-                    // 暂时设置为0
-                    document.getElementById('todayProfitBelow20').textContent = '0';
-                    document.getElementById('todayProfitBelow10').textContent = '0';
-                    document.getElementById('todayLossCount').textContent = '0';
+                    // 加载空单盈利统计（从快照数据库获取最新值）
+                    try {
+                        const now = new Date();
+                        const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+                        const endTime = now.toISOString().slice(0, 19).replace('T', ' ');
+                        
+                        const shortStatsRes = await fetch(`/api/anchor/snapshots/statistics?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}&limit=100`);
+                        const shortStatsData = await shortStatsRes.json();
+                        
+                        if (shortStatsData.success && shortStatsData.snapshots && shortStatsData.snapshots.length > 0) {
+                            // 获取最新的各项统计
+                            const latestStats = {};
+                            
+                            // 按类型分组，取最新值
+                            shortStatsData.snapshots.forEach(snap => {
+                                if (!latestStats[snap.stat_type] || snap.snapshot_time > latestStats[snap.stat_type].snapshot_time) {
+                                    latestStats[snap.stat_type] = snap;
+                                }
+                            });
+                            
+                            // 更新页面
+                            if (latestStats['short_profit_lte_20']) {
+                                document.getElementById('todayProfitBelow20').textContent = latestStats['short_profit_lte_20'].stat_value || 0;
+                            }
+                            
+                            if (latestStats['short_profit_lte_10']) {
+                                document.getElementById('todayProfitBelow10').textContent = latestStats['short_profit_lte_10'].stat_value || 0;
+                            }
+                            
+                            if (latestStats['short_loss']) {
+                                document.getElementById('todayLossCount').textContent = latestStats['short_loss'].stat_value || 0;
+                            }
+                        } else {
+                            // 如果没有快照数据，设置为0
+                            document.getElementById('todayProfitBelow20').textContent = '0';
+                            document.getElementById('todayProfitBelow10').textContent = '0';
+                            document.getElementById('todayLossCount').textContent = '0';
+                        }
+                    } catch (error) {
+                        console.error('加载空单盈利统计失败:', error);
+                        // 设置默认值
+                        document.getElementById('todayProfitBelow20').textContent = '0';
+                        document.getElementById('todayProfitBelow10').textContent = '0';
+                        document.getElementById('todayLossCount').textContent = '0';
+                    }
                 }
 
                 // 更新时间
