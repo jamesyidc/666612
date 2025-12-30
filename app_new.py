@@ -7177,31 +7177,25 @@ def api_escape_top_signals_history_timeseries():
 
 @app.route('/api/escape-event-stats/timeseries')
 def api_escape_event_stats_timeseries():
-    """获取逃顶事件统计的时间序列数据"""
+    """获取逃顶事件统计的时间序列数据（从JSON文件读取）"""
     try:
         hours = request.args.get('hours', 24, type=int)
         
-        conn = sqlite3.connect('crypto_data.db', timeout=30.0)
-        cursor = conn.cursor()
+        # 从JSON文件读取数据
+        import json
+        import os
+        from datetime import datetime, timedelta
         
-        # 查询统计数据
-        cursor.execute('''
-            SELECT 
-                datetime(record_time, '+8 hours') as beijing_time,
-                event_count
-            FROM escape_event_stats
-            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
-            ORDER BY record_time ASC
-        ''', (f'-{hours}',))
-        
+        data_file = 'escape_event_stats.json'
         timeseries = []
-        for row in cursor.fetchall():
-            timeseries.append({
-                'time': row[0],
-                'count': row[1]
-            })
         
-        conn.close()
+        if os.path.exists(data_file):
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                
+            # 过滤指定小时数的数据
+            cutoff_time = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:00')
+            timeseries = [item for item in data if item['time'] >= cutoff_time]
         
         return jsonify({
             'success': True,

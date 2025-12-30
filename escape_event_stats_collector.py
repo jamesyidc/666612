@@ -54,21 +54,17 @@ def create_table():
         return False
 
 def collect_escape_event_count():
-    """统计当前的逃顶事件数量"""
+    """统计当前的逃顶事件数量（右边框显示的徽章数量）"""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=30.0)
         cursor = conn.cursor()
         
-        # 统计最近24小时内不同时间点的逃顶事件
-        # 条件：alert_triggered=1 且 (情况3+情况4)>=8 且 情况3>=1 且 情况4>=1
+        # 统计 escape_top_signals_24h 表中 is_escape_signal=1 的记录数
+        # 这些记录就是右边框显示的逃顶事件徽章
         cursor.execute('''
-            SELECT COUNT(DISTINCT strftime('%Y-%m-%d %H:%M', record_time)) as event_count
-            FROM support_resistance_levels
-            WHERE datetime(record_time) >= datetime('now', '-24 hours')
-              AND alert_triggered = 1
-              AND (alert_scenario_3 + alert_scenario_4) >= 8
-              AND alert_scenario_3 >= 1
-              AND alert_scenario_4 >= 1
+            SELECT COUNT(*) as event_count
+            FROM escape_top_signals_24h
+            WHERE is_escape_signal = 1
         ''')
         
         result = cursor.fetchone()
