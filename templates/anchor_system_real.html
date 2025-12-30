@@ -749,10 +749,34 @@
                     <span style="color: #718096; font-size: 14px;">最近50条记录</span>
                 </div>
             </div>
+            
+            <!-- 当天费用统计 -->
+            <div style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; color: white;">
+                    <div>
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">📊 账户名称</div>
+                        <div style="font-size: 24px; font-weight: 800;" id="accountName">JAMESYI</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">💰 今日总费用</div>
+                        <div style="font-size: 32px; font-weight: 800;" id="todayTotalCost">$0.0000</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">🔧 今日维护次数</div>
+                        <div style="font-size: 32px; font-weight: 800;" id="todayMaintenanceCount">0</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">📈 今日净盈亏</div>
+                        <div style="font-size: 32px; font-weight: 800;" id="todayNetProfit">$0.0000</div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="table-container">
                 <table id="maintenanceTable">
                     <thead>
                         <tr>
+                            <th>账户</th>
                             <th>时间</th>
                             <th>币种</th>
                             <th>方向</th>
@@ -774,7 +798,7 @@
                         </tr>
                     </thead>
                     <tbody id="maintenanceBody">
-                        <tr><td colspan="18" class="loading">加载中...</td></tr>
+                        <tr><td colspan="19" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1453,9 +1477,38 @@
             const tbody = document.getElementById('maintenanceBody');
             
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="18" class="empty">暂无维护记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="19" class="empty">暂无维护记录</td></tr>';
+                // 重置统计
+                document.getElementById('todayTotalCost').textContent = '$0.0000';
+                document.getElementById('todayMaintenanceCount').textContent = '0';
+                document.getElementById('todayNetProfit').textContent = '$0.0000';
                 return;
             }
+
+            // 计算今日统计
+            const today = new Date().toISOString().split('T')[0];  // YYYY-MM-DD
+            const todayRecords = data.filter(item => {
+                if (!item.created_at) return false;
+                const itemDate = item.created_at.split(' ')[0];  // 提取日期部分
+                return itemDate === today;
+            });
+            
+            const todayTotalCost = todayRecords.reduce((sum, item) => {
+                return sum + (item.total_cost || item.total_fee || 0);
+            }, 0);
+            
+            const todayNetProfit = todayRecords.reduce((sum, item) => {
+                return sum + (item.net_profit || 0);
+            }, 0);
+            
+            // 更新统计显示
+            document.getElementById('todayTotalCost').textContent = '$' + todayTotalCost.toFixed(4);
+            document.getElementById('todayMaintenanceCount').textContent = todayRecords.length;
+            
+            const netProfitColor = todayNetProfit >= 0 ? '#48bb78' : '#f56565';
+            const netProfitEl = document.getElementById('todayNetProfit');
+            netProfitEl.textContent = (todayNetProfit >= 0 ? '+' : '') + '$' + todayNetProfit.toFixed(4);
+            netProfitEl.style.color = netProfitColor;
 
             tbody.innerHTML = data.map((item, index) => {
                 const profit = item.total_profit || 0;
@@ -1463,9 +1516,11 @@
                 const totalCost = item.total_cost || (item.total_fee || 0);  // 兼容旧数据
                 const profitColor = profit > 0 ? '#48bb78' : profit < 0 ? '#f56565' : '#718096';
                 const netProfitColor = netProfit > 0 ? '#48bb78' : netProfit < 0 ? '#f56565' : '#718096';
+                const accountName = item.account_name || 'JAMESYI';  // 默认账户名
                 
                 return `
                 <tr>
+                    <td style="font-weight: 600; color: #667eea;">${accountName}</td>
                     <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
                     <td style="font-weight: 600;">${item.inst_id}</td>
                     <td>

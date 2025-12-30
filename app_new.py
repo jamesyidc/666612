@@ -13888,6 +13888,7 @@ def maintain_anchor_order():
             # 添加新记录
             new_record = {
                 'id': len(records) + 1,
+                'account_name': 'JAMESYI',  # 账户名称（后续可从配置读取）
                 'inst_id': inst_id,
                 'pos_side': pos_side,
                 'original_size': pos_size,
