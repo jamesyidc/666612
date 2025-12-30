@@ -12973,6 +12973,8 @@ def get_sub_account_positions():
             secret_key = sub_account['secret_key']
             passphrase = sub_account['passphrase']
             
+            api_success = False
+            
             try:
                 # 生成OKEx签名
                 request_path = '/api/v5/account/positions'
@@ -12998,63 +13000,100 @@ def get_sub_account_positions():
                 params = {'instType': 'SWAP'}
                 response = requests.get(url, headers=headers, params=params, timeout=10)
                 
-                if response.status_code != 200:
-                    continue
-                
-                data = response.json()
-                if data.get('code') != '0':
-                    continue
-                
-                # 处理持仓数据
-                for pos in data.get('data', []):
-                    pos_size = float(pos.get('pos', 0))
-                    if pos_size == 0:
-                        continue
-                    
-                    avg_px = float(pos.get('avgPx', 0))
-                    mark_px = float(pos.get('markPx', 0))
-                    upl = float(pos.get('upl', 0))
-                    notional_usd = float(pos.get('notionalUsd', 0))
-                    margin = float(pos.get('margin', 0))
-                    leverage = pos.get('lever', '10')
-                    
-                    # 计算盈亏率
-                    if notional_usd != 0:
-                        profit_rate = (upl / abs(notional_usd)) * 100
-                    else:
-                        profit_rate = 0
-                    
-                    # 获取维护次数
-                    maintenance_count = 0
-                    try:
-                        with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
-                            counts = json_lib.load(f)
-                        today = datetime.now().strftime('%Y-%m-%d')
-                        key = f"{account_name}:{pos['instId']}:{pos['posSide']}:{today}"
-                        maintenance_count = counts.get(key, 0)
-                    except:
-                        pass
-                    
-                    all_positions.append({
-                        'account_name': account_name,
-                        'inst_id': pos['instId'],
-                        'pos_side': pos['posSide'],
-                        'pos_size': abs(pos_size),
-                        'avg_price': avg_px,
-                        'mark_price': mark_px,
-                        'leverage': leverage,
-                        'margin': margin,
-                        'upl': upl,
-                        'profit_rate': profit_rate,
-                        'notional_usd': abs(notional_usd),
-                        'maintenance_count': maintenance_count,
-                        'status': '正常',
-                        'is_sub_account': True
-                    })
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('code') == '0':
+                        api_success = True
+                        # 处理持仓数据
+                        for pos in data.get('data', []):
+                            pos_size = float(pos.get('pos', 0))
+                            if pos_size == 0:
+                                continue
+                            
+                            avg_px = float(pos.get('avgPx', 0))
+                            mark_px = float(pos.get('markPx', 0))
+                            upl = float(pos.get('upl', 0))
+                            notional_usd = float(pos.get('notionalUsd', 0))
+                            margin = float(pos.get('margin', 0))
+                            leverage = pos.get('lever', '10')
+                            
+                            # 计算盈亏率
+                            if notional_usd != 0:
+                                profit_rate = (upl / abs(notional_usd)) * 100
+                            else:
+                                profit_rate = 0
+                            
+                            # 获取维护次数
+                            maintenance_count = 0
+                            try:
+                                with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
+                                    counts = json_lib.load(f)
+                                today = datetime.now().strftime('%Y-%m-%d')
+                                key = f"{account_name}:{pos['instId']}:{pos['posSide']}:{today}"
+                                maintenance_count = counts.get(key, 0)
+                            except:
+                                pass
+                            
+                            all_positions.append({
+                                'account_name': account_name,
+                                'inst_id': pos['instId'],
+                                'pos_side': pos['posSide'],
+                                'pos_size': abs(pos_size),
+                                'avg_price': avg_px,
+                                'mark_price': mark_px,
+                                'leverage': leverage,
+                                'margin': margin,
+                                'upl': upl,
+                                'profit_rate': profit_rate,
+                                'notional_usd': abs(notional_usd),
+                                'maintenance_count': maintenance_count,
+                                'status': '正常',
+                                'is_sub_account': True
+                            })
             
             except Exception as e:
                 print(f"获取子账号 {account_name} 持仓失败: {e}")
-                continue
+            
+            # 如果API失败，使用本地记录
+            if not api_success:
+                print(f"⚠️ 子账号 {account_name} API失败，使用本地记录")
+                try:
+                    with open('sub_account_opened_positions.json', 'r', encoding='utf-8') as f:
+                        opened_positions = json_lib.load(f)
+                    
+                    for key, pos_info in opened_positions.items():
+                        if pos_info['account_name'] == account_name:
+                            # 获取维护次数
+                            maintenance_count = 0
+                            try:
+                                with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
+                                    counts = json_lib.load(f)
+                                today = datetime.now().strftime('%Y-%m-%d')
+                                count_key = f"{account_name}:{pos_info['inst_id']}:{pos_info['pos_side']}:{today}"
+                                maintenance_count = counts.get(count_key, 0)
+                            except:
+                                pass
+                            
+                            # 添加基于本地记录的持仓（没有实时价格数据）
+                            all_positions.append({
+                                'account_name': account_name,
+                                'inst_id': pos_info['inst_id'],
+                                'pos_side': pos_info['pos_side'],
+                                'pos_size': 0,  # 未知
+                                'avg_price': 0,  # 未知
+                                'mark_price': 0,  # 未知
+                                'leverage': '10',
+                                'margin': 10,  # 估算
+                                'upl': 0,  # 未知
+                                'profit_rate': 0,  # 未知
+                                'notional_usd': 10,  # 估算
+                                'maintenance_count': maintenance_count,
+                                'status': '⚠️ 数据来自本地记录',
+                                'is_sub_account': True,
+                                'from_local': True
+                            })
+                except Exception as e:
+                    print(f"读取本地持仓记录失败: {e}")
         
         return jsonify({
             'success': True,
