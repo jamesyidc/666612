@@ -2639,20 +2639,20 @@
                     return;
                 }
                 
-                // 按时间汇总数据（统计每个时间点有多少个币种有逃顶记录）
+                // 按时间汇总数据（统计每个时间点有多少个不同币种）
                 const timeMap = {};
                 result.data.forEach(item => {
                     const time = item.signal_time;
                     if (!timeMap[time]) {
-                        timeMap[time] = 0;
+                        timeMap[time] = new Set(); // 使用Set来去重币种
                     }
-                    // 统计所有记录（不管是否达到逃顶阈值）
-                    timeMap[time]++;
+                    // 添加币种到Set中（自动去重）
+                    timeMap[time].add(item.symbol);
                 });
                 
                 // 按时间排序
                 const times = Object.keys(timeMap).sort();
-                const counts = times.map(t => timeMap[t]);
+                const counts = times.map(t => timeMap[t].size); // Set的size就是不同币种的数量
                 
                 // 格式化时间显示（月-日 时:分）
                 const timeLabels = times.map(t => {
