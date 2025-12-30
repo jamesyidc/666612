@@ -7120,6 +7120,49 @@ def api_escape_top_signals_stats():
             'message': str(e)
         })
 
+@app.route('/api/escape-top-signals/history-timeseries')
+def api_escape_top_signals_history_timeseries():
+    """获取逃顶信号的历史时间序列数据（每5分钟统计一次）"""
+    try:
+        hours = request.args.get('hours', 24, type=int)
+        
+        conn = sqlite3.connect('crypto_data.db', timeout=30.0)
+        cursor = conn.cursor()
+        
+        # 按5分钟间隔统计逃顶信号数量
+        cursor.execute('''
+            SELECT 
+                strftime('%Y-%m-%d %H:%M', datetime(record_time, '-' || (strftime('%M', record_time) % 5) || ' minutes')) as time_slot,
+                COUNT(DISTINCT symbol) as unique_symbols
+            FROM support_resistance_levels
+            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
+              AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
+            GROUP BY time_slot
+            ORDER BY time_slot ASC
+        ''', (f'-{hours}',))
+        
+        timeseries = []
+        for row in cursor.fetchall():
+            timeseries.append({
+                'time': row[0] + ':00',  # 添加秒数
+                'count': row[1]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': timeseries,
+            'count': len(timeseries)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'data': []
+        })
+
 # =====================================================
 # OKEx K线指标系统 API路由
 # =====================================================
