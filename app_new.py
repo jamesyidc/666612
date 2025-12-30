@@ -12976,10 +12976,11 @@ def get_sub_account_positions():
             api_success = False
             
             try:
-                # 生成OKEx签名
+                # 生成OKEx签名 - GET请求需要在签名中包含查询参数
                 request_path = '/api/v5/account/positions'
+                query_string = 'instType=SWAP'
                 timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-                message = timestamp + 'GET' + request_path
+                message = timestamp + 'GET' + request_path + '?' + query_string
                 mac = hmac.new(
                     secret_key.encode('utf-8'),
                     message.encode('utf-8'),
@@ -13002,19 +13003,30 @@ def get_sub_account_positions():
                 
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"⚠️ 子账号 {account_name} API响应: code={data.get('code')}, 持仓数={len(data.get('data', []))}")
                     if data.get('code') == '0':
                         api_success = True
                         # 处理持仓数据
                         for pos in data.get('data', []):
-                            pos_size = float(pos.get('pos', 0))
+                            # 安全转换float，处理空字符串
+                            try:
+                                pos_size = float(pos.get('pos') or 0)
+                            except:
+                                pos_size = 0
+                            
                             if pos_size == 0:
                                 continue
                             
-                            avg_px = float(pos.get('avgPx', 0))
-                            mark_px = float(pos.get('markPx', 0))
-                            upl = float(pos.get('upl', 0))
-                            notional_usd = float(pos.get('notionalUsd', 0))
-                            margin = float(pos.get('margin', 0))
+                            try:
+                                avg_px = float(pos.get('avgPx') or 0)
+                                mark_px = float(pos.get('markPx') or 0)
+                                upl = float(pos.get('upl') or 0)
+                                notional_usd = float(pos.get('notionalUsd') or 0)
+                                margin = float(pos.get('margin') or 0)
+                            except Exception as e:
+                                print(f"⚠️ 数据转换失败: {e}, pos={pos}")
+                                continue
+                            
                             leverage = pos.get('lever', '10')
                             
                             # 计算盈亏率

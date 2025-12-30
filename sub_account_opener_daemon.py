@@ -114,7 +114,25 @@ def get_sub_account_positions(sub_account):
         passphrase = sub_account['passphrase']
         
         request_path = '/api/v5/account/positions'
-        headers = get_okex_headers(api_key, secret_key, passphrase, 'GET', request_path)
+        query_string = 'instType=SWAP'
+        
+        # GET请求需要在签名中包含查询参数
+        timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        message = timestamp + 'GET' + request_path + '?' + query_string
+        mac = hmac.new(
+            secret_key.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256
+        )
+        signature = base64.b64encode(mac.digest()).decode('utf-8')
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
         
         url = f"{OKEX_REST_URL}{request_path}"
         params = {'instType': 'SWAP'}
