@@ -4,11 +4,5 @@
     "inst_id": "CRO-USDT-SWAP",
     "pos_side": "long",
     "opened_at": "2025-12-30 16:12:12"
-  },
-  "Wu666666:FIL-USDT-SWAP:long": {
-    "account_name": "Wu666666",
-    "inst_id": "FIL-USDT-SWAP",
-    "pos_side": "long",
-    "opened_at": "2025-12-30 16:14:23"
   }
 }
