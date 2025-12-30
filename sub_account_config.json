@@ -22,5 +22,7 @@
   "main_account": {
     "account_name": "JAMESYI",
     "enabled": true
-  }
+  },
+  "super_maintain_long_enabled": true,
+  "super_maintain_short_enabled": true
 }

@@ -15,6 +15,7 @@ from datetime import datetime
 
 # 配置
 CONFIG_FILE = '/home/user/webapp/sub_account_config.json'
+OPENED_POSITIONS_FILE = '/home/user/webapp/sub_account_opened_positions.json'  # 已开仓记录
 MAIN_API_URL = 'http://localhost:5000'
 OKEX_REST_URL = 'https://www.okx.com'
 CHECK_INTERVAL = 60  # 每60秒检查一次
@@ -23,6 +24,38 @@ def load_config():
     """加载配置"""
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+def load_opened_positions():
+    """加载已开仓记录"""
+    try:
+        with open(OPENED_POSITIONS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_opened_positions(positions):
+    """保存已开仓记录"""
+    with open(OPENED_POSITIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(positions, f, indent=2, ensure_ascii=False)
+
+def mark_position_opened(account_name, inst_id, pos_side):
+    """标记已开仓"""
+    positions = load_opened_positions()
+    key = f"{account_name}:{inst_id}:{pos_side}"
+    positions[key] = {
+        'account_name': account_name,
+        'inst_id': inst_id,
+        'pos_side': pos_side,
+        'opened_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    save_opened_positions(positions)
+
+def is_position_opened(account_name, inst_id, pos_side):
+    """检查是否已开仓"""
+    positions = load_opened_positions()
+    key = f"{account_name}:{inst_id}:{pos_side}"
+    return key in positions
+
 
 def get_okex_signature(timestamp, method, request_path, body, secret_key):
     """生成OKEx签名"""
@@ -210,11 +243,21 @@ def check_and_open_positions():
             
             print(f"\n🔍 检查子账号: {sub_account['account_name']}")
             
+            account_name = sub_account['account_name']
+            
             # 获取子账号持仓
             sub_positions = get_sub_account_positions(sub_account)
             sub_inst_ids = set(p['inst_id'] for p in sub_positions)
             
-            print(f"   子账号已有持仓: {len(sub_positions)}个 ({', '.join(sub_inst_ids)})")
+            # 如果API获取失败（401错误），使用本地记录
+            if not sub_positions:
+                print(f"   ⚠️ 无法从API获取持仓，使用本地记录")
+                opened_positions = load_opened_positions()
+                for key, pos in opened_positions.items():
+                    if pos['account_name'] == account_name:
+                        sub_inst_ids.add(pos['inst_id'])
+            
+            print(f"   子账号已有持仓: {len(sub_inst_ids)}个 ({', '.join(sub_inst_ids) if sub_inst_ids else '无'})")
             
             # 找出需要开仓的币种
             for main_pos in loss_positions:
@@ -224,6 +267,11 @@ def check_and_open_positions():
                 
                 # 如果子账号没有该仓位
                 if inst_id not in sub_inst_ids:
+                    # 检查本地记录，避免重复开仓
+                    if is_position_opened(account_name, inst_id, pos_side):
+                        print(f"   ✓ {inst_id} {pos_side} 已记录开仓，跳过")
+                        continue
+                    
                     print(f"   ⚠️ 发现主账号亏损但子账号未持仓: {inst_id} {pos_side} 亏损:{profit_rate:.2f}%")
                     
                     # 开10U仓位
@@ -234,6 +282,8 @@ def check_and_open_positions():
                     
                     if success:
                         print(f"   ✅ 开仓成功: {inst_id} {pos_side} {initial_size}U")
+                        # 记录已开仓
+                        mark_position_opened(account_name, inst_id, pos_side)
                     else:
                         print(f"   ❌ 开仓失败: {inst_id} {pos_side}")
                     
