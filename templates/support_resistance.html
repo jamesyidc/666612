@@ -2615,18 +2615,18 @@
         // 加载24小时逃顶信号数据
         async function loadEscapeSignalData() {
             try {
-                // 使用新的统计API获取数据
-                const response = await fetch('/api/escape-event-stats/timeseries?hours=24');
+                // 获取历史时间序列数据（24小时）
+                const response = await fetch('/api/escape-top-signals/history-timeseries?hours=24');
                 const result = await response.json();
                 
                 if (!result.success) {
                     throw new Error(result.message || '加载失败');
                 }
                 
-                // 获取当前逃顶事件总数（最新的一个数据点）
-                const escapeEvents = result.data && result.data.length > 0 
-                    ? result.data[result.data.length - 1].count 
-                    : 0;
+                // 获取统计数据（逃顶事件次数）
+                const statsResponse = await fetch('/api/escape-top-signals/stats');
+                const statsResult = await statsResponse.json();
+                const escapeEvents = statsResult.success ? statsResult.stats.total_signals : 0;
                 document.getElementById('escapeCurrentCount').textContent = escapeEvents;
                 
                 // 处理图表数据
