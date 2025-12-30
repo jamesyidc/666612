@@ -399,6 +399,52 @@
             </div>
         </div>
 
+        <!-- 今日维护统计 -->
+        <div class="stats-grid" style="margin-bottom: 30px;">
+            <div class="stat-card" style="border: 2px solid #48bb78; background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-label" style="color: #22543d;">自动维护多单-10%</div>
+                <div class="stat-value" id="autoMaintainLongCount" style="color: #22543d; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #22543d;">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #f56565; background: linear-gradient(135deg, #fed7d7 0%, #fc8181 100%);">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-label" style="color: #742a2a;">自动维护空单-10%</div>
+                <div class="stat-value" id="autoMaintainShortCount" style="color: #742a2a; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #742a2a;">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #ed8936; background: linear-gradient(135deg, #feebc8 0%, #fbd38d 100%);">
+                <div class="stat-icon">💫</div>
+                <div class="stat-label" style="color: #7c2d12;">超级维护多单</div>
+                <div class="stat-value" id="superMaintainLongCount" style="color: #7c2d12; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #7c2d12;">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #f687b3; background: linear-gradient(135deg, #fed7e2 0%, #fbb6ce 100%);">
+                <div class="stat-icon">🚀</div>
+                <div class="stat-label" style="color: #702459;">超级维护空单</div>
+                <div class="stat-value" id="superMaintainShortCount" style="color: #702459; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #702459;">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #4299e1; background: linear-gradient(135deg, #bee3f8 0%, #90cdf4 100%);">
+                <div class="stat-icon">📉</div>
+                <div class="stat-label" style="color: #2c5282;">空单盈利≤20%</div>
+                <div class="stat-value" id="todayProfitBelow20" style="color: #2c5282; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #2c5282;">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #667eea; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);">
+                <div class="stat-icon">📊</div>
+                <div class="stat-label" style="color: #434190;">空单盈利≤10%</div>
+                <div class="stat-value" id="todayProfitBelow10" style="color: #434190; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #434190;">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #fc8181; background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);">
+                <div class="stat-icon">❌</div>
+                <div class="stat-label" style="color: #742a2a;">空单亏损</div>
+                <div class="stat-value" id="todayLossCount" style="color: #742a2a; font-size: 42px; font-weight: 800;">0</div>
+                <div class="stat-subvalue" style="color: #742a2a;">1小时内: --</div>
+            </div>
+        </div>
+
         <!-- 统计卡片 -->
         <div class="stats-grid">
             <div class="stat-card">
@@ -829,6 +875,24 @@
                 if (maintenanceData.success) {
                     maintenanceRecordsData = maintenanceData.data;  // 保存到全局变量
                     renderMaintenanceOrders(maintenanceData.data);
+                }
+
+                // 加载今日维护统计
+                const todayStatsRes = await fetch('/api/anchor-system/today-statistics?trade_mode=real');
+                const todayStatsData = await todayStatsRes.json();
+                
+                if (todayStatsData.success) {
+                    const stats = todayStatsData.statistics;
+                    document.getElementById('autoMaintainLongCount').textContent = stats.auto_maintain_long || 0;
+                    document.getElementById('autoMaintainShortCount').textContent = stats.auto_maintain_short || 0;
+                    document.getElementById('superMaintainLongCount').textContent = stats.super_maintain_long || 0;
+                    document.getElementById('superMaintainShortCount').textContent = stats.super_maintain_short || 0;
+                    
+                    // 这里可以加载空单盈利统计（需要额外API）
+                    // 暂时设置为0
+                    document.getElementById('todayProfitBelow20').textContent = '0';
+                    document.getElementById('todayProfitBelow10').textContent = '0';
+                    document.getElementById('todayLossCount').textContent = '0';
                 }
 
                 // 更新时间
