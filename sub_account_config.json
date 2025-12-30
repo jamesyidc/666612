@@ -7,6 +7,8 @@
       "secret_key": "4C2BD2AC6A08615EA7F36A6251857FCE",
       "passphrase": "Wu666666.",
       "enabled": true,
+      "super_maintain_long_enabled": false,
+      "super_maintain_short_enabled": false,
       "maintenance_config": {
         "max_maintenance_count": 3,
         "loss_threshold": -10,

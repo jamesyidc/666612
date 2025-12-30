@@ -713,6 +713,16 @@
                     </span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="subSuperMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护多单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="subSuperMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护空单-10%</span>
+                        </label>
+                    </div>
                     <div style="font-size: 13px; opacity: 0.9;">
                         账户数量: <strong id="subAccountCount">--</strong>
                     </div>
@@ -867,6 +877,16 @@
                     document.getElementById('autoMaintainShort').checked = config.auto_maintain_short_enabled || false;
                     document.getElementById('superMaintainLong').checked = config.super_maintain_long_enabled || false;
                     document.getElementById('superMaintainShort').checked = config.super_maintain_short_enabled || false;
+                }
+
+                // 加载子账户配置
+                const subConfigRes = await fetch('/api/sub-account/config');
+                const subConfigData = await subConfigRes.json();
+                
+                if (subConfigData.success) {
+                    const subConfig = subConfigData.config;
+                    document.getElementById('subSuperMaintainLong').checked = subConfig.super_maintain_long_enabled || false;
+                    document.getElementById('subSuperMaintainShort').checked = subConfig.super_maintain_short_enabled || false;
                 }
 
                 // 加载状态
@@ -2056,6 +2076,66 @@ ${closeDetails}
                     const data = await response.json();
                     if (data.success) {
                         showToast(enabled ? '🚀 空单超级维护已开启' : '❌ 空单超级维护已关闭', enabled ? 'success' : 'info');
+                    } else {
+                        showToast('⚠️ 配置保存失败', 'error');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    showToast('⚠️ 配置保存失败', 'error');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 子账户超级维护多单开关
+            document.getElementById('subSuperMaintainLong').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 子账户超级维护多单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(enabled ? '🚀 子账户多单超级维护已开启' : '❌ 子账户多单超级维护已关闭', enabled ? 'success' : 'info');
+                    } else {
+                        showToast('⚠️ 配置保存失败', 'error');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    showToast('⚠️ 配置保存失败', 'error');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 子账户超级维护空单开关
+            document.getElementById('subSuperMaintainShort').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 子账户超级维护空单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(enabled ? '🚀 子账户空单超级维护已开启' : '❌ 子账户空单超级维护已关闭', enabled ? 'success' : 'info');
                     } else {
                         showToast('⚠️ 配置保存失败', 'error');
                         e.target.checked = !enabled;

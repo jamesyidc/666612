@@ -308,6 +308,17 @@ def check_and_maintain():
                 stop_loss_threshold = sub_account['maintenance_config']['stop_loss_threshold']
                 max_count = sub_account['maintenance_config']['max_maintenance_count']
                 
+                # 检查超级维护开关
+                super_maintain_enabled = False
+                if pos_side == 'long':
+                    super_maintain_enabled = sub_account.get('super_maintain_long_enabled', False)
+                else:  # short
+                    super_maintain_enabled = sub_account.get('super_maintain_short_enabled', False)
+                
+                if not super_maintain_enabled:
+                    print(f"   ⏸️ {inst_id} {pos_side} 超级维护未启用")
+                    continue
+                
                 print(f"   📈 {inst_id} {pos_side} 盈亏:{profit_rate:.2f}% 维护次数:{current_count}/{max_count}")
                 
                 # 检查止损条件（第3次维护后）

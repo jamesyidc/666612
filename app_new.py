@@ -12877,6 +12877,74 @@ def get_today_statistics():
         
         try:
             import json as json_lib
+            import os
+            if os.path.exists(maintenance_file):
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    records = json_lib.load(f)
+                
+                today = datetime.now().strftime('%Y-%m-%d')
+                for record in records:
+                    if record.get('created_at', '').startswith(today):
+                        pos_side = record.get('pos_side')
+                        maintenance_type = record.get('maintenance_type', 'normal')
+                        
+                        if maintenance_type == 'super_maintain':
+                            if pos_side == 'long':
+                                super_maintain_long += 1
+                            else:
+                                super_maintain_short += 1
+                        else:
+                            if pos_side == 'long':
+                                auto_maintain_long += 1
+                            else:
+                                auto_maintain_short += 1
+        except Exception as e:
+            print(f"统计维护次数失败: {e}")
+        
+        # 获取当前持仓统计
+        positions_response = requests.get(
+            f'http://localhost:5000/api/anchor-system/current-positions?trade_mode={trade_mode}',
+            timeout=10
+        )
+        
+        total_positions = 0
+        anchor_positions = 0
+        warning_positions = 0
+        
+        if positions_response.status_code == 200:
+            positions_data = positions_response.json()
+            if positions_data.get('success'):
+                positions = positions_data.get('positions', [])
+                total_positions = len(positions)
+                
+                for pos in positions:
+                    if pos.get('is_anchor'):
+                        anchor_positions += 1
+                    if pos.get('profit_rate', 0) <= -8:
+                        warning_positions += 1
+        
+        return jsonify({
+            'success': True,
+            'statistics': {
+                'auto_maintain_long': auto_maintain_long,
+                'auto_maintain_short': auto_maintain_short,
+                'super_maintain_long': super_maintain_long,
+                'super_maintain_short': super_maintain_short,
+                'total_positions': total_positions,
+                'anchor_positions': anchor_positions,
+                'warning_positions': warning_positions
+            },
+            'trade_mode': trade_mode,
+            'date': datetime.now().strftime('%Y-%m-%d')
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/api/anchor-system/sub-account-positions')
 def get_sub_account_positions():
@@ -13002,74 +13070,71 @@ def get_sub_account_positions():
             'traceback': traceback.format_exc()
         })
 
-            import os
-            if os.path.exists(maintenance_file):
-                with open(maintenance_file, 'r', encoding='utf-8') as f:
-                    records = json_lib.load(f)
-                
-                today = datetime.now().strftime('%Y-%m-%d')
-                for record in records:
-                    if record.get('created_at', '').startswith(today):
-                        pos_side = record.get('pos_side')
-                        maintenance_type = record.get('maintenance_type', 'normal')
-                        
-                        if maintenance_type == 'super_maintain':
-                            if pos_side == 'long':
-                                super_maintain_long += 1
-                            else:
-                                super_maintain_short += 1
-                        else:
-                            if pos_side == 'long':
-                                auto_maintain_long += 1
-                            else:
-                                auto_maintain_short += 1
-        except Exception as e:
-            print(f"统计维护次数失败: {e}")
+@app.route('/api/anchor/sub-account-config', methods=['GET', 'POST'])
+def sub_account_config():
+    """子账户配置管理"""
+    try:
+        import json as json_lib
+        import os
         
-        # 获取当前持仓统计
-        positions_response = requests.get(
-            f'http://localhost:5000/api/anchor-system/current-positions?trade_mode={trade_mode}',
-            timeout=10
-        )
+        config_file = 'sub_account_config.json'
         
-        total_positions = 0
-        anchor_positions = 0
-        warning_positions = 0
+        if request.method == 'GET':
+            # 读取配置
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            else:
+                config = {
+                    'sub_accounts': [],
+                    'main_account': {'account_name': 'JAMESYI', 'enabled': True}
+                }
+            
+            return jsonify({
+                'success': True,
+                'config': config
+            })
         
-        if positions_response.status_code == 200:
-            positions_data = positions_response.json()
-            if positions_data.get('success'):
-                positions = positions_data.get('positions', [])
-                total_positions = len(positions)
-                
-                for pos in positions:
-                    if pos.get('is_anchor'):
-                        anchor_positions += 1
-                    if pos.get('profit_rate', 0) <= -8:
-                        warning_positions += 1
-        
-        return jsonify({
-            'success': True,
-            'statistics': {
-                'auto_maintain_long': auto_maintain_long,
-                'auto_maintain_short': auto_maintain_short,
-                'super_maintain_long': super_maintain_long,
-                'super_maintain_short': super_maintain_short,
-                'total_positions': total_positions,
-                'anchor_positions': anchor_positions,
-                'warning_positions': warning_positions
-            },
-            'trade_mode': trade_mode,
-            'date': datetime.now().strftime('%Y-%m-%d')
-        })
-        
+        elif request.method == 'POST':
+            # 更新配置
+            data = request.json
+            
+            # 读取现有配置
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            else:
+                config = {
+                    'sub_accounts': [],
+                    'main_account': {'account_name': 'JAMESYI', 'enabled': True}
+                }
+            
+            # 更新所有子账户的超级维护开关
+            if 'super_maintain_long_enabled' in data:
+                for sub_account in config.get('sub_accounts', []):
+                    sub_account['super_maintain_long_enabled'] = data['super_maintain_long_enabled']
+            
+            if 'super_maintain_short_enabled' in data:
+                for sub_account in config.get('sub_accounts', []):
+                    sub_account['super_maintain_short_enabled'] = data['super_maintain_short_enabled']
+            
+            # 保存配置
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(config, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'success': True,
+                'message': '配置已更新',
+                'config': config
+            })
+    
     except Exception as e:
         import traceback
         return jsonify({
             'success': False,
-            'error': str(e),
+            'message': f'操作失败: {str(e)}',
             'traceback': traceback.format_exc()
-        }), 500
+        })
 
 # ====================交易决策系统路由 ====================
 
@@ -14430,6 +14495,69 @@ def auto_maintenance_config():
             return jsonify({
                 'success': True,
                 'message': '配置已更新',
+                'config': config
+            })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'操作失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/sub-account/config', methods=['GET', 'POST'])
+def sub_account_config():
+    """获取或设置子账户配置"""
+    try:
+        import json as json_lib
+        import os
+        
+        config_file = 'sub_account_config.json'
+        
+        if request.method == 'GET':
+            # 读取配置
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '子账户配置文件不存在'
+                })
+            
+            return jsonify({
+                'success': True,
+                'config': config
+            })
+        
+        elif request.method == 'POST':
+            # 更新配置
+            data = request.get_json()
+            
+            # 读取现有配置
+            if os.path.exists(config_file):
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '子账户配置文件不存在'
+                })
+            
+            # 更新指定的字段
+            if 'super_maintain_long_enabled' in data:
+                config['super_maintain_long_enabled'] = data['super_maintain_long_enabled']
+            if 'super_maintain_short_enabled' in data:
+                config['super_maintain_short_enabled'] = data['super_maintain_short_enabled']
+            
+            # 保存配置
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(config, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'success': True,
+                'message': '子账户配置已更新',
                 'config': config
             })
     
