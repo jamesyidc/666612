@@ -1,0 +1,38 @@
+# 数据库文件
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# 日志文件
+*.log
+logs/
+
+# 缓存文件
+__pycache__/
+*.pyc
+cache/
+
+# 备份文件
+*.gz
+*.tar
+*.zip
+1230中午 分割/
+databases/
+backup*/
+
+# 配置中的敏感信息 (保留模板)
+# telegram_config.json
+# trading_config.json
+
+# PM2
+.pm2/
+pm2/
+
+# 临时文件
+*.tmp
+*.swp
+*~
+
+# 依赖包
+node_modules/
