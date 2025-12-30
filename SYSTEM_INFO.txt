@@ -1,0 +1,33 @@
+================================================================================
+系统信息 - 备份时间: $(date '+%Y-%m-%d %H:%M:%S')
+================================================================================
+
+【操作系统】
+$(uname -a)
+
+【Python版本】
+$(python3 --version)
+
+【Node.js版本】
+$(node --version 2>/dev/null || echo "未安装")
+
+【npm版本】
+$(npm --version 2>/dev/null || echo "未安装")
+
+【pip版本】
+$(pip --version)
+
+【PM2版本】
+$(pm2 --version)
+
+【磁盘使用】
+$(df -h | grep -E "Filesystem|/dev/")
+
+【内存使用】
+$(free -h)
+
+【当前进程】
+$(ps aux | wc -l) 个进程正在运行
+
+【网络监听端口】
+$(netstat -tlnp 2>/dev/null | grep LISTEN | head -20 || ss -tlnp | head -20)

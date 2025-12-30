@@ -1,0 +1,17 @@
+On branch genspark_ai_developer
+Your branch is up to date with 'origin/genspark_ai_developer'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   collector_monitor.log
+	modified:   crypto_index_collector.log
+	modified:   fund_monitor_collector.log
+	modified:   gdrive_monitor.log
+	modified:   panic_wash_collector.log
+	modified:   position_system.log
+	modified:   support_resistance.log
+	modified:   support_resistance_snapshot.log
+	modified:   v1v2_collector.log
+
+no changes added to commit (use "git add" and/or "git commit -a")

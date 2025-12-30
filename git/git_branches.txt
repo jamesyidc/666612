@@ -1,0 +1,2 @@
+* genspark_ai_developer
+  remotes/origin/genspark_ai_developer
