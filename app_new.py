@@ -13409,39 +13409,47 @@ def maintain_anchor_order():
         open_fills = []
         open_total_fee = 0
         open_total_qty = 0
+        open_total_value = 0
         if open_fills_data.get('code') == '0' and open_fills_data.get('data'):
             for fill in open_fills_data['data']:
                 qty = float(fill.get('fillSz', 0))
                 price = float(fill.get('fillPx', 0))
                 fee = float(fill.get('fee', 0))
+                value = qty * price  # 这笔交易的价值
                 open_fills.append({
                     'trade_id': fill.get('tradeId'),
                     'qty': qty,
                     'price': price,
+                    'value': value,  # 交易价值
                     'fee': abs(fee),  # 费用取绝对值
                     'fee_currency': fill.get('feeCcy', 'USDT')
                 })
                 open_total_fee += abs(fee)
                 open_total_qty += qty
+                open_total_value += value
         
         # 处理平仓成交明细
         close_fills = []
         close_total_fee = 0
         close_total_qty = 0
+        close_total_value = 0
         if close_fills_data.get('code') == '0' and close_fills_data.get('data'):
             for fill in close_fills_data['data']:
                 qty = float(fill.get('fillSz', 0))
                 price = float(fill.get('fillPx', 0))
                 fee = float(fill.get('fee', 0))
+                value = qty * price  # 这笔交易的价值
                 close_fills.append({
                     'trade_id': fill.get('tradeId'),
                     'qty': qty,
                     'price': price,
+                    'value': value,  # 交易价值
                     'fee': abs(fee),
                     'fee_currency': fill.get('feeCcy', 'USDT')
                 })
                 close_total_fee += abs(fee)
                 close_total_qty += qty
+                close_total_value += value
         
         # 计算总费用和费率
         total_fee = open_total_fee + close_total_fee
@@ -13449,14 +13457,12 @@ def maintain_anchor_order():
         # 计算平均开仓价格
         avg_open_price = 0
         if open_total_qty > 0:
-            total_value = sum(f['qty'] * f['price'] for f in open_fills)
-            avg_open_price = total_value / open_total_qty
+            avg_open_price = open_total_value / open_total_qty
         
         # 计算平均平仓价格
         avg_close_price = 0
         if close_total_qty > 0:
-            total_value = sum(f['qty'] * f['price'] for f in close_fills)
-            avg_close_price = total_value / close_total_qty
+            avg_close_price = close_total_value / close_total_qty
         
         # 计算交易金额（以USDT计）
         trade_value = open_total_qty * avg_open_price
@@ -13464,9 +13470,44 @@ def maintain_anchor_order():
         # 计算费率（费用/交易金额）
         fee_rate = (total_fee / trade_value * 100) if trade_value > 0 else 0
         
+        # 计算每笔订单的盈亏
+        # 对于每笔开仓，计算对应的平仓盈亏
+        # 盈亏 = (平仓价格 - 开仓价格) * 数量 (多单)
+        # 盈亏 = (开仓价格 - 平仓价格) * 数量 (空单)
+        for i, open_fill in enumerate(open_fills):
+            if i < len(close_fills):
+                close_fill = close_fills[i]
+                qty = min(open_fill['qty'], close_fill['qty'])
+                
+                if pos_side == 'long':
+                    # 多单：平仓价格 - 开仓价格
+                    profit = (close_fill['price'] - open_fill['price']) * qty
+                else:
+                    # 空单：开仓价格 - 平仓价格
+                    profit = (open_fill['price'] - close_fill['price']) * qty
+                
+                # 减去这笔交易的手续费
+                net_profit = profit - open_fill['fee'] - close_fill['fee']
+                
+                open_fill['profit'] = profit
+                open_fill['net_profit'] = net_profit
+                close_fill['profit'] = profit
+                close_fill['net_profit'] = net_profit
+        
+        # 计算总盈亏
+        total_profit = 0
+        if pos_side == 'long':
+            total_profit = (avg_close_price - avg_open_price) * close_total_qty
+        else:
+            total_profit = (avg_open_price - avg_close_price) * close_total_qty
+        
+        # 净盈亏（扣除手续费）
+        net_profit = total_profit - total_fee
+        
         print(f"📊 开仓成交: {len(open_fills)}笔, 总量{open_total_qty}, 均价${avg_open_price:.4f}, 费用${open_total_fee:.4f}")
         print(f"📊 平仓成交: {len(close_fills)}笔, 总量{close_total_qty}, 均价${avg_close_price:.4f}, 费用${close_total_fee:.4f}")
         print(f"💰 总费用: ${total_fee:.4f}, 费率: {fee_rate:.4f}%")
+        print(f"💵 盈亏: ${total_profit:.4f}, 净盈亏: ${net_profit:.4f}")
         
         # 保存维护记录到JSON文件
         try:
@@ -13504,6 +13545,8 @@ def maintain_anchor_order():
                 'remaining_size': order_size - close_size,
                 'total_fee': total_fee,
                 'fee_rate': fee_rate,
+                'total_profit': total_profit,  # 总盈亏
+                'net_profit': net_profit,  # 净盈亏（扣除手续费）
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'status': 'success'
             }
@@ -13547,8 +13590,10 @@ def maintain_anchor_order():
 • 成交笔数: {len(close_fills)}笔
 • 平仓费用: ${close_total_fee:.4f} USDT
 
-**💰 费用统计**:
-• 总费用: ${total_fee:.4f} USDT
+**💰 盈亏统计**:
+• 总盈亏: ${total_profit:.4f} USDT {'📈' if total_profit > 0 else '📉' if total_profit < 0 else '➖'}
+• 手续费: ${total_fee:.4f} USDT
+• 净盈亏: ${net_profit:.4f} USDT {'✅' if net_profit > 0 else '❌' if net_profit < 0 else '➖'}
 • 费率: {fee_rate:.4f}%
 • 剩余仓位: {order_size - close_size}
 

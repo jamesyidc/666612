@@ -163,6 +163,11 @@ def check_and_maintain():
             
             log(f"🔍 检查: {inst_id} {pos_side} 收益率={profit_rate:.2f}% 保证金={margin:.4f}u")
             
+            # 检查持仓保证金是否小于2U
+            if margin >= 2.0:
+                log(f"⚠️  保证金 >= 2U，不自动维护: {margin:.4f}u")
+                continue
+            
             # 检查1：收益率是否达到维护阈值
             should_maintain = False
             if pos_side == 'long' and auto_maintain_long and profit_rate <= loss_threshold:

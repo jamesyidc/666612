@@ -674,11 +674,13 @@
                             <th>平仓费用</th>
                             <th>总费用</th>
                             <th>费率</th>
+                            <th>盈亏</th>
+                            <th>净盈亏</th>
                             <th>状态</th>
                         </tr>
                     </thead>
                     <tbody id="maintenanceBody">
-                        <tr><td colspan="15" class="loading">加载中...</td></tr>
+                        <tr><td colspan="17" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1276,11 +1278,17 @@
             const tbody = document.getElementById('maintenanceBody');
             
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="15" class="empty">暂无维护记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="17" class="empty">暂无维护记录</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = data.map((item, index) => `
+            tbody.innerHTML = data.map((item, index) => {
+                const profit = item.total_profit || 0;
+                const netProfit = item.net_profit || 0;
+                const profitColor = profit > 0 ? '#48bb78' : profit < 0 ? '#f56565' : '#718096';
+                const netProfitColor = netProfit > 0 ? '#48bb78' : netProfit < 0 ? '#f56565' : '#718096';
+                
+                return `
                 <tr>
                     <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
                     <td style="font-weight: 600;">${item.inst_id}</td>
@@ -1300,13 +1308,20 @@
                     <td style="color: #f56565;">$${(item.close_total_fee || 0).toFixed(6)}</td>
                     <td style="color: #f56565; font-weight: 700; font-size: 14px;">$${(item.total_fee || 0).toFixed(6)}</td>
                     <td style="color: #ed8936; font-weight: 700; font-size: 14px;">${(item.fee_rate || 0).toFixed(4)}%</td>
+                    <td style="color: ${profitColor}; font-weight: 700; font-size: 14px;">
+                        ${profit > 0 ? '+' : ''}$${profit.toFixed(4)}
+                    </td>
+                    <td style="color: ${netProfitColor}; font-weight: 700; font-size: 14px;">
+                        ${netProfit > 0 ? '+' : ''}$${netProfit.toFixed(4)}
+                    </td>
                     <td>
                         <span class="badge badge-profit">
                             ${item.status === 'success' ? '成功' : '失败'}
                         </span>
                     </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
         }
         
         // 全局变量存储维护记录
