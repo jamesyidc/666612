@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 # 数据库配置
-DB_PATH = os.path.join(os.path.dirname(__file__), 'crypto_data.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'support_resistance.db')
 DB_TIMEOUT = 60.0  # 60秒超时
 
 # 日志文件

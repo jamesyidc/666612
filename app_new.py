@@ -6380,7 +6380,7 @@ def api_trading_signals_history():
 def api_support_resistance_latest():
     """获取最新的支撑压力线数据"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('support_resistance.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -6624,7 +6624,7 @@ def api_support_resistance_history(symbol):
     try:
         hours = request.args.get('hours', 24, type=int)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('support_resistance.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -6694,7 +6694,7 @@ def api_support_resistance_snapshots():
         end_time = request.args.get('end_time')  # 格式: 2025-12-13 12:00:00
         get_all = request.args.get('all', 'false').lower() == 'true'  # 获取所有历史数据
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('support_resistance.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -6816,7 +6816,7 @@ def api_support_resistance_latest_signal():
         from datetime import datetime
         import pytz
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('support_resistance.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -6890,7 +6890,7 @@ def api_support_resistance_latest_signal():
 def api_support_resistance_dates():
     """获取有快照数据的所有日期列表"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('support_resistance.db')
         cursor = conn.cursor()
         
         cursor.execute('''
