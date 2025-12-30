@@ -17,6 +17,14 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
+def get_china_today():
+    """获取中国时区的今日日期字符串 (YYYY-MM-DD)"""
+    return datetime.now(BEIJING_TZ).strftime('%Y-%m-%d')
+
+def get_china_now():
+    """获取中国时区的当前时间"""
+    return datetime.now(BEIJING_TZ)
+
 # 导入交易API Blueprint
 from trading_api import trading_bp
 app.register_blueprint(trading_bp)
@@ -12742,7 +12750,7 @@ def get_current_positions():
                 with open(maintenance_file, 'r', encoding='utf-8') as f:
                     maintenance_records = json_lib.load(f)
                 
-                today = datetime.now().strftime('%Y-%m-%d')
+                today = get_china_today()
                 for record in maintenance_records:
                     created_at = record.get('created_at', '')
                     if created_at.startswith(today):
@@ -12882,7 +12890,7 @@ def get_today_statistics():
                 with open(maintenance_file, 'r', encoding='utf-8') as f:
                     records = json_lib.load(f)
                 
-                today = datetime.now().strftime('%Y-%m-%d')
+                today = get_china_today()
                 for record in records:
                     if record.get('created_at', '').startswith(today):
                         pos_side = record.get('pos_side')
@@ -12935,7 +12943,7 @@ def get_today_statistics():
                 'warning_positions': warning_positions
             },
             'trade_mode': trade_mode,
-            'date': datetime.now().strftime('%Y-%m-%d')
+            'date': get_china_today()
         })
         
     except Exception as e:
@@ -13041,7 +13049,7 @@ def get_sub_account_positions():
                             try:
                                 with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
                                     counts = json_lib.load(f)
-                                today = datetime.now().strftime('%Y-%m-%d')
+                                today = get_china_today()
                                 key = f"{account_name}:{pos['instId']}:{pos['posSide']}:{today}"
                                 maintenance_count = counts.get(key, 0)
                             except:
@@ -13081,7 +13089,7 @@ def get_sub_account_positions():
                             try:
                                 with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
                                     counts = json_lib.load(f)
-                                today = datetime.now().strftime('%Y-%m-%d')
+                                today = get_china_today()
                                 count_key = f"{account_name}:{pos_info['inst_id']}:{pos_info['pos_side']}:{today}"
                                 maintenance_count = counts.get(count_key, 0)
                             except:
@@ -13787,7 +13795,7 @@ def maintain_anchor_order():
         from collections import defaultdict
         
         maintenance_file = 'maintenance_orders.json'
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = get_china_today()
         
         # 统计今天的维护次数
         today_count = 0
@@ -14636,7 +14644,7 @@ def get_maintenance_stats():
             return jsonify({
                 'success': True,
                 'stats': {},
-                'today_date': datetime.now().strftime('%Y-%m-%d')
+                'today_date': get_china_today()
             })
         
         # 读取维护记录
@@ -14644,7 +14652,7 @@ def get_maintenance_stats():
             records = json_lib.load(f)
         
         # 今天的日期
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = get_china_today()
         
         # 统计今天每个币种+方向的维护次数（普通维护和超级维护都是+1）
         stats = defaultdict(int)
@@ -14842,7 +14850,7 @@ def get_snapshot_times():
         date = request.args.get('date')  # 格式：2025-12-30
         
         if not date:
-            date = datetime.now().strftime('%Y-%m-%d')
+            date = get_china_today()
         
         # 查询数据库
         conn = sqlite3.connect('/home/user/webapp/anchor_snapshots.db')
