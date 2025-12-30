@@ -1151,17 +1151,17 @@
             <div class="timeline-header">
                 <div>
                     <h2 style="font-size: 20px; margin-bottom: 5px;">🚨 24小时逃顶信号统计</h2>
-                    <p style="color: rgba(255,255,255,0.6); font-size: 13px;">每5分钟统计一次逃顶信号数量（逃顶分数 ≥ 8）</p>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 13px;">每5分钟统计一次接近压力线的币种数量（情况3+情况4）</p>
                 </div>
                 <div style="background: rgba(239,68,68,0.2); padding: 12px 20px; border-radius: 8px; border: 2px solid rgba(239,68,68,0.5);">
-                    <span style="color: rgba(255,255,255,0.8); font-size: 14px; margin-right: 10px;">当前逃顶信号</span>
+                    <span style="color: rgba(255,255,255,0.8); font-size: 14px; margin-right: 10px;">当前信号总数</span>
                     <strong style="color: #ef4444; font-size: 24px;" id="escapeCurrentCount">-</strong>
                     <span style="color: rgba(255,255,255,0.6); font-size: 14px; margin-left: 5px;">个</span>
                 </div>
             </div>
             <div id="escapeSignalChart" class="trend-chart-container"></div>
             <p style="color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 10px; text-align: center;">
-                💡 提示: 鼠标悬停查看详细信息 | 每3分钟自动刷新
+                💡 提示: 鼠标悬停查看详细信息 | 每3分钟自动刷新 | 显示所有接近压力线的记录
             </p>
         </div>
         
@@ -2550,7 +2550,7 @@
                             ? window.escapeFullTimes[dataIndex] 
                             : params[0].axisValue;
                         let result = '<div style="font-weight: bold; margin-bottom: 5px;">🕐 ' + fullTime + '</div>';
-                        result += params[0].marker + '逃顶信号数量: <b style="font-size: 16px;">' + params[0].value + '</b> 个';
+                        result += params[0].marker + '接近压力线币种: <b style="font-size: 16px;">' + params[0].value + '</b> 个';
                         return result;
                     }
                 },
@@ -2574,7 +2574,7 @@
                 },
                 yAxis: {
                     type: 'value',
-                    name: '逃顶信号数量',
+                    name: '接近压力线币种数',
                     nameTextStyle: { color: '#fff' },
                     axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
                     axisLabel: { color: '#fff' },
@@ -2639,17 +2639,15 @@
                     return;
                 }
                 
-                // 按时间汇总数据（统计每个时间点有多少个币种触发逃顶）
+                // 按时间汇总数据（统计每个时间点有多少个币种有逃顶记录）
                 const timeMap = {};
                 result.data.forEach(item => {
                     const time = item.signal_time;
                     if (!timeMap[time]) {
                         timeMap[time] = 0;
                     }
-                    // 只统计is_escape_signal=true的记录
-                    if (item.is_escape_signal) {
-                        timeMap[time]++;
-                    }
+                    // 统计所有记录（不管是否达到逃顶阈值）
+                    timeMap[time]++;
                 });
                 
                 // 按时间排序
