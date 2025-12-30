@@ -1,5 +1,135 @@
 [
   {
+    "id": 6,
+    "account_name": "JAMESYI",
+    "inst_id": "TON-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 6.0,
+    "open_order_id": "3174702124720185344",
+    "open_size": 60.0,
+    "open_fills": [
+      {
+        "trade_id": "125803725",
+        "qty": 59.0,
+        "price": 1.612,
+        "value": 95.108,
+        "fee": 0.047554,
+        "fee_currency": "USDT",
+        "profit": -0.055000000000006155,
+        "net_profit": -0.14685650000000616
+      },
+      {
+        "trade_id": "125803724",
+        "qty": 1.0,
+        "price": 1.612,
+        "value": 1.612,
+        "fee": 0.000806,
+        "fee_currency": "USDT"
+      }
+    ],
+    "open_total_qty": 60.0,
+    "open_avg_price": 1.6119999999999999,
+    "open_total_fee": 0.04836,
+    "close_order_id": "3174702249743998976",
+    "close_size": 55.0,
+    "close_fills": [
+      {
+        "trade_id": "125803728",
+        "qty": 55.0,
+        "price": 1.611,
+        "value": 88.605,
+        "fee": 0.0443025,
+        "fee_currency": "USDT",
+        "profit": -0.055000000000006155,
+        "net_profit": -0.14685650000000616
+      }
+    ],
+    "close_total_qty": 55.0,
+    "close_avg_price": 1.611,
+    "close_total_fee": 0.0443025,
+    "remaining_size": 5.0,
+    "total_fee": 0.09266250000000001,
+    "total_cost": 0.14766249999999395,
+    "fee_rate": 0.1526700785773304,
+    "total_profit": -0.05499999999999394,
+    "net_profit": -0.14685650000000616,
+    "created_at": "2025-12-30 17:31:43",
+    "status": "success"
+  },
+  {
+    "id": 5,
+    "account_name": "JAMESYI",
+    "inst_id": "CRO-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 10.0,
+    "open_order_id": "3174696475026251776",
+    "open_size": 100.0,
+    "open_fills": [
+      {
+        "trade_id": "111955188",
+        "qty": 17.0,
+        "price": 0.09233,
+        "value": 1.56961,
+        "fee": 0.00784805,
+        "fee_currency": "USDT",
+        "profit": -0.0005100000000000382,
+        "net_profit": -0.04989305000000004
+      },
+      {
+        "trade_id": "111955187",
+        "qty": 68.0,
+        "price": 0.09233,
+        "value": 6.27844,
+        "fee": 0.0313922,
+        "fee_currency": "USDT"
+      },
+      {
+        "trade_id": "111955186",
+        "qty": 13.0,
+        "price": 0.09233,
+        "value": 1.2002899999999999,
+        "fee": 0.00600145,
+        "fee_currency": "USDT"
+      },
+      {
+        "trade_id": "111955185",
+        "qty": 2.0,
+        "price": 0.09232,
+        "value": 0.18464,
+        "fee": 0.0009232,
+        "fee_currency": "USDT"
+      }
+    ],
+    "open_total_qty": 100.0,
+    "open_avg_price": 0.09232979999999999,
+    "open_total_fee": 0.0461649,
+    "close_order_id": "3174696599949402112",
+    "close_size": 90.0,
+    "close_fills": [
+      {
+        "trade_id": "111955189",
+        "qty": 90.0,
+        "price": 0.0923,
+        "value": 8.306999999999999,
+        "fee": 0.041535,
+        "fee_currency": "USDT",
+        "profit": -0.0005100000000000382,
+        "net_profit": -0.04989305000000004
+      }
+    ],
+    "close_total_qty": 90.0,
+    "close_avg_price": 0.09229999999999998,
+    "close_total_fee": 0.041535,
+    "remaining_size": 10.0,
+    "total_fee": 0.0876999,
+    "total_cost": 0.09038190000000093,
+    "fee_rate": 0.9789028027787446,
+    "total_profit": -0.0026820000000009336,
+    "net_profit": -0.04989305000000004,
+    "created_at": "2025-12-30 17:28:55",
+    "status": "success"
+  },
+  {
     "id": 4,
     "inst_id": "DOT-USDT-SWAP",
     "pos_side": "long",
