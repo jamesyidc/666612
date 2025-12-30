@@ -664,17 +664,21 @@
                             <th>币种</th>
                             <th>方向</th>
                             <th>原始仓位</th>
-                            <th>开仓数量</th>
-                            <th>平仓数量</th>
-                            <th>剩余数量</th>
+                            <th>开仓笔数</th>
+                            <th>开仓总量</th>
+                            <th>开仓均价</th>
+                            <th>开仓费用</th>
+                            <th>平仓笔数</th>
+                            <th>平仓总量</th>
+                            <th>平仓均价</th>
+                            <th>平仓费用</th>
                             <th>总费用</th>
                             <th>费率</th>
                             <th>状态</th>
-                            <th>详情</th>
                         </tr>
                     </thead>
                     <tbody id="maintenanceBody">
-                        <tr><td colspan="11" class="loading">加载中...</td></tr>
+                        <tr><td colspan="15" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1272,7 +1276,7 @@
             const tbody = document.getElementById('maintenanceBody');
             
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="empty">暂无维护记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="15" class="empty">暂无维护记录</td></tr>';
                 return;
             }
 
@@ -1286,28 +1290,20 @@
                         </span>
                     </td>
                     <td>${(item.original_size || 0).toFixed(4)}</td>
+                    <td style="color: #667eea; font-weight: 600;">${(item.open_fills || []).length}笔</td>
                     <td style="color: #3182ce; font-weight: 600;">${(item.open_total_qty || item.open_size || 0).toFixed(4)}</td>
+                    <td style="color: #3182ce;">$${(item.open_avg_price || 0).toFixed(4)}</td>
+                    <td style="color: #f56565;">$${(item.open_total_fee || 0).toFixed(6)}</td>
+                    <td style="color: #764ba2; font-weight: 600;">${(item.close_fills || []).length}笔</td>
                     <td style="color: #e53e3e; font-weight: 600;">${(item.close_total_qty || item.close_size || 0).toFixed(4)}</td>
-                    <td style="color: #48bb78; font-weight: 600;">${(item.remaining_size || 0).toFixed(4)}</td>
-                    <td style="color: #f56565; font-weight: 600;">$${(item.total_fee || 0).toFixed(4)}</td>
-                    <td style="color: #ed8936; font-weight: 600;">${(item.fee_rate || 0).toFixed(4)}%</td>
+                    <td style="color: #e53e3e;">$${(item.close_avg_price || 0).toFixed(4)}</td>
+                    <td style="color: #f56565;">$${(item.close_total_fee || 0).toFixed(6)}</td>
+                    <td style="color: #f56565; font-weight: 700; font-size: 14px;">$${(item.total_fee || 0).toFixed(6)}</td>
+                    <td style="color: #ed8936; font-weight: 700; font-size: 14px;">${(item.fee_rate || 0).toFixed(4)}%</td>
                     <td>
                         <span class="badge badge-profit">
                             ${item.status === 'success' ? '成功' : '失败'}
                         </span>
-                    </td>
-                    <td>
-                        <button onclick="showMaintenanceDetail(${index})" 
-                                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                       color: white;
-                                       border: none;
-                                       padding: 4px 10px;
-                                       border-radius: 6px;
-                                       cursor: pointer;
-                                       font-size: 11px;
-                                       font-weight: 600;">
-                            📊 详情
-                        </button>
                     </td>
                 </tr>
             `).join('');
