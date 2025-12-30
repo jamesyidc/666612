@@ -157,11 +157,11 @@ def check_and_maintain():
             margin = pos['margin']
             is_anchor = pos.get('is_anchor', 0)
             
-            # 只处理锚点单
-            if not is_anchor:
-                continue
+            # 跳过非锚点单（is_anchor=0）的持仓，除非它们满足自动维护条件
+            # 如果是锚点单，继续检查
+            # 如果不是锚点单，只有在满足维护条件时才处理
             
-            log(f"🔍 检查: {inst_id} {pos_side} 收益率={profit_rate:.2f}% 保证金={margin:.4f}u")
+            log(f"🔍 检查: {inst_id} {pos_side} 收益率={profit_rate:.2f}% 保证金={margin:.4f}u {'[锚点单]' if is_anchor else '[普通单]'}")
             
             # 检查持仓保证金是否小于2U
             if margin >= 2.0:
