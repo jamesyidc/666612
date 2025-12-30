@@ -1,0 +1,24 @@
+{
+  "sub_accounts": [
+    {
+      "account_name": "Wu666666",
+      "project_name": "POIT",
+      "api_key": "8650e46c-059b-431d-93cf-55f8c79babdb",
+      "secret_key": "4C2BD2AC6A08615EA7F36A6251857FCE",
+      "passphrase": "Wu666666.",
+      "enabled": true,
+      "maintenance_config": {
+        "max_maintenance_count": 3,
+        "loss_threshold": -10,
+        "stop_loss_threshold": -20,
+        "buy_amount_usdt": 100,
+        "keep_margin_usdt": 10,
+        "initial_position_usdt": 10
+      }
+    }
+  ],
+  "main_account": {
+    "account_name": "JAMESYI",
+    "enabled": true
+  }
+}
