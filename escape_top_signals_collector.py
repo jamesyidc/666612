@@ -28,11 +28,22 @@ COLLECTION_INTERVAL = 60  # 每60秒采集一次
 
 def collect_escape_signals():
     """采集逃顶信号"""
+    conn = None
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        # 使用更长的超时时间和WAL模式
+        conn = sqlite3.connect(DB_PATH, timeout=60.0, isolation_level=None)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=60000')  # 60秒超时
         cursor = conn.cursor()
         
-        # 插入或更新逃顶信号
+        # 先清理超过24小时的旧数据
+        cursor.execute("""
+            DELETE FROM escape_top_signals_24h
+            WHERE datetime(signal_time) < datetime('now', '-24 hours')
+        """)
+        deleted_count = cursor.rowcount
+        
+        # 插入或更新逃顶信号（降低阈值：只要有情况3或情况4就记录）
         insert_sql = """
         INSERT OR REPLACE INTO escape_top_signals_24h 
         (symbol, signal_time, current_price, resistance_line_1, resistance_line_2, 
@@ -58,20 +69,11 @@ def collect_escape_signals():
             alert_triggered
         FROM support_resistance_levels
         WHERE datetime(record_time) >= datetime('now', '-24 hours')
-          AND (alert_scenario_3 + alert_scenario_4) >= 8
+          AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
         """
         
         cursor.execute(insert_sql)
         inserted_count = cursor.rowcount
-        conn.commit()
-        
-        # 清理超过24小时的旧数据
-        cursor.execute("""
-            DELETE FROM escape_top_signals_24h
-            WHERE datetime(signal_time) < datetime('now', '-24 hours')
-        """)
-        deleted_count = cursor.rowcount
-        conn.commit()
         
         # 获取当前统计
         cursor.execute("SELECT COUNT(*) FROM escape_top_signals_24h")
@@ -84,8 +86,6 @@ def collect_escape_signals():
         """)
         active_coins = cursor.fetchone()[0]
         
-        conn.close()
-        
         logger.info(
             f"✅ 采集完成 | 新增/更新: {inserted_count} | 清理: {deleted_count} | "
             f"总计: {total_count} | 活跃币种: {active_coins}"
@@ -93,9 +93,21 @@ def collect_escape_signals():
         
         return True
         
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e):
+            logger.warning(f"⚠️ 数据库繁忙，将在下次重试: {str(e)}")
+        else:
+            logger.error(f"❌ 数据库操作失败: {str(e)}")
+        return False
     except Exception as e:
         logger.error(f"❌ 采集失败: {str(e)}")
         return False
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 def main():
     """主函数"""

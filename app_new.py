@@ -6923,34 +6923,35 @@ def escape_top_signals_page():
 
 @app.route('/api/escape-top-signals/latest')
 def api_escape_top_signals_latest():
-    """获取最新的逃顶信号数据"""
+    """获取最新的逃顶信号数据 - 直接从support_resistance_levels查询"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('crypto_data.db', timeout=30.0)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 获取24小时内的所有逃顶信号
+        # 直接从support_resistance_levels表查询24小时内有逃顶倾向的数据
         cursor.execute('''
             SELECT 
                 symbol,
-                signal_time,
+                record_time as signal_time,
                 current_price,
                 resistance_line_1,
                 resistance_line_2,
-                distance_to_r1,
-                distance_to_r2,
-                scenario_3_count,
-                scenario_4_count,
-                total_escape_score,
-                is_escape_signal,
+                distance_to_resistance_1 as distance_to_r1,
+                distance_to_resistance_2 as distance_to_r2,
+                alert_scenario_3 as scenario_3_count,
+                alert_scenario_4 as scenario_4_count,
+                (alert_scenario_3 + alert_scenario_4) as total_escape_score,
+                CASE WHEN (alert_scenario_3 + alert_scenario_4) >= 8 THEN 1 ELSE 0 END as is_escape_signal,
                 position_48h,
                 position_7d,
                 price_change_24h,
                 change_percent_24h,
                 alert_triggered
-            FROM escape_top_signals_24h
-            WHERE datetime(signal_time) >= datetime('now', '-24 hours')
-            ORDER BY signal_time DESC
+            FROM support_resistance_levels
+            WHERE datetime(record_time) >= datetime('now', '-24 hours')
+              AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
+            ORDER BY record_time DESC
         ''')
         
         rows = cursor.fetchall()
@@ -7044,35 +7045,37 @@ def api_escape_top_signals_history(symbol):
 
 @app.route('/api/escape-top-signals/stats')
 def api_escape_top_signals_stats():
-    """获取逃顶信号统计数据"""
+    """获取逃顶信号统计数据 - 直接从support_resistance_levels查询"""
     try:
         hours = request.args.get('hours', 24, type=int)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('crypto_data.db', timeout=30.0)
         cursor = conn.cursor()
         
-        # 总信号数
+        # 总信号数（有逃顶倾向的记录数）
         cursor.execute('''
             SELECT COUNT(*) as total
-            FROM escape_top_signals_24h
-            WHERE datetime(signal_time) >= datetime('now', ? || ' hours')
+            FROM support_resistance_levels
+            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
+              AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
         ''', (f'-{hours}',))
         total = cursor.fetchone()[0]
         
-        # 触发信号的币种数
+        # 触发信号的币种数（总分>=8的不同币种数）
         cursor.execute('''
             SELECT COUNT(DISTINCT symbol) as coin_count
-            FROM escape_top_signals_24h
-            WHERE datetime(signal_time) >= datetime('now', ? || ' hours')
-              AND is_escape_signal = 1
+            FROM support_resistance_levels
+            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
+              AND (alert_scenario_3 + alert_scenario_4) >= 8
         ''', (f'-{hours}',))
         coin_count = cursor.fetchone()[0]
         
         # 平均逃顶分数
         cursor.execute('''
-            SELECT AVG(total_escape_score) as avg_score
-            FROM escape_top_signals_24h
-            WHERE datetime(signal_time) >= datetime('now', ? || ' hours')
+            SELECT AVG(alert_scenario_3 + alert_scenario_4) as avg_score
+            FROM support_resistance_levels
+            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
+              AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
         ''', (f'-{hours}',))
         avg_score = cursor.fetchone()[0] or 0
         
@@ -7081,10 +7084,11 @@ def api_escape_top_signals_stats():
             SELECT 
                 symbol,
                 COUNT(*) as signal_count,
-                AVG(total_escape_score) as avg_score,
-                MAX(total_escape_score) as max_score
-            FROM escape_top_signals_24h
-            WHERE datetime(signal_time) >= datetime('now', ? || ' hours')
+                AVG(alert_scenario_3 + alert_scenario_4) as avg_score,
+                MAX(alert_scenario_3 + alert_scenario_4) as max_score
+            FROM support_resistance_levels
+            WHERE datetime(record_time) >= datetime('now', ? || ' hours')
+              AND (alert_scenario_3 > 0 OR alert_scenario_4 > 0)
             GROUP BY symbol
             ORDER BY signal_count DESC
         ''', (f'-{hours}',))
