@@ -13022,7 +13022,8 @@ def get_sub_account_positions():
                                 mark_px = float(pos.get('markPx') or 0)
                                 upl = float(pos.get('upl') or 0)
                                 notional_usd = float(pos.get('notionalUsd') or 0)
-                                margin = float(pos.get('margin') or 0)
+                                # 优先使用 imr（初始保证金），如果为空则尝试 margin
+                                margin = float(pos.get('imr') or pos.get('margin') or 0)
                             except Exception as e:
                                 print(f"⚠️ 数据转换失败: {e}, pos={pos}")
                                 continue
