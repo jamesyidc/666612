@@ -13344,6 +13344,93 @@ def maintain_anchor_order():
         
         close_order_id = close_result['data'][0]['ordId']
         
+        # 等待平仓订单成交
+        print(f"⏳ 等待3秒确保平仓订单成交...")
+        time.sleep(3)
+        
+        # 查询开仓订单的成交明细（fills）
+        fills_path = f'/api/v5/trade/fills?instId={inst_id}&ordId={open_order_id}'
+        headers = get_headers('GET', fills_path)
+        open_fills_response = requests.get(
+            OKEX_REST_URL + fills_path,
+            headers=headers,
+            timeout=10
+        )
+        open_fills_data = open_fills_response.json()
+        
+        # 查询平仓订单的成交明细
+        close_fills_path = f'/api/v5/trade/fills?instId={inst_id}&ordId={close_order_id}'
+        headers = get_headers('GET', close_fills_path)
+        close_fills_response = requests.get(
+            OKEX_REST_URL + close_fills_path,
+            headers=headers,
+            timeout=10
+        )
+        close_fills_data = close_fills_response.json()
+        
+        # 处理开仓成交明细
+        open_fills = []
+        open_total_fee = 0
+        open_total_qty = 0
+        if open_fills_data.get('code') == '0' and open_fills_data.get('data'):
+            for fill in open_fills_data['data']:
+                qty = float(fill.get('fillSz', 0))
+                price = float(fill.get('fillPx', 0))
+                fee = float(fill.get('fee', 0))
+                open_fills.append({
+                    'trade_id': fill.get('tradeId'),
+                    'qty': qty,
+                    'price': price,
+                    'fee': abs(fee),  # 费用取绝对值
+                    'fee_currency': fill.get('feeCcy', 'USDT')
+                })
+                open_total_fee += abs(fee)
+                open_total_qty += qty
+        
+        # 处理平仓成交明细
+        close_fills = []
+        close_total_fee = 0
+        close_total_qty = 0
+        if close_fills_data.get('code') == '0' and close_fills_data.get('data'):
+            for fill in close_fills_data['data']:
+                qty = float(fill.get('fillSz', 0))
+                price = float(fill.get('fillPx', 0))
+                fee = float(fill.get('fee', 0))
+                close_fills.append({
+                    'trade_id': fill.get('tradeId'),
+                    'qty': qty,
+                    'price': price,
+                    'fee': abs(fee),
+                    'fee_currency': fill.get('feeCcy', 'USDT')
+                })
+                close_total_fee += abs(fee)
+                close_total_qty += qty
+        
+        # 计算总费用和费率
+        total_fee = open_total_fee + close_total_fee
+        
+        # 计算平均开仓价格
+        avg_open_price = 0
+        if open_total_qty > 0:
+            total_value = sum(f['qty'] * f['price'] for f in open_fills)
+            avg_open_price = total_value / open_total_qty
+        
+        # 计算平均平仓价格
+        avg_close_price = 0
+        if close_total_qty > 0:
+            total_value = sum(f['qty'] * f['price'] for f in close_fills)
+            avg_close_price = total_value / close_total_qty
+        
+        # 计算交易金额（以USDT计）
+        trade_value = open_total_qty * avg_open_price
+        
+        # 计算费率（费用/交易金额）
+        fee_rate = (total_fee / trade_value * 100) if trade_value > 0 else 0
+        
+        print(f"📊 开仓成交: {len(open_fills)}笔, 总量{open_total_qty}, 均价${avg_open_price:.4f}, 费用${open_total_fee:.4f}")
+        print(f"📊 平仓成交: {len(close_fills)}笔, 总量{close_total_qty}, 均价${avg_close_price:.4f}, 费用${close_total_fee:.4f}")
+        print(f"💰 总费用: ${total_fee:.4f}, 费率: {fee_rate:.4f}%")
+        
         # 保存维护记录到JSON文件
         try:
             import json as json_lib
@@ -13367,9 +13454,19 @@ def maintain_anchor_order():
                 'original_size': pos_size,
                 'open_order_id': open_order_id,
                 'open_size': order_size,
+                'open_fills': open_fills,
+                'open_total_qty': open_total_qty,
+                'open_avg_price': avg_open_price,
+                'open_total_fee': open_total_fee,
                 'close_order_id': close_order_id,
                 'close_size': close_size,
+                'close_fills': close_fills,
+                'close_total_qty': close_total_qty,
+                'close_avg_price': avg_close_price,
+                'close_total_fee': close_total_fee,
                 'remaining_size': order_size - close_size,
+                'total_fee': total_fee,
+                'fee_rate': fee_rate,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'status': 'success'
             }
@@ -13385,6 +13482,49 @@ def maintain_anchor_order():
                 json_lib.dump(records, f, ensure_ascii=False, indent=2)
             
             print(f"✅ 维护记录已保存: ID {new_record['id']}")
+            
+            # 发送TG通知
+            try:
+                from telegram_notifier import TelegramNotifier
+                
+                notifier = TelegramNotifier()
+                
+                # 构建通知消息
+                tg_message = f"""🔧 **锚点单维护通知**
+
+📍 **币种**: {inst_id}
+📊 **方向**: {'做空' if pos_side == 'short' else '做多'}
+💼 **原始仓位**: {pos_size}
+
+**🟢 开仓详情**:
+• 订单ID: `{open_order_id}`
+• 开仓数量: {open_total_qty}
+• 平均价格: ${avg_open_price:.4f}
+• 成交笔数: {len(open_fills)}笔
+• 开仓费用: ${open_total_fee:.4f} USDT
+
+**🔴 平仓详情**:
+• 订单ID: `{close_order_id}`
+• 平仓数量: {close_total_qty}
+• 平均价格: ${avg_close_price:.4f}
+• 成交笔数: {len(close_fills)}笔
+• 平仓费用: ${close_total_fee:.4f} USDT
+
+**💰 费用统计**:
+• 总费用: ${total_fee:.4f} USDT
+• 费率: {fee_rate:.4f}%
+• 剩余仓位: {order_size - close_size}
+
+⏰ 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+                
+                notifier.send_message(tg_message)
+                print(f"✅ TG通知已发送")
+            except Exception as tg_error:
+                print(f"⚠️  发送TG通知失败: {tg_error}")
+                import traceback
+                print(traceback.format_exc())
+                # 不影响主流程
         except Exception as save_error:
             print(f"⚠️  保存维护记录失败: {save_error}")
             # 不影响主流程，继续返回成功
@@ -13397,7 +13537,13 @@ def maintain_anchor_order():
                 'close_order_id': close_order_id,
                 'open_size': order_size,
                 'close_size': close_size,
-                'remaining_size': order_size - close_size
+                'remaining_size': order_size - close_size,
+                'open_fills': open_fills,
+                'close_fills': close_fills,
+                'open_total_fee': open_total_fee,
+                'close_total_fee': close_total_fee,
+                'total_fee': total_fee,
+                'fee_rate': fee_rate
             }
         })
         

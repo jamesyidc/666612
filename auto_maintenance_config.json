@@ -1,6 +1,6 @@
 {
-  "auto_maintain_long_enabled": false,
-  "auto_maintain_short_enabled": false,
+  "auto_maintain_long_enabled": true,
+  "auto_maintain_short_enabled": true,
   "loss_threshold": -10,
   "margin_min": 0.6,
   "margin_max": 1.0,

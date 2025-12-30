@@ -667,13 +667,14 @@
                             <th>开仓数量</th>
                             <th>平仓数量</th>
                             <th>剩余数量</th>
-                            <th>开仓订单ID</th>
-                            <th>平仓订单ID</th>
+                            <th>总费用</th>
+                            <th>费率</th>
                             <th>状态</th>
+                            <th>详情</th>
                         </tr>
                     </thead>
                     <tbody id="maintenanceBody">
-                        <tr><td colspan="10" class="loading">加载中...</td></tr>
+                        <tr><td colspan="11" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -775,6 +776,7 @@
                 const maintenanceData = await maintenanceRes.json();
                 
                 if (maintenanceData.success) {
+                    maintenanceRecordsData = maintenanceData.data;  // 保存到全局变量
                     renderMaintenanceOrders(maintenanceData.data);
                 }
 
@@ -1270,11 +1272,11 @@
             const tbody = document.getElementById('maintenanceBody');
             
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty">暂无维护记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="empty">暂无维护记录</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = data.map(item => `
+            tbody.innerHTML = data.map((item, index) => `
                 <tr>
                     <td style="font-size: 12px; color: #718096;">${item.created_at}</td>
                     <td style="font-weight: 600;">${item.inst_id}</td>
@@ -1283,19 +1285,92 @@
                             ${item.pos_side === 'short' ? '做空' : '做多'}
                         </span>
                     </td>
-                    <td>${item.original_size.toFixed(4)}</td>
-                    <td style="color: #3182ce; font-weight: 600;">${item.open_size.toFixed(4)}</td>
-                    <td style="color: #e53e3e; font-weight: 600;">${item.close_size.toFixed(4)}</td>
-                    <td style="color: #48bb78; font-weight: 600;">${item.remaining_size.toFixed(4)}</td>
-                    <td style="font-size: 11px; font-family: monospace;">${item.open_order_id}</td>
-                    <td style="font-size: 11px; font-family: monospace;">${item.close_order_id}</td>
+                    <td>${(item.original_size || 0).toFixed(4)}</td>
+                    <td style="color: #3182ce; font-weight: 600;">${(item.open_total_qty || item.open_size || 0).toFixed(4)}</td>
+                    <td style="color: #e53e3e; font-weight: 600;">${(item.close_total_qty || item.close_size || 0).toFixed(4)}</td>
+                    <td style="color: #48bb78; font-weight: 600;">${(item.remaining_size || 0).toFixed(4)}</td>
+                    <td style="color: #f56565; font-weight: 600;">$${(item.total_fee || 0).toFixed(4)}</td>
+                    <td style="color: #ed8936; font-weight: 600;">${(item.fee_rate || 0).toFixed(4)}%</td>
                     <td>
                         <span class="badge badge-profit">
                             ${item.status === 'success' ? '成功' : '失败'}
                         </span>
                     </td>
+                    <td>
+                        <button onclick="showMaintenanceDetail(${index})" 
+                                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                       color: white;
+                                       border: none;
+                                       padding: 4px 10px;
+                                       border-radius: 6px;
+                                       cursor: pointer;
+                                       font-size: 11px;
+                                       font-weight: 600;">
+                            📊 详情
+                        </button>
+                    </td>
                 </tr>
             `).join('');
+        }
+        
+        // 全局变量存储维护记录
+        let maintenanceRecordsData = [];
+        
+        // 显示维护详情
+        function showMaintenanceDetail(index) {
+            const item = maintenanceRecordsData[index];
+            if (!item) return;
+            
+            // 构建开仓明细
+            let openDetails = '暂无详情';
+            if (item.open_fills && item.open_fills.length > 0) {
+                openDetails = item.open_fills.map((fill, i) => 
+                    `  ${i+1}. 数量: ${fill.qty.toFixed(4)}, 价格: $${fill.price.toFixed(4)}, 费用: $${fill.fee.toFixed(4)}`
+                ).join('\n');
+            }
+            
+            // 构建平仓明细
+            let closeDetails = '暂无详情';
+            if (item.close_fills && item.close_fills.length > 0) {
+                closeDetails = item.close_fills.map((fill, i) => 
+                    `  ${i+1}. 数量: ${fill.qty.toFixed(4)}, 价格: $${fill.price.toFixed(4)}, 费用: $${fill.fee.toFixed(4)}`
+                ).join('\n');
+            }
+            
+            const message = `🔧 维护锚点单详情
+
+📍 币种: ${item.inst_id}
+📊 方向: ${item.pos_side === 'short' ? '做空' : '做多'}
+💼 原始仓位: ${(item.original_size || 0).toFixed(4)}
+
+🟢 开仓详情:
+• 订单ID: ${item.open_order_id}
+• 总数量: ${(item.open_total_qty || 0).toFixed(4)}
+• 平均价格: $${(item.open_avg_price || 0).toFixed(4)}
+• 成交笔数: ${(item.open_fills || []).length}笔
+• 开仓费用: $${(item.open_total_fee || 0).toFixed(4)}
+
+成交明细:
+${openDetails}
+
+🔴 平仓详情:
+• 订单ID: ${item.close_order_id}
+• 总数量: ${(item.close_total_qty || 0).toFixed(4)}
+• 平均价格: $${(item.close_avg_price || 0).toFixed(4)}
+• 成交笔数: ${(item.close_fills || []).length}笔
+• 平仓费用: $${(item.close_total_fee || 0).toFixed(4)}
+
+成交明细:
+${closeDetails}
+
+💰 费用统计:
+• 总费用: $${(item.total_fee || 0).toFixed(4)} USDT
+• 费率: ${(item.fee_rate || 0).toFixed(4)}%
+• 剩余仓位: ${(item.remaining_size || 0).toFixed(4)}
+
+⏰ 时间: ${item.created_at}`;
+
+            alert(message);
         }
 
         // 渲染监控记录表

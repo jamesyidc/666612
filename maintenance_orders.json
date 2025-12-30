@@ -1,5 +1,44 @@
 [
   {
+    "id": 2,
+    "inst_id": "CRV-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 0.1,
+    "open_order_id": "3174290716144689152",
+    "open_size": 1.0,
+    "open_fills": [
+      {
+        "trade_id": "379734741",
+        "qty": 1.0,
+        "price": 0.3787,
+        "fee": 0.00018935,
+        "fee_currency": "USDT"
+      }
+    ],
+    "open_total_qty": 1.0,
+    "open_avg_price": 0.3787,
+    "open_total_fee": 0.00018935,
+    "close_order_id": "3174290841436938240",
+    "close_size": 1.0,
+    "close_fills": [
+      {
+        "trade_id": "379734750",
+        "qty": 1.0,
+        "price": 0.3786,
+        "fee": 0.0001893,
+        "fee_currency": "USDT"
+      }
+    ],
+    "close_total_qty": 1.0,
+    "close_avg_price": 0.3786,
+    "close_total_fee": 0.0001893,
+    "remaining_size": 0.0,
+    "total_fee": 0.00037865,
+    "fee_rate": 0.09998679693688937,
+    "created_at": "2025-12-30 14:07:22",
+    "status": "success"
+  },
+  {
     "id": 1,
     "inst_id": "DOT-USDT-SWAP",
     "pos_side": "long",
