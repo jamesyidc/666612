@@ -262,6 +262,12 @@
             </div>
         </div>
         
+        <!-- 全局趋势图 -->
+        <div class="chart-container">
+            <h2 style="margin-bottom: 15px;">📈 24小时全局逃顶趋势图（所有币种汇总）</h2>
+            <div id="globalTrendChart" style="width: 100%; height: 400px;"></div>
+        </div>
+        
         <div class="chart-container">
             <h2 style="margin-bottom: 15px;">📊 逃顶分数趋势图（按币种）</h2>
             <div id="escapeScoreChart"></div>
@@ -314,11 +320,15 @@
 
     <script>
         let chart = null;
+        let globalTrendChart = null;
         
         // 初始化ECharts
         function initChart() {
             const chartDom = document.getElementById('escapeScoreChart');
             chart = echarts.init(chartDom);
+            
+            const globalChartDom = document.getElementById('globalTrendChart');
+            globalTrendChart = echarts.init(globalChartDom);
         }
         
         // 更新图表
@@ -419,6 +429,173 @@
             chart.setOption(option);
         }
         
+        // 更新全局趋势图（所有币种汇总）
+        function updateGlobalTrendChart(data) {
+            // 按时间排序并汇总所有币种的逃顶信号数量
+            const timeMap = {};
+            
+            data.forEach(item => {
+                const time = item.signal_time;
+                if (!timeMap[time]) {
+                    timeMap[time] = {
+                        count: 0,
+                        totalScore: 0,
+                        maxScore: 0,
+                        symbols: []
+                    };
+                }
+                timeMap[time].count++;
+                timeMap[time].totalScore += item.total_escape_score;
+                timeMap[time].maxScore = Math.max(timeMap[time].maxScore, item.total_escape_score);
+                if (item.is_escape_signal) {
+                    timeMap[time].symbols.push(`${item.symbol}(${item.total_escape_score})`);
+                }
+            });
+            
+            // 按时间排序
+            const times = Object.keys(timeMap).sort();
+            const counts = times.map(t => timeMap[t].count);
+            const avgScores = times.map(t => (timeMap[t].totalScore / timeMap[t].count).toFixed(2));
+            const maxScores = times.map(t => timeMap[t].maxScore);
+            
+            const option = {
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    textStyle: {
+                        color: '#fff'
+                    },
+                    formatter: function(params) {
+                        const time = params[0].axisValue;
+                        const symbols = timeMap[time].symbols;
+                        let html = `<div style="padding: 5px;">`;
+                        html += `<strong>${time}</strong><br/>`;
+                        params.forEach(param => {
+                            html += `${param.marker} ${param.seriesName}: ${param.value}<br/>`;
+                        });
+                        if (symbols.length > 0) {
+                            html += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">`;
+                            html += `<strong>逃顶币种:</strong><br/>`;
+                            html += symbols.join('<br/>');
+                            html += `</div>`;
+                        }
+                        html += `</div>`;
+                        return html;
+                    }
+                },
+                legend: {
+                    data: ['信号数量', '平均分数', '最高分数'],
+                    textStyle: {
+                        color: '#fff'
+                    },
+                    top: '5%'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: times,
+                    axisLabel: {
+                        color: '#fff',
+                        rotate: 30,
+                        formatter: function(value) {
+                            return value.substring(5, 16); // 显示 MM-DD HH:mm
+                        }
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '信号数量',
+                        position: 'left',
+                        axisLabel: {
+                            color: '#fff'
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: 'rgba(255,255,255,0.1)'
+                            }
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: '逃顶分数',
+                        position: 'right',
+                        axisLabel: {
+                            color: '#fff'
+                        },
+                        splitLine: {
+                            show: false
+                        }
+                    }
+                ],
+                series: [
+                    {
+                        name: '信号数量',
+                        type: 'bar',
+                        data: counts,
+                        yAxisIndex: 0,
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: '#fbbf24' },
+                                { offset: 1, color: '#f59e0b' }
+                            ])
+                        }
+                    },
+                    {
+                        name: '平均分数',
+                        type: 'line',
+                        data: avgScores,
+                        yAxisIndex: 1,
+                        smooth: true,
+                        itemStyle: {
+                            color: '#3b82f6'
+                        },
+                        lineStyle: {
+                            width: 2
+                        }
+                    },
+                    {
+                        name: '最高分数',
+                        type: 'line',
+                        data: maxScores,
+                        yAxisIndex: 1,
+                        smooth: true,
+                        itemStyle: {
+                            color: '#ef4444'
+                        },
+                        lineStyle: {
+                            width: 2,
+                            type: 'dashed'
+                        },
+                        markLine: {
+                            data: [{
+                                yAxis: 8,
+                                label: {
+                                    formatter: '逃顶阈值: 8'
+                                },
+                                lineStyle: {
+                                    color: '#ef4444',
+                                    type: 'solid',
+                                    width: 2
+                                }
+                            }]
+                        }
+                    }
+                ]
+            };
+            
+            globalTrendChart.setOption(option);
+        }
+        
         // 加载数据
         async function loadData() {
             try {
@@ -460,6 +637,9 @@
                 
                 // 更新图表
                 updateChart(result.data);
+                
+                // 更新全局趋势图
+                updateGlobalTrendChart(result.data);
                 
                 // 更新时间
                 document.getElementById('updateTime').textContent = 
