@@ -1146,25 +1146,6 @@
             </div>
         </div>
         
-        <!-- 24小时逃顶信号统计图 -->
-        <div class="timeline-section" style="margin-top: 30px;">
-            <div class="timeline-header">
-                <div>
-                    <h2 style="font-size: 20px; margin-bottom: 5px;">🚨 24小时逃顶信号统计</h2>
-                    <p style="color: rgba(255,255,255,0.6); font-size: 13px;">每5分钟统计一次接近压力线的币种数量（情况3+情况4）</p>
-                </div>
-                <div style="background: rgba(239,68,68,0.2); padding: 12px 20px; border-radius: 8px; border: 2px solid rgba(239,68,68,0.5);">
-                    <span style="color: rgba(255,255,255,0.8); font-size: 14px; margin-right: 10px;">当前信号总数</span>
-                    <strong style="color: #ef4444; font-size: 24px;" id="escapeCurrentCount">-</strong>
-                    <span style="color: rgba(255,255,255,0.6); font-size: 14px; margin-left: 5px;">个</span>
-                </div>
-            </div>
-            <div id="escapeSignalChart" class="trend-chart-container"></div>
-            <p style="color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 10px; text-align: center;">
-                💡 提示: 鼠标悬停查看详细信息 | 每3分钟自动刷新 | 显示所有接近压力线的记录
-            </p>
-        </div>
-        
         <!-- 全局趋势图 -->
         <div class="timeline-section" style="margin-top: 30px;">
             <!-- 逃顶信号统计（左右并排）-->
@@ -1551,7 +1532,6 @@
         let currentDate = getBeijingDate();
         let globalTrendChart; // 全局趋势图
         let pagedTrendChart; // 12小时分页趋势图
-        let escapeSignalChart; // 24小时逃顶信号统计图
         
         // 设置状态（从localStorage加载）
         let signalSettings = {
@@ -2521,157 +2501,7 @@
             console.log('✅ 分页图表更新完成', markLineData.length > 0 ? `(含${markLineData.length}条日期分割线)` : '');
         }
         
-        // 初始化24小时逃顶信号统计图
-        function initEscapeSignalChart() {
-            if (typeof echarts === 'undefined') {
-                console.error('❌ ECharts库未加载');
-                return;
-            }
-            
-            const chartDom = document.getElementById('escapeSignalChart');
-            if (!chartDom) {
-                console.error('❌ 找不到逃顶信号图表容器');
-                return;
-            }
-            
-            escapeSignalChart = echarts.init(chartDom);
-            
-            const option = {
-                backgroundColor: 'transparent',
-                tooltip: {
-                    trigger: 'axis',
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    borderColor: 'rgba(255,255,255,0.2)',
-                    textStyle: { color: '#fff' },
-                    formatter: function(params) {
-                        if (!params || params.length === 0) return '';
-                        const dataIndex = params[0].dataIndex;
-                        const fullTime = window.escapeFullTimes && window.escapeFullTimes[dataIndex] 
-                            ? window.escapeFullTimes[dataIndex] 
-                            : params[0].axisValue;
-                        let result = '<div style="font-weight: bold; margin-bottom: 5px;">🕐 ' + fullTime + '</div>';
-                        result += params[0].marker + '接近压力线币种: <b style="font-size: 16px;">' + params[0].value + '</b> 个';
-                        return result;
-                    }
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '3%',
-                    top: '5%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    boundaryGap: false,
-                    data: [],
-                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
-                    axisLabel: { 
-                        color: '#fff', 
-                        rotate: 30,
-                        fontSize: 11
-                    }
-                },
-                yAxis: {
-                    type: 'value',
-                    name: '接近压力线币种数',
-                    nameTextStyle: { color: '#fff' },
-                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
-                    axisLabel: { color: '#fff' },
-                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
-                    minInterval: 1
-                },
-                series: [
-                    {
-                        name: '逃顶信号数量',
-                        type: 'line',
-                        data: [],
-                        smooth: true,
-                        symbol: 'circle',
-                        symbolSize: 6,
-                        lineStyle: { 
-                            color: '#ef4444', 
-                            width: 3 
-                        },
-                        itemStyle: { 
-                            color: '#ef4444',
-                            borderColor: '#fff',
-                            borderWidth: 2
-                        },
-                        areaStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: 'rgba(239, 68, 68, 0.5)' },
-                                { offset: 1, color: 'rgba(239, 68, 68, 0.1)' }
-                            ])
-                        }
-                    }
-                ]
-            };
-            
-            escapeSignalChart.setOption(option);
-            console.log('✅ 逃顶信号统计图初始化完成');
-        }
-        
-        // 加载24小时逃顶信号数据
-        async function loadEscapeSignalData() {
-            try {
-                // 获取历史时间序列数据（24小时）
-                const response = await fetch('/api/escape-top-signals/history-timeseries?hours=24');
-                const result = await response.json();
                 
-                if (!result.success) {
-                    throw new Error(result.message || '加载失败');
-                }
-                
-                // 获取统计数据（逃顶事件次数）
-                const statsResponse = await fetch('/api/escape-top-signals/stats');
-                const statsResult = await statsResponse.json();
-                const escapeEvents = statsResult.success ? statsResult.stats.total_signals : 0;
-                document.getElementById('escapeCurrentCount').textContent = escapeEvents;
-                
-                // 处理图表数据
-                if (!result.data || result.data.length === 0) {
-                    console.log('⚠️ 暂无逃顶信号历史数据');
-                    escapeSignalChart.setOption({
-                        xAxis: { data: [] },
-                        series: [{ data: [] }]
-                    });
-                    return;
-                }
-                
-                // 提取时间和数量
-                const times = result.data.map(d => d.time);
-                const counts = result.data.map(d => d.count);
-                
-                // 格式化时间显示（月-日 时:分）
-                const timeLabels = times.map(t => {
-                    const parts = t.split(' ');
-                    const date = parts[0].substring(5); // MM-DD
-                    const time = parts[1].substring(0, 5); // HH:MM
-                    return `${date} ${time}`;
-                });
-                
-                // 保存完整时间用于tooltip
-                window.escapeFullTimes = times;
-                
-                // 更新图表
-                escapeSignalChart.setOption({
-                    xAxis: { data: timeLabels },
-                    series: [{ data: counts }]
-                });
-                
-                console.log('✅ 逃顶信号数据加载完成:', {
-                    时间点: times.length,
-                    当前信号数: currentCount,
-                    数据示例: times.slice(0, 3).map((t, i) => `${t}: ${counts[i]}个`)
-                });
-                
-            } catch (error) {
-                console.error('❌ 加载逃顶信号数据失败:', error);
-                document.getElementById('escapeCurrentCount').textContent = '?';
-            }
-        }
-        
         // 显示分页图表的快照详情
         function showPagedSnapshotDetail(dataIndex) {
             console.log('🔍 显示分页快照详情，索引:', dataIndex);
@@ -3200,22 +3030,6 @@
                 console.error('❌ 12小时分页图初始化失败:', error);
             }
             
-            // 初始化24小时逃顶信号统计图
-            console.log('🚨 初始化24小时逃顶信号统计图...');
-            try {
-                initEscapeSignalChart();
-                console.log('✅ 逃顶信号统计图初始化成功');
-            } catch (error) {
-                console.error('❌ 逃顶信号统计图初始化失败:', error);
-            }
-            
-            // 加载逃顶信号数据
-            console.log('📡 加载逃顶信号数据...');
-            try {
-                loadEscapeSignalData();
-            } catch (error) {
-                console.error('❌ 加载逃顶信号数据失败:', error);
-            }
             
             // 日期选择器控制分页图表
             
@@ -3778,7 +3592,6 @@
         setInterval(function() {
             loadGlobalTrendData(); // 全局趋势图每3分钟刷新
             loadDailyTimeline(currentDate); // 当日时间轴每3分钟刷新
-            loadEscapeSignalData(); // 逃顶信号数据每3分钟刷新
         }, 180000);
         
         // 自动检测最新信号（每30秒检测一次）
