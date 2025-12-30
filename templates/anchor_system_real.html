@@ -198,12 +198,7 @@
             padding: 12px;
             border-bottom: 1px solid #e2e8f0;
             font-size: 13px;
-            color: #000 !important;
-        }
-        
-        /* 子账户表格强制黑色字体 */
-        #subAccountPositionTable td {
-            color: #000 !important;
+            color: #2d3748;
         }
 
         tr:hover {
@@ -760,7 +755,7 @@
                             <th style="color: white; width: 8%;">操作</th>
                         </tr>
                     </thead>
-                    <tbody id="subAccountPositionBody" style="color: #000 !important;">
+                    <tbody id="subAccountPositionBody">
                         <tr><td colspan="14" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
@@ -1615,23 +1610,23 @@
                 const maintenanceCount = item.maintenance_count || 0;
                 
                 return `
-                <tr style="color: #000 !important;">
-                    <td style="font-weight: 700; color: #000 !important; font-size: 14px;">${item.account_name}</td>
-                    <td style="font-weight: 700; color: #000 !important;">${coinNumber}</td>
-                    <td style="font-weight: 600; color: #000 !important;">${item.inst_id}</td>
+                <tr>
+                    <td style="font-weight: 700; font-size: 14px;">${item.account_name}</td>
+                    <td style="font-weight: 700;">${coinNumber}</td>
+                    <td style="font-weight: 600;">${item.inst_id}</td>
                     <td>
                         <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
                             ${item.pos_side === 'short' ? '做空' : '做多'}
                         </span>
                     </td>
-                    <td style="color: #000 !important;">${Math.abs(item.pos_size || 0).toFixed(4)}</td>
-                    <td style="color: #000 !important;">$${(item.avg_price || 0).toFixed(4)}</td>
-                    <td style="color: #000 !important;">$${(item.mark_price || 0).toFixed(4)}</td>
-                    <td style="color: #000 !important;">${item.leverage}x</td>
+                    <td>${Math.abs(item.pos_size || 0).toFixed(4)}</td>
+                    <td>$${(item.avg_price || 0).toFixed(4)}</td>
+                    <td>$${(item.mark_price || 0).toFixed(4)}</td>
+                    <td>${item.leverage}x</td>
                     <td style="color: ${uplColor}; font-weight: 600;">
                         ${(item.upl || 0) >= 0 ? '+' : ''}${(item.upl || 0).toFixed(4)} USDT
                     </td>
-                    <td style="color: #000 !important;">${(item.margin || 0).toFixed(4)} USDT</td>
+                    <td>${(item.margin || 0).toFixed(4)} USDT</td>
                     <td style="color: ${profitColor}; font-weight: 700; font-size: 16px;">
                         ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
                     </td>
