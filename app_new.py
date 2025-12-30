@@ -7129,12 +7129,12 @@ def api_escape_top_signals_history_timeseries():
         conn = sqlite3.connect('crypto_data.db', timeout=30.0)
         cursor = conn.cursor()
         
-        # 按5分钟间隔统计逃顶信号数量（数据库已存储北京时间）
+        # 按5分钟间隔统计逃顶信号数量（UTC转北京时间+8小时）
         cursor.execute('''
             SELECT 
                 datetime(
-                    strftime('%Y-%m-%d %H:', record_time) || 
-                    printf('%02d', (CAST(strftime('%M', record_time) AS INTEGER) / 5) * 5) ||
+                    strftime('%Y-%m-%d %H:', datetime(record_time, '+8 hours')) || 
+                    printf('%02d', (CAST(strftime('%M', datetime(record_time, '+8 hours')) AS INTEGER) / 5) * 5) ||
                     ':00'
                 ) as time_slot,
                 COUNT(DISTINCT symbol) as unique_symbols
