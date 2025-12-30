@@ -12082,6 +12082,66 @@ def anchor_system_real():
     response.headers['Expires'] = '-1'
     return response
 
+@app.route('/api/anchor-system/real/hourly-extreme-stats')
+def get_real_hourly_extreme_stats():
+    """获取实盘锚点系统最近1小时的极值统计"""
+    try:
+        from datetime import datetime, timedelta
+        
+        db_path = '/home/user/webapp/anchor_system.db'
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 获取1小时前的时间
+        one_hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 统计最近1小时内的极值记录
+        cursor.execute("""
+            SELECT 
+                pos_side,
+                record_type,
+                COUNT(*) as count
+            FROM anchor_real_profit_records
+            WHERE timestamp >= ?
+            GROUP BY pos_side, record_type
+        """, (one_hour_ago,))
+        
+        stats_rows = cursor.fetchall()
+        
+        # 组织数据
+        stats = {
+            'short_max_profit': 0,  # 空单利润创新高
+            'short_max_loss': 0,    # 空单亏损创新高
+            'long_max_profit': 0,   # 多单利润创新高
+            'long_max_loss': 0      # 多单亏损创新高
+        }
+        
+        for row in stats_rows:
+            pos_side, record_type, count = row
+            if pos_side == 'short' and record_type == 'max_profit':
+                stats['short_max_profit'] = count
+            elif pos_side == 'short' and record_type == 'max_loss':
+                stats['short_max_loss'] = count
+            elif pos_side == 'long' and record_type == 'max_profit':
+                stats['long_max_profit'] = count
+            elif pos_side == 'long' and record_type == 'max_loss':
+                stats['long_max_loss'] = count
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'time_range': f'最近1小时 (>{one_hour_ago})',
+            'stats': stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/anchor-system-paper')
 def anchor_system_paper():
     """模拟盘锚点系统"""

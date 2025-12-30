@@ -524,6 +524,9 @@
                 <div class="card-title">
                     <span>🏆</span>
                     历史极值记录
+                    <span id="hourlyStats" style="margin-left: 20px; font-size: 13px; font-weight: normal; color: #718096;">
+                        <!-- 1小时统计将在这里显示 -->
+                    </span>
                 </div>
             </div>
             <div class="table-container">
@@ -683,6 +686,14 @@
                 
                 if (recordsData.success) {
                     renderRecordsTable(recordsData.records);
+                }
+
+                // 加载最近1小时的极值统计
+                const hourlyStatsRes = await fetch('/api/anchor-system/real/hourly-extreme-stats');
+                const hourlyStatsData = await hourlyStatsRes.json();
+                
+                if (hourlyStatsData.success) {
+                    renderHourlyStats(hourlyStatsData.stats);
                 }
 
                 // 加载当前持仓情况（实盘模式）
@@ -851,6 +862,33 @@
             });
             
             console.log('⏰ 持续时间已更新');
+        }
+
+        // 渲染1小时内极值统计
+        function renderHourlyStats(stats) {
+            const statsElement = document.getElementById('hourlyStats');
+            if (!statsElement) return;
+            
+            // 构建统计信息HTML
+            const html = `
+                <span style="color: #48bb78; margin-right: 10px;">
+                    🟢 多单盈利: <strong>${stats.long_max_profit}</strong>
+                </span>
+                <span style="color: #f56565; margin-right: 10px;">
+                    🔴 多单亏损: <strong>${stats.long_max_loss}</strong>
+                </span>
+                <span style="color: #48bb78; margin-right: 10px;">
+                    🟢 空单盈利: <strong>${stats.short_max_profit}</strong>
+                </span>
+                <span style="color: #f56565;">
+                    🔴 空单亏损: <strong>${stats.short_max_loss}</strong>
+                </span>
+                <span style="color: #a0aec0; margin-left: 10px; font-size: 12px;">
+                    (最近1小时内创新高)
+                </span>
+            `;
+            
+            statsElement.innerHTML = html;
         }
 
         // 渲染历史极值记录表
