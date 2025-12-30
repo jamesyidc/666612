@@ -12084,31 +12084,41 @@ def anchor_system_real():
 
 @app.route('/api/anchor-system/real/hourly-extreme-stats')
 def get_real_hourly_extreme_stats():
-    """获取实盘锚点系统最近1小时的极值统计"""
+    """获取实盘锚点系统最近1小时的极值统计（只统计每个币种的最新极值）"""
     try:
         from datetime import datetime, timedelta
+        import pytz
         
         db_path = '/home/user/webapp/anchor_system.db'
         conn = sqlite3.connect(db_path, timeout=10.0)
         cursor = conn.cursor()
         
-        # 获取1小时前的时间
-        one_hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+        # 使用北京时区
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        one_hour_ago_beijing = now_beijing - timedelta(hours=1)
         
-        # 统计最近1小时内的极值记录
+        # 转换为字符串（数据库中存储的是北京时间）
+        one_hour_ago_str = one_hour_ago_beijing.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 获取所有记录
         cursor.execute("""
-            SELECT 
-                pos_side,
-                record_type,
-                COUNT(*) as count
+            SELECT inst_id, pos_side, record_type, profit_rate, timestamp
             FROM anchor_real_profit_records
-            WHERE timestamp >= ?
-            GROUP BY pos_side, record_type
-        """, (one_hour_ago,))
+            ORDER BY timestamp DESC
+        """)
         
-        stats_rows = cursor.fetchall()
+        all_records = cursor.fetchall()
         
-        # 组织数据
+        # 按币种、方向、类型分组，只保留最新的记录
+        latest_records = {}
+        for record in all_records:
+            inst_id, pos_side, record_type, profit_rate, timestamp = record
+            key = (inst_id, pos_side, record_type)
+            if key not in latest_records:
+                latest_records[key] = record
+        
+        # 统计最近1小时内的最新极值
         stats = {
             'short_max_profit': 0,  # 空单利润创新高
             'short_max_loss': 0,    # 空单亏损创新高
@@ -12116,23 +12126,26 @@ def get_real_hourly_extreme_stats():
             'long_max_loss': 0      # 多单亏损创新高
         }
         
-        for row in stats_rows:
-            pos_side, record_type, count = row
-            if pos_side == 'short' and record_type == 'max_profit':
-                stats['short_max_profit'] = count
-            elif pos_side == 'short' and record_type == 'max_loss':
-                stats['short_max_loss'] = count
-            elif pos_side == 'long' and record_type == 'max_profit':
-                stats['long_max_profit'] = count
-            elif pos_side == 'long' and record_type == 'max_loss':
-                stats['long_max_loss'] = count
+        for key, record in latest_records.items():
+            inst_id, pos_side, record_type, profit_rate, timestamp = record
+            if timestamp >= one_hour_ago_str:
+                if pos_side == 'short' and record_type == 'max_profit':
+                    stats['short_max_profit'] += 1
+                elif pos_side == 'short' and record_type == 'max_loss':
+                    stats['short_max_loss'] += 1
+                elif pos_side == 'long' and record_type == 'max_profit':
+                    stats['long_max_profit'] += 1
+                elif pos_side == 'long' and record_type == 'max_loss':
+                    stats['long_max_loss'] += 1
         
         conn.close()
         
         return jsonify({
             'success': True,
-            'time_range': f'最近1小时 (>{one_hour_ago})',
-            'stats': stats
+            'time_range': f'最近1小时 (>{one_hour_ago_str})',
+            'current_time': now_beijing.strftime('%Y-%m-%d %H:%M:%S'),
+            'stats': stats,
+            'note': '只统计每个币种的最新极值记录（北京时间）'
         })
         
     except Exception as e:
