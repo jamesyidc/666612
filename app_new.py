@@ -12731,12 +12731,29 @@ def get_current_positions():
             # 查找数据库记录（可能是锚点单，也可能不是）
             db_record = db_positions_dict.get((inst_id, pos_side))
             
+            # 安全转换函数
+            def safe_float(value, default=0):
+                try:
+                    if value == '' or value is None:
+                        return default
+                    return float(value)
+                except (ValueError, TypeError):
+                    return default
+            
+            def safe_int(value, default=10):
+                try:
+                    if value == '' or value is None:
+                        return default
+                    return int(value)
+                except (ValueError, TypeError):
+                    return default
+            
             # 计算数据
-            okex_avg_price = float(pos.get('avgPx', 0))
-            mark_price = float(pos.get('markPx', 0))
-            lever = int(pos.get('lever', 10))
-            upl = float(pos.get('upl', 0))
-            margin = float(pos.get('margin', 0))
+            okex_avg_price = safe_float(pos.get('avgPx', 0))
+            mark_price = safe_float(pos.get('markPx', 0))
+            lever = safe_int(pos.get('lever', 10))
+            upl = safe_float(pos.get('upl', 0))
+            margin = safe_float(pos.get('margin', 0))
             
             # 如果数据库中有记录，使用数据库的开仓价格（可能是维护后的）
             if db_record:
