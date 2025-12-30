@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>锚点系统 - 历史快照</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .filters {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .filter-group label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .filter-group input,
+        .filter-group select {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #f3f4f6;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #f9fafb;
+        }
+        
+        th {
+            padding: 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        td {
+            padding: 12px;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-long {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-short {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-anchor {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .profit-positive {
+            color: #059669;
+            font-weight: 600;
+        }
+        
+        .profit-negative {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📸 锚点系统 - 历史快照</h1>
+            <p>查看持仓和统计数据的历史记录，每1分钟自动保存快照</p>
+        </div>
+        
+        <div class="filters">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>开始时间</label>
+                    <input type="datetime-local" id="startTime">
+                </div>
+                <div class="filter-group">
+                    <label>结束时间</label>
+                    <input type="datetime-local" id="endTime">
+                </div>
+                <div class="filter-group">
+                    <label>币种（可选）</label>
+                    <input type="text" id="instId" placeholder="例如：DOT-USDT-SWAP">
+                </div>
+                <div class="filter-group">
+                    <label>方向（可选）</label>
+                    <select id="posSide">
+                        <option value="">全部</option>
+                        <option value="long">做多</option>
+                        <option value="short">做空</option>
+                    </select>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="loadSnapshots()">🔍 查询快照</button>
+                <button class="btn btn-secondary" onclick="loadToday()">📅 今天</button>
+                <button class="btn btn-secondary" onclick="loadLast24Hours()">⏰ 最近24小时</button>
+                <button class="btn btn-secondary" onclick="backToMain()">🏠 返回主页</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid" id="statsGrid" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-label">快照总数</div>
+                <div class="stat-value" id="totalSnapshots">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">时间范围</div>
+                <div class="stat-value" style="font-size: 14px;" id="timeRange">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">查询耗时</div>
+                <div class="stat-value" id="queryTime">-</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('positions')">📊 持仓快照</button>
+                <button class="tab" onclick="switchTab('statistics')">📈 统计快照</button>
+            </div>
+            
+            <div id="positionsTab" class="tab-content active">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>快照时间</th>
+                                <th>币种</th>
+                                <th>方向</th>
+                                <th>持仓量</th>
+                                <th>开仓价</th>
+                                <th>标记价</th>
+                                <th>杠杆</th>
+                                <th>保证金</th>
+                                <th>收益率</th>
+                                <th>未实现盈亏</th>
+                                <th>维护次数</th>
+                                <th>类型</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsBody">
+                            <tr>
+                                <td colspan="12" class="loading">请选择时间范围并点击查询按钮</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="statisticsTab" class="tab-content">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>快照时间</th>
+                                <th>统计项目</th>
+                                <th>数值</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statisticsBody">
+                            <tr>
+                                <td colspan="3" class="loading">请选择时间范围并点击查询按钮</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 初始化时间
+        function initTime() {
+            const now = new Date();
+            const endTime = new Date(now.getTime());
+            const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24小时前
+            
+            document.getElementById('startTime').value = formatDateTimeLocal(startTime);
+            document.getElementById('endTime').value = formatDateTimeLocal(endTime);
+        }
+        
+        function formatDateTimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+        
+        function loadToday() {
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0);
+            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59);
+            
+            document.getElementById('startTime').value = formatDateTimeLocal(startOfDay);
+            document.getElementById('endTime').value = formatDateTimeLocal(endOfDay);
+            loadSnapshots();
+        }
+        
+        function loadLast24Hours() {
+            initTime();
+            loadSnapshots();
+        }
+        
+        function backToMain() {
+            window.location.href = '/anchor-system-real';
+        }
+        
+        function switchTab(tab) {
+            // 切换标签页
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            if (tab === 'positions') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('positionsTab').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('statisticsTab').classList.add('active');
+            }
+        }
+        
+        async function loadSnapshots() {
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            const instId = document.getElementById('instId').value;
+            const posSide = document.getElementById('posSide').value;
+            
+            if (!startTime || !endTime) {
+                alert('请选择开始和结束时间');
+                return;
+            }
+            
+            // 转换为服务器格式 (YYYY-MM-DD HH:MM:SS)
+            const startTimeStr = startTime.replace('T', ' ') + ':00';
+            const endTimeStr = endTime.replace('T', ' ') + ':00';
+            
+            const startQueryTime = Date.now();
+            
+            try {
+                // 加载持仓快照
+                document.getElementById('positionsBody').innerHTML = '<tr><td colspan="12" class="loading">加载中...</td></tr>';
+                
+                const posParams = new URLSearchParams({
+                    start_time: startTimeStr,
+                    end_time: endTimeStr,
+                    limit: 1000
+                });
+                
+                if (instId) posParams.append('inst_id', instId);
+                if (posSide) posParams.append('pos_side', posSide);
+                
+                const posResponse = await fetch(`/api/anchor/snapshots/positions?${posParams}`);
+                const posData = await posResponse.json();
+                
+                // 加载统计快照
+                document.getElementById('statisticsBody').innerHTML = '<tr><td colspan="3" class="loading">加载中...</td></tr>';
+                
+                const statParams = new URLSearchParams({
+                    start_time: startTimeStr,
+                    end_time: endTimeStr,
+                    limit: 1000
+                });
+                
+                const statResponse = await fetch(`/api/anchor/snapshots/statistics?${statParams}`);
+                const statData = await statResponse.json();
+                
+                const queryTime = ((Date.now() - startQueryTime) / 1000).toFixed(2);
+                
+                // 显示统计信息
+                document.getElementById('statsGrid').style.display = 'grid';
+                document.getElementById('totalSnapshots').textContent = posData.count;
+                document.getElementById('timeRange').textContent = `${startTimeStr.split(' ')[0]}`;
+                document.getElementById('queryTime').textContent = `${queryTime}s`;
+                
+                // 渲染持仓快照
+                renderPositionSnapshots(posData.snapshots);
+                
+                // 渲染统计快照
+                renderStatisticsSnapshots(statData.snapshots);
+                
+            } catch (error) {
+                console.error('加载快照失败:', error);
+                alert('加载快照失败: ' + error.message);
+            }
+        }
+        
+        function renderPositionSnapshots(snapshots) {
+            const tbody = document.getElementById('positionsBody');
+            
+            if (!snapshots || snapshots.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" class="empty">暂无数据</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = snapshots.map(snap => {
+                const profitClass = snap.profit_rate >= 0 ? 'profit-positive' : 'profit-negative';
+                const profitSign = snap.profit_rate >= 0 ? '+' : '';
+                
+                return `
+                    <tr>
+                        <td>${snap.snapshot_time}</td>
+                        <td><strong>${snap.inst_id}</strong></td>
+                        <td>
+                            <span class="badge badge-${snap.pos_side}">
+                                ${snap.pos_side === 'long' ? '做多' : '做空'}
+                            </span>
+                        </td>
+                        <td>${snap.pos_size.toFixed(4)}</td>
+                        <td>$${snap.avg_price.toFixed(4)}</td>
+                        <td>$${snap.mark_price.toFixed(4)}</td>
+                        <td>${snap.leverage}x</td>
+                        <td>${snap.margin.toFixed(4)}u</td>
+                        <td class="${profitClass}">${profitSign}${snap.profit_rate.toFixed(2)}%</td>
+                        <td class="${profitClass}">${profitSign}${snap.upl.toFixed(4)}</td>
+                        <td>${snap.maintenance_count}/5</td>
+                        <td>
+                            ${snap.is_anchor ? '<span class="badge badge-anchor">锚点单</span>' : '普通单'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function renderStatisticsSnapshots(snapshots) {
+            const tbody = document.getElementById('statisticsBody');
+            
+            if (!snapshots || snapshots.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="empty">暂无数据</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = snapshots.map(snap => {
+                return `
+                    <tr>
+                        <td>${snap.snapshot_time}</td>
+                        <td>${snap.stat_label}</td>
+                        <td><strong>${snap.stat_value}</strong></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // 页面加载时初始化
+        initTime();
+    </script>
+</body>
+</html>

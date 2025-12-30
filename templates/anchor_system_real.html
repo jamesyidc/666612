@@ -662,7 +662,13 @@
                     <span>🔧</span>
                     维护锚点单成交记录
                 </div>
-                <span style="color: #718096; font-size: 14px;">最近50条记录</span>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button onclick="window.open('/anchor-snapshots', '_blank')" 
+                            style="padding: 8px 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                        📸 查看历史快照
+                    </button>
+                    <span style="color: #718096; font-size: 14px;">最近50条记录</span>
+                </div>
             </div>
             <div class="table-container">
                 <table id="maintenanceTable">

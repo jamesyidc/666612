@@ -12177,6 +12177,17 @@ def anchor_system_real():
     response.headers['Expires'] = '-1'
     return response
 
+@app.route('/anchor-snapshots')
+def anchor_snapshots():
+    """锚点系统历史快照查看"""
+    response = make_response(render_template('anchor_snapshots.html'))
+    # 禁用所有缓存
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
+
 @app.route('/api/anchor-system/real/hourly-extreme-stats')
 def get_real_hourly_extreme_stats():
     """获取实盘锚点系统最近1小时的极值统计（只统计每个币种的最新极值）"""
@@ -12838,6 +12849,102 @@ def get_current_positions():
             'error': str(e),
             'traceback': traceback.format_exc()
         })
+
+@app.route('/api/anchor-system/today-statistics')
+def get_today_statistics():
+    """获取今日统计数据"""
+    try:
+        import sqlite3
+        import requests
+        from datetime import datetime
+        
+        trade_mode = request.args.get('trade_mode', 'real')
+        
+        # 获取维护次数统计
+        maintenance_stats_response = requests.get('http://localhost:5000/api/anchor/maintenance-stats', timeout=5)
+        maintenance_stats = {}
+        if maintenance_stats_response.status_code == 200:
+            maintenance_data = maintenance_stats_response.json()
+            if maintenance_data.get('success'):
+                maintenance_stats = maintenance_data.get('stats', {})
+        
+        # 统计今日维护次数（按类型分类）
+        maintenance_file = 'maintenance_orders.json'
+        auto_maintain_long = 0
+        auto_maintain_short = 0
+        super_maintain_long = 0
+        super_maintain_short = 0
+        
+        try:
+            import json as json_lib
+            import os
+            if os.path.exists(maintenance_file):
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    records = json_lib.load(f)
+                
+                today = datetime.now().strftime('%Y-%m-%d')
+                for record in records:
+                    if record.get('created_at', '').startswith(today):
+                        pos_side = record.get('pos_side')
+                        maintenance_type = record.get('maintenance_type', 'normal')
+                        
+                        if maintenance_type == 'super_maintain':
+                            if pos_side == 'long':
+                                super_maintain_long += 1
+                            else:
+                                super_maintain_short += 1
+                        else:
+                            if pos_side == 'long':
+                                auto_maintain_long += 1
+                            else:
+                                auto_maintain_short += 1
+        except Exception as e:
+            print(f"统计维护次数失败: {e}")
+        
+        # 获取当前持仓统计
+        positions_response = requests.get(
+            f'http://localhost:5000/api/anchor-system/current-positions?trade_mode={trade_mode}',
+            timeout=10
+        )
+        
+        total_positions = 0
+        anchor_positions = 0
+        warning_positions = 0
+        
+        if positions_response.status_code == 200:
+            positions_data = positions_response.json()
+            if positions_data.get('success'):
+                positions = positions_data.get('positions', [])
+                total_positions = len(positions)
+                
+                for pos in positions:
+                    if pos.get('is_anchor'):
+                        anchor_positions += 1
+                    if pos.get('profit_rate', 0) <= -8:
+                        warning_positions += 1
+        
+        return jsonify({
+            'success': True,
+            'statistics': {
+                'auto_maintain_long': auto_maintain_long,
+                'auto_maintain_short': auto_maintain_short,
+                'super_maintain_long': super_maintain_long,
+                'super_maintain_short': super_maintain_short,
+                'total_positions': total_positions,
+                'anchor_positions': anchor_positions,
+                'warning_positions': warning_positions
+            },
+            'trade_mode': trade_mode,
+            'date': datetime.now().strftime('%Y-%m-%d')
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 # ====================交易决策系统路由 ====================
 
@@ -14244,6 +14351,209 @@ def get_maintenance_stats():
             'message': f'查询失败: {str(e)}',
             'traceback': traceback.format_exc()
         })
+
+# ==================== 历史快照API ====================
+
+@app.route('/api/anchor/snapshots/positions', methods=['GET'])
+def get_position_snapshots():
+    """获取持仓历史快照"""
+    try:
+        import sqlite3
+        from datetime import datetime, timedelta
+        
+        # 获取参数
+        start_time = request.args.get('start_time')  # 2025-12-30 00:00:00
+        end_time = request.args.get('end_time')      # 2025-12-30 23:59:59
+        inst_id = request.args.get('inst_id')        # 可选：筛选币种
+        pos_side = request.args.get('pos_side')      # 可选：筛选方向
+        limit = int(request.args.get('limit', 100))  # 默认100条
+        
+        # 默认查询最近24小时
+        if not end_time:
+            end_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if not start_time:
+            start_dt = datetime.now() - timedelta(hours=24)
+            start_time = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 查询数据库
+        conn = sqlite3.connect('/home/user/webapp/anchor_snapshots.db')
+        cursor = conn.cursor()
+        
+        # 构建查询
+        query = '''
+        SELECT snapshot_time, inst_id, pos_side, pos_size, avg_price,
+               mark_price, leverage, margin, profit_rate, upl,
+               maintenance_count, is_anchor, status
+        FROM position_snapshots
+        WHERE snapshot_time BETWEEN ? AND ?
+        '''
+        params = [start_time, end_time]
+        
+        if inst_id:
+            query += ' AND inst_id = ?'
+            params.append(inst_id)
+        
+        if pos_side:
+            query += ' AND pos_side = ?'
+            params.append(pos_side)
+        
+        query += ' ORDER BY snapshot_time DESC LIMIT ?'
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # 转换为字典列表
+        snapshots = []
+        for row in rows:
+            snapshots.append({
+                'snapshot_time': row[0],
+                'inst_id': row[1],
+                'pos_side': row[2],
+                'pos_size': row[3],
+                'avg_price': row[4],
+                'mark_price': row[5],
+                'leverage': row[6],
+                'margin': row[7],
+                'profit_rate': row[8],
+                'upl': row[9],
+                'maintenance_count': row[10],
+                'is_anchor': row[11],
+                'status': row[12]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'snapshots': snapshots,
+            'count': len(snapshots),
+            'start_time': start_time,
+            'end_time': end_time
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/api/anchor/snapshots/statistics', methods=['GET'])
+def get_statistics_snapshots():
+    """获取统计历史快照"""
+    try:
+        import sqlite3
+        from datetime import datetime, timedelta
+        
+        # 获取参数
+        start_time = request.args.get('start_time')
+        end_time = request.args.get('end_time')
+        stat_type = request.args.get('stat_type')  # 可选：筛选统计类型
+        limit = int(request.args.get('limit', 100))
+        
+        # 默认查询最近24小时
+        if not end_time:
+            end_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if not start_time:
+            start_dt = datetime.now() - timedelta(hours=24)
+            start_time = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 查询数据库
+        conn = sqlite3.connect('/home/user/webapp/anchor_snapshots.db')
+        cursor = conn.cursor()
+        
+        # 构建查询
+        query = '''
+        SELECT snapshot_time, stat_type, stat_value, stat_label
+        FROM statistics_snapshots
+        WHERE snapshot_time BETWEEN ? AND ?
+        '''
+        params = [start_time, end_time]
+        
+        if stat_type:
+            query += ' AND stat_type = ?'
+            params.append(stat_type)
+        
+        query += ' ORDER BY snapshot_time DESC, stat_type LIMIT ?'
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # 转换为字典列表
+        snapshots = []
+        for row in rows:
+            snapshots.append({
+                'snapshot_time': row[0],
+                'stat_type': row[1],
+                'stat_value': row[2],
+                'stat_label': row[3]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'snapshots': snapshots,
+            'count': len(snapshots),
+            'start_time': start_time,
+            'end_time': end_time
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/api/anchor/snapshots/times', methods=['GET'])
+def get_snapshot_times():
+    """获取可用的快照时间点列表"""
+    try:
+        import sqlite3
+        from datetime import datetime, timedelta
+        
+        # 获取参数
+        date = request.args.get('date')  # 格式：2025-12-30
+        
+        if not date:
+            date = datetime.now().strftime('%Y-%m-%d')
+        
+        # 查询数据库
+        conn = sqlite3.connect('/home/user/webapp/anchor_snapshots.db')
+        cursor = conn.cursor()
+        
+        # 查询当天的所有快照时间
+        cursor.execute('''
+        SELECT DISTINCT snapshot_time
+        FROM position_snapshots
+        WHERE snapshot_time LIKE ?
+        ORDER BY snapshot_time DESC
+        ''', (f"{date}%",))
+        
+        rows = cursor.fetchall()
+        times = [row[0] for row in rows]
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'times': times,
+            'count': len(times),
+            'date': date
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/api/trading/positions/opens')
 def get_trading_positions_opens():
