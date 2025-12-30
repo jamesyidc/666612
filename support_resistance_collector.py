@@ -16,6 +16,7 @@ from typing import Dict, List, Optional
 
 # 数据库配置
 DB_PATH = os.path.join(os.path.dirname(__file__), 'crypto_data.db')
+DB_TIMEOUT = 60.0  # 60秒超时
 
 # 日志文件
 LOG_FILE = os.path.join(os.path.dirname(__file__), 'support_resistance.log')
@@ -109,7 +110,8 @@ def get_or_create_baseline_price(symbol: str, current_price: float) -> dict:
     获取或创建今日基准价格（北京时间0点）
     返回: {'baseline_price': float, 'price_change': float, 'change_percent': float}
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=DB_TIMEOUT)
+    conn.execute("PRAGMA busy_timeout = 60000")  # 60秒busy timeout
     cursor = conn.cursor()
     
     # 获取北京时间当前日期
@@ -347,7 +349,8 @@ def calculate_support_resistance(symbol: str) -> Optional[Dict]:
 def save_to_database(data: Dict) -> bool:
     """保存到数据库"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=DB_TIMEOUT)
+        conn.execute("PRAGMA busy_timeout = 60000")
         cursor = conn.cursor()
         
         cursor.execute('''
