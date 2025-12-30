@@ -2615,17 +2615,21 @@
         // 加载24小时逃顶信号数据
         async function loadEscapeSignalData() {
             try {
-                // 获取统计数据（用于更新当前值）
-                const statsResponse = await fetch('/api/escape-top-signals/stats');
-                const statsResult = await statsResponse.json();
-                
-                // 更新统计数字（只显示当前信号总数）
-                const currentCount = statsResult.success ? statsResult.stats.total_signals : 0;
-                document.getElementById('escapeCurrentCount').textContent = currentCount;
-                
-                // 获取历史时间序列数据
+                // 先获取历史数据，用于统计逃顶事件次数
                 const response = await fetch('/api/escape-top-signals/history-timeseries?hours=24');
                 const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.message || '加载失败');
+                }
+                
+                // 统计逃顶事件次数（币种数≥8的时间点数量）
+                const escapeEvents = result.data ? result.data.filter(d => d.count >= 8).length : 0;
+                document.getElementById('escapeCurrentCount').textContent = escapeEvents;
+                
+                // 获取历史时间序列数据（已经获取过了，直接使用result）
+                // const response = await fetch('/api/escape-top-signals/history-timeseries?hours=24');
+                // const result = await response.json();
                 
                 if (!result.success) {
                     throw new Error(result.message || '加载失败');
