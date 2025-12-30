@@ -13378,7 +13378,7 @@ def super_maintain_anchor_order():
                 'keep_size': keep_size,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'status': 'success',
-                'maintenance_count': 2  # 超级维护计数+2
+                'maintenance_count': 1  # 超级维护也是计数+1
             }
             
             records.insert(0, new_record)
@@ -14218,7 +14218,7 @@ def get_maintenance_stats():
         # 今天的日期
         today = datetime.now().strftime('%Y-%m-%d')
         
-        # 统计今天每个币种+方向的维护次数（超级维护计数+2）
+        # 统计今天每个币种+方向的维护次数（普通维护和超级维护都是+1）
         stats = defaultdict(int)
         
         for record in records:
@@ -14228,14 +14228,8 @@ def get_maintenance_stats():
                 pos_side = record.get('pos_side', '')
                 key = f"{inst_id}:{pos_side}"
                 
-                # 检查是否是超级维护
-                record_type = record.get('type', 'normal')
-                if record_type == 'super_maintain':
-                    # 超级维护计数+2
-                    stats[key] += 2
-                else:
-                    # 普通维护计数+1
-                    stats[key] += 1
+                # 无论是普通维护还是超级维护，都计数+1
+                stats[key] += 1
         
         return jsonify({
             'success': True,

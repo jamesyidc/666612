@@ -20,7 +20,7 @@ def log(message):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 
 def get_maintenance_count_today(inst_id, pos_side):
-    """获取今天的维护次数（超级维护计数+2）"""
+    """获取今天的维护次数（普通维护+1，超级维护+1）"""
     try:
         response = requests.get(f"{BASE_URL}/api/anchor/maintenance-stats", timeout=5)
         data = response.json()
@@ -85,7 +85,7 @@ def maintain_anchor(inst_id, pos_side, pos_size):
         return False
 
 def super_maintain_anchor(inst_id, pos_side, pos_size):
-    """执行超级维护锚点单（买入100U，保留10U）"""
+    """执行超级维护锚点单（买入100U，保留10U），计数+1"""
     try:
         log(f"🚀 开始超级维护: {inst_id} {pos_side} {pos_size}")
         response = requests.post(
@@ -218,25 +218,25 @@ def check_and_maintain():
                     log(f"🛑 已达到每日维护上限(5次)，停止维护")
                     continue
                 elif today_count >= 3:
-                    # 第3次和第4次使用超级维护
+                    # 第4次和第5次使用超级维护（计数各+1）
                     should_super = False
                     if pos_side == 'long' and super_maintain_long:
-                        log(f"🚀 多单维护次数={today_count}，触发超级维护")
+                        log(f"🚀 多单维护次数={today_count}，触发超级维护（第{today_count + 1}次）")
                         should_super = True
                     elif pos_side == 'short' and super_maintain_short:
-                        log(f"🚀 空单维护次数={today_count}，触发超级维护")
+                        log(f"🚀 空单维护次数={today_count}，触发超级维护（第{today_count + 1}次）")
                         should_super = True
                     
                     if should_super:
-                        # 执行超级维护（计数+2）
+                        # 执行超级维护（计数+1）
                         success = super_maintain_anchor(inst_id, pos_side, pos_size)
                         if success:
-                            log(f"✅ 超级维护完成: {inst_id} (今日第{today_count + 2}次，+2次)")
+                            log(f"✅ 超级维护完成: {inst_id} (今日第{today_count + 1}次)")
                             time.sleep(2)
                     else:
                         log(f"⚠️  超级维护开关未开启，跳过")
                 else:
-                    # 前3次使用普通维护
+                    # 前3次使用普通维护（计数各+1）
                     success = maintain_anchor(inst_id, pos_side, pos_size)
                     if success:
                         log(f"✅ 自动维护完成: {inst_id} (今日第{today_count + 1}次)")
