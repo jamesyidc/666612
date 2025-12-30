@@ -172,13 +172,13 @@ def open_position_on_sub_account(sub_account, inst_id, pos_side, size_usdt):
         secret_key = sub_account['secret_key']
         passphrase = sub_account['passphrase']
         
-        # 先设置杠杆为10倍
-        print(f"🔧 设置杠杆为10倍...")
+        # 先设置杠杆为10倍（逐仓模式）
+        print(f"🔧 设置杠杆为10倍（逐仓模式）...")
         leverage_path = '/api/v5/account/set-leverage'
         leverage_data = {
             'instId': inst_id,
             'lever': '10',
-            'mgnMode': 'cross',
+            'mgnMode': 'isolated',  # 逐仓模式
             'posSide': pos_side
         }
         leverage_headers = get_okex_headers(api_key, secret_key, passphrase, 'POST', leverage_path, leverage_data)
@@ -217,11 +217,11 @@ def open_position_on_sub_account(sub_account, inst_id, pos_side, size_usdt):
         
         print(f"📊 准备开仓: {inst_id} {pos_side} 数量:{size}张 价格:${last_price:.4f}")
         
-        # 下单
+        # 下单（逐仓模式）
         request_path = '/api/v5/trade/order'
         order_data = {
             'instId': inst_id,
-            'tdMode': 'cross',  # 全仓模式
+            'tdMode': 'isolated',  # 逐仓模式
             'side': 'buy' if pos_side == 'long' else 'sell',
             'posSide': pos_side,
             'ordType': 'market',
