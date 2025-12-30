@@ -746,12 +746,13 @@
                             <th style="color: white;">未实现盈亏</th>
                             <th style="color: white;">保证金</th>
                             <th style="color: white;">收益率</th>
-                            <th style="color: white;">维护次数</th>
+                            <th style="color: white;">今日维护</th>
                             <th style="color: white;">状态</th>
+                            <th style="color: white;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="subAccountPositionBody">
-                        <tr><td colspan="13" class="loading">加载中...</td></tr>
+                        <tr><td colspan="14" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1557,7 +1558,7 @@
             const accountCountSpan = document.getElementById('subAccountCount');
             
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="13" class="empty">暂无子账户持仓</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="14" class="empty">暂无子账户持仓</td></tr>';
                 statsSpan.innerHTML = '';
                 accountCountSpan.textContent = '0';
                 return;
@@ -1602,35 +1603,63 @@
                 const uplColor = (item.upl || 0) >= 0 ? '#48bb78' : '#f56565';
                 const coinNumber = coinNumbers[item.inst_id] || '--';
                 const maxMaintenanceCount = 3;  // 子账号最多3次维护
+                const maintenanceCount = item.maintenance_count || 0;
                 
                 return `
                 <tr>
                     <td style="font-weight: 700; color: #667eea; font-size: 14px;">${item.account_name}</td>
-                    <td style="font-weight: 600; color: #667eea;">${coinNumber}</td>
+                    <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
                     <td style="font-weight: 600;">${item.inst_id}</td>
                     <td>
                         <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
                             ${item.pos_side === 'short' ? '做空' : '做多'}
                         </span>
                     </td>
-                    <td style="color: #3182ce; font-weight: 600;">${Math.abs(item.pos_size || 0).toFixed(4)}</td>
-                    <td style="color: #3182ce;">$${(item.avg_price || 0).toFixed(4)}</td>
-                    <td style="color: #805ad5;">$${(item.mark_price || 0).toFixed(4)}</td>
-                    <td style="color: #ed8936; font-weight: 600;">${item.leverage}x</td>
-                    <td style="color: ${uplColor}; font-weight: 700; font-size: 14px;">
-                        ${(item.upl || 0) >= 0 ? '+' : ''}$${(item.upl || 0).toFixed(4)}
+                    <td>${Math.abs(item.pos_size || 0).toFixed(4)}</td>
+                    <td>$${(item.avg_price || 0).toFixed(4)}</td>
+                    <td>$${(item.mark_price || 0).toFixed(4)}</td>
+                    <td>${item.leverage}x</td>
+                    <td style="color: ${uplColor}; font-weight: 600;">
+                        ${(item.upl || 0) >= 0 ? '+' : ''}${(item.upl || 0).toFixed(4)} USDT
                     </td>
-                    <td style="color: #718096;">$${(item.margin || 0).toFixed(4)}</td>
+                    <td>${(item.margin || 0).toFixed(4)} USDT</td>
                     <td style="color: ${profitColor}; font-weight: 700; font-size: 16px;">
                         ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
                     </td>
-                    <td style="font-weight: 700; color: #667eea; font-size: 14px;">
-                        ${item.maintenance_count || 0}/${maxMaintenanceCount}次
+                    <td>
+                        <span style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;
+                                     background: ${maintenanceCount > 0 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#e2e8f0'};
+                                     color: ${maintenanceCount > 0 ? 'white' : '#718096'};
+                                     box-shadow: ${maintenanceCount > 0 ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'};">
+                            ${maintenanceCount}次
+                        </span>
                     </td>
                     <td>
-                        <span class="badge badge-profit">
+                        <span class="badge ${
+                            (item.profit_rate || 0) >= 10 ? 'badge-profit' : 
+                            (item.profit_rate || 0) <= -10 ? 'badge-loss' : 
+                            'badge-normal'
+                        }">
                             ${item.status || '正常'}
                         </span>
+                    </td>
+                    <td>
+                        <button class="btn-maintain-anchor" 
+                                onclick="maintainSubAccount('${item.account_name}', '${item.inst_id}', '${item.pos_side}', ${item.pos_size})"
+                                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                       color: white;
+                                       border: none;
+                                       padding: 6px 12px;
+                                       border-radius: 6px;
+                                       cursor: pointer;
+                                       font-size: 12px;
+                                       font-weight: 600;
+                                       transition: all 0.3s;
+                                       box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);"
+                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.4)';"
+                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.3)';">
+                            🔧 维护
+                        </button>
                     </td>
                 </tr>
                 `;
@@ -2266,6 +2295,63 @@ ${closeDetails}
                 }
             } catch (error) {
                 console.error('维护锚点单错误:', error);
+                alert(`❌ 请求失败: ${error.message}`);
+            }
+        }
+
+        // 子账户维护函数
+        async function maintainSubAccount(accountName, instId, posSide, posSize) {
+            try {
+                if (!confirm(`确认执行子账户维护操作？\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n持仓量: ${posSize}\n\n将买入100U并立即平仓`)) {
+                    return;
+                }
+                
+                // 显示加载状态
+                const loadingToast = document.createElement('div');
+                loadingToast.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    color: white;
+                    padding: 20px 40px;
+                    border-radius: 12px;
+                    z-index: 10000;
+                    font-size: 16px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                `;
+                loadingToast.textContent = '⏳ 正在执行子账户维护操作...';
+                document.body.appendChild(loadingToast);
+                
+                const response = await fetch('/api/anchor/maintain-sub-account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_name: accountName,
+                        inst_id: instId,
+                        pos_side: posSide,
+                        pos_size: posSize
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // 移除加载提示
+                document.body.removeChild(loadingToast);
+                
+                if (result.success) {
+                    alert(`✅ 子账户维护执行成功！\n\n${result.message || '维护完成'}`);
+                    
+                    // 刷新持仓数据
+                    loadData();
+                } else {
+                    alert(`❌ 子账户维护执行失败\n\n${result.message || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('子账户维护错误:', error);
                 alert(`❌ 请求失败: ${error.message}`);
             }
         }
