@@ -172,6 +172,26 @@ def open_position_on_sub_account(sub_account, inst_id, pos_side, size_usdt):
         secret_key = sub_account['secret_key']
         passphrase = sub_account['passphrase']
         
+        # 先设置杠杆为10倍
+        print(f"🔧 设置杠杆为10倍...")
+        leverage_path = '/api/v5/account/set-leverage'
+        leverage_data = {
+            'instId': inst_id,
+            'lever': '10',
+            'mgnMode': 'cross',
+            'posSide': pos_side
+        }
+        leverage_headers = get_okex_headers(api_key, secret_key, passphrase, 'POST', leverage_path, leverage_data)
+        leverage_url = f"{OKEX_REST_URL}{leverage_path}"
+        leverage_response = requests.post(leverage_url, headers=leverage_headers, json=leverage_data, timeout=10)
+        
+        if leverage_response.status_code == 200:
+            leverage_result = leverage_response.json()
+            if leverage_result.get('code') == '0':
+                print(f"✅ 杠杆设置成功: 10x")
+            else:
+                print(f"⚠️ 杠杆设置失败: {leverage_result.get('msg')} (继续开仓)")
+        
         # 获取当前价格
         ticker_url = f"{OKEX_REST_URL}/api/v5/market/ticker"
         ticker_response = requests.get(ticker_url, params={'instId': inst_id}, timeout=10)
