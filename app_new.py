@@ -13166,6 +13166,254 @@ def get_anchor_warnings():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor/super-maintain-anchor', methods=['POST'])
+def super_maintain_anchor_order():
+    """超级维护锚点单：买入100U，保留10U，卖出剩余"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        from okex_api_config import OKEX_API_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE, OKEX_REST_URL
+        
+        data = request.json
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        current_pos_size = float(data.get('current_pos_size', 0))
+        
+        print(f"🚀 开始超级维护: {inst_id} {pos_side} 当前持仓={current_pos_size}")
+        
+        # 生成签名函数
+        def generate_signature(timestamp, method, request_path, body=''):
+            if body:
+                body = json_lib.dumps(body)
+            message = timestamp + method + request_path + body
+            mac = hmac.new(
+                bytes(OKEX_SECRET_KEY, encoding='utf8'),
+                bytes(message, encoding='utf-8'),
+                digestmod=hashlib.sha256
+            )
+            return base64.b64encode(mac.digest()).decode()
+        
+        def get_headers(method, request_path, body=''):
+            timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            sign = generate_signature(timestamp, method, request_path, body)
+            return {
+                'OK-ACCESS-KEY': OKEX_API_KEY,
+                'OK-ACCESS-SIGN': sign,
+                'OK-ACCESS-TIMESTAMP': timestamp,
+                'OK-ACCESS-PASSPHRASE': OKEX_PASSPHRASE,
+                'Content-Type': 'application/json'
+            }
+        
+        # 获取当前标记价格和杠杆
+        position_path = f'/api/v5/account/positions?instType=SWAP&instId={inst_id}'
+        headers = get_headers('GET', position_path)
+        pos_response = requests.get(OKEX_REST_URL + position_path, headers=headers, timeout=10)
+        pos_data = pos_response.json()
+        
+        mark_price = 0
+        lever = 10
+        if pos_data.get('code') == '0' and pos_data.get('data'):
+            for position in pos_data['data']:
+                if position.get('posSide') == pos_side:
+                    mark_price = float(position.get('markPx', 0))
+                    lever = int(position.get('lever', 10))
+                    break
+        
+        if mark_price == 0:
+            return jsonify({
+                'success': False,
+                'message': '无法获取标记价格'
+            })
+        
+        print(f"📊 标记价格: ${mark_price}, 杠杆: {lever}x")
+        
+        # 计算买入数量：100U × 杠杆 / 标记价格
+        buy_value = 100  # 100U
+        buy_size_raw = (buy_value * lever) / mark_price
+        
+        # 获取合约面值
+        inst_path = f'/api/v5/public/instruments?instType=SWAP&instId={inst_id}'
+        inst_resp = requests.get(OKEX_REST_URL + inst_path, timeout=10)
+        inst_data = inst_resp.json()
+        lot_size = 1
+        if inst_data.get('code') == '0' and inst_data.get('data'):
+            lot_size = float(inst_data['data'][0].get('ctVal', 1))
+        
+        # 向下取整到lot_size的整数倍
+        buy_size = int(buy_size_raw / lot_size) * lot_size
+        
+        print(f"💰 买入数量: {buy_size} (原始: {buy_size_raw:.2f}, lot_size: {lot_size})")
+        
+        # 第一步：买入100U
+        order_path = '/api/v5/trade/order'
+        buy_side = 'sell' if pos_side == 'short' else 'buy'
+        
+        buy_order_body = {
+            'instId': inst_id,
+            'tdMode': 'isolated',
+            'side': buy_side,
+            'posSide': pos_side,
+            'ordType': 'market',
+            'sz': str(buy_size),
+            'lever': str(lever)
+        }
+        
+        headers = get_headers('POST', order_path, buy_order_body)
+        buy_response = requests.post(
+            OKEX_REST_URL + order_path,
+            headers=headers,
+            json=buy_order_body,
+            timeout=10
+        )
+        buy_data = buy_response.json()
+        
+        if buy_data.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f'买入失败: {buy_data.get("msg")}',
+                'error_code': buy_data.get('code')
+            })
+        
+        buy_order_id = buy_data['data'][0]['ordId']
+        print(f"✅ 买入订单提交成功: {buy_order_id}")
+        
+        # 等待3秒让订单成交
+        import time
+        time.sleep(3)
+        
+        # 查询买入后的持仓
+        pos_response = requests.get(OKEX_REST_URL + position_path, headers=headers, timeout=10)
+        pos_data = pos_response.json()
+        
+        new_pos_size = current_pos_size
+        if pos_data.get('code') == '0' and pos_data.get('data'):
+            for position in pos_data['data']:
+                if position.get('posSide') == pos_side:
+                    new_pos_size = abs(float(position.get('pos', 0)))
+                    break
+        
+        print(f"📊 买入后持仓: {new_pos_size}")
+        
+        # 计算保留目标：10U × 杠杆 / 标记价格
+        keep_value = 10  # 保留10U
+        keep_size_raw = (keep_value * lever) / mark_price
+        keep_size = int(keep_size_raw / lot_size) * lot_size
+        
+        # 计算卖出数量
+        sell_size_raw = new_pos_size - keep_size
+        sell_size = int(sell_size_raw / lot_size) * lot_size
+        
+        if sell_size <= 0:
+            print(f"⚠️  无需卖出，当前持仓已小于目标")
+            return jsonify({
+                'success': True,
+                'message': '超级维护完成（无需卖出）',
+                'data': {
+                    'buy_order_id': buy_order_id,
+                    'buy_size': buy_size,
+                    'new_pos_size': new_pos_size,
+                    'keep_size': keep_size
+                }
+            })
+        
+        print(f"💰 卖出数量: {sell_size} (保留: {keep_size})")
+        
+        # 第二步：卖出到保留10U
+        sell_side = 'buy' if pos_side == 'short' else 'sell'
+        
+        sell_order_body = {
+            'instId': inst_id,
+            'tdMode': 'isolated',
+            'side': sell_side,
+            'posSide': pos_side,
+            'ordType': 'market',
+            'sz': str(sell_size)
+        }
+        
+        headers = get_headers('POST', order_path, sell_order_body)
+        sell_response = requests.post(
+            OKEX_REST_URL + order_path,
+            headers=headers,
+            json=sell_order_body,
+            timeout=10
+        )
+        sell_data = sell_response.json()
+        
+        if sell_data.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f'卖出失败: {sell_data.get("msg")}',
+                'buy_order_id': buy_order_id,
+                'error_code': sell_data.get('code')
+            })
+        
+        sell_order_id = sell_data['data'][0]['ordId']
+        print(f"✅ 卖出订单提交成功: {sell_order_id}")
+        
+        # 保存超级维护记录（计数+2）
+        try:
+            import os
+            maintenance_file = 'maintenance_orders.json'
+            
+            if os.path.exists(maintenance_file):
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    records = json_lib.load(f)
+            else:
+                records = []
+            
+            # 添加超级维护记录
+            new_record = {
+                'id': len(records) + 1,
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'type': 'super_maintain',  # 标记为超级维护
+                'buy_order_id': buy_order_id,
+                'buy_size': buy_size,
+                'sell_order_id': sell_order_id,
+                'sell_size': sell_size,
+                'keep_size': keep_size,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'status': 'success',
+                'maintenance_count': 2  # 超级维护计数+2
+            }
+            
+            records.insert(0, new_record)
+            
+            if len(records) > 100:
+                records = records[:100]
+            
+            with open(maintenance_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(records, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 超级维护记录已保存")
+        except Exception as save_error:
+            print(f"⚠️  保存超级维护记录失败: {save_error}")
+        
+        return jsonify({
+            'success': True,
+            'message': '超级维护执行成功',
+            'data': {
+                'buy_order_id': buy_order_id,
+                'buy_size': buy_size,
+                'sell_order_id': sell_order_id,
+                'sell_size': sell_size,
+                'keep_size': keep_size,
+                'new_pos_size': new_pos_size
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'超级维护失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/anchor/maintain-anchor', methods=['POST'])
 def maintain_anchor_order():
     """维护锚点单：以市价买入10倍底仓数量（10倍杠杆），然后立即平掉92%"""
@@ -13970,7 +14218,7 @@ def get_maintenance_stats():
         # 今天的日期
         today = datetime.now().strftime('%Y-%m-%d')
         
-        # 统计今天每个币种+方向的维护次数
+        # 统计今天每个币种+方向的维护次数（超级维护计数+2）
         stats = defaultdict(int)
         
         for record in records:
@@ -13978,9 +14226,16 @@ def get_maintenance_stats():
             if created_at.startswith(today):
                 inst_id = record.get('inst_id', '')
                 pos_side = record.get('pos_side', '')
-                # 使用 "inst_id:pos_side" 作为key
                 key = f"{inst_id}:{pos_side}"
-                stats[key] += 1
+                
+                # 检查是否是超级维护
+                record_type = record.get('type', 'normal')
+                if record_type == 'super_maintain':
+                    # 超级维护计数+2
+                    stats[key] += 2
+                else:
+                    # 普通维护计数+1
+                    stats[key] += 1
         
         return jsonify({
             'success': True,

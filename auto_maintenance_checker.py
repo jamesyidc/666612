@@ -20,7 +20,7 @@ def log(message):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 
 def get_maintenance_count_today(inst_id, pos_side):
-    """获取今天的维护次数"""
+    """获取今天的维护次数（超级维护计数+2）"""
     try:
         response = requests.get(f"{BASE_URL}/api/anchor/maintenance-stats", timeout=5)
         data = response.json()
@@ -84,6 +84,31 @@ def maintain_anchor(inst_id, pos_side, pos_size):
         log(f"❌ 自动维护操作异常: {e}")
         return False
 
+def super_maintain_anchor(inst_id, pos_side, pos_size):
+    """执行超级维护锚点单（买入100U，保留10U）"""
+    try:
+        log(f"🚀 开始超级维护: {inst_id} {pos_side} {pos_size}")
+        response = requests.post(
+            f"{BASE_URL}/api/anchor/super-maintain-anchor",
+            json={
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'current_pos_size': pos_size
+            },
+            timeout=30
+        )
+        data = response.json()
+        if data.get('success'):
+            log(f"✅ 超级维护成功: {inst_id}")
+            log(f"   📊 买入: {data['data'].get('buy_size', 0)}, 卖出: {data['data'].get('sell_size', 0)}, 保留: {data['data'].get('keep_size', 0)}")
+            return True
+        else:
+            log(f"❌ 超级维护失败: {data.get('message')}")
+            return False
+    except Exception as e:
+        log(f"❌ 超级维护操作异常: {e}")
+        return False
+
 def adjust_margin(inst_id, pos_side, margin, target_margin=0.8):
     """调整保证金到目标值（通过部分平仓）"""
     try:
@@ -141,12 +166,15 @@ def check_and_maintain():
         
         auto_maintain_long = config.get('auto_maintain_long_enabled', False)
         auto_maintain_short = config.get('auto_maintain_short_enabled', False)
+        super_maintain_long = config.get('super_maintain_long_enabled', False)
+        super_maintain_short = config.get('super_maintain_short_enabled', False)
         loss_threshold = config.get('loss_threshold', -10)
         margin_min = config.get('margin_min', 0.6)
         margin_max = config.get('margin_max', 1.0)
         
-        log(f"📊 配置: 多单自动维护={auto_maintain_long}, 空单自动维护={auto_maintain_short}, 阈值={loss_threshold}%")
-        log(f"💰 保证金范围: {margin_min}u - {margin_max}u")
+        log(f"📊 配置: 多单自动维护={auto_maintain_long}, 空单自动维护={auto_maintain_short}")
+        log(f"🚀 配置: 多单超级维护={super_maintain_long}, 空单超级维护={super_maintain_short}")
+        log(f"💰 阈值={loss_threshold}%, 保证金范围: {margin_min}u - {margin_max}u")
         
         # 获取持仓
         positions = get_positions()
@@ -183,17 +211,36 @@ def check_and_maintain():
             if should_maintain:
                 # 检查今天的维护次数
                 today_count = get_maintenance_count_today(inst_id, pos_side)
-                log(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/3")
+                log(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/5")
                 
-                if today_count >= 3:
-                    log(f"⚠️  已达到每日维护上限(3次)，跳过本次维护")
+                # 判断使用哪种维护方式
+                if today_count >= 5:
+                    log(f"🛑 已达到每日维护上限(5次)，停止维护")
                     continue
-                
-                # 执行维护
-                success = maintain_anchor(inst_id, pos_side, pos_size)
-                if success:
-                    log(f"✅ 自动维护完成: {inst_id} (今日第{today_count + 1}次)")
-                    time.sleep(2)  # 稍作延迟
+                elif today_count >= 3:
+                    # 第3次和第4次使用超级维护
+                    should_super = False
+                    if pos_side == 'long' and super_maintain_long:
+                        log(f"🚀 多单维护次数={today_count}，触发超级维护")
+                        should_super = True
+                    elif pos_side == 'short' and super_maintain_short:
+                        log(f"🚀 空单维护次数={today_count}，触发超级维护")
+                        should_super = True
+                    
+                    if should_super:
+                        # 执行超级维护（计数+2）
+                        success = super_maintain_anchor(inst_id, pos_side, pos_size)
+                        if success:
+                            log(f"✅ 超级维护完成: {inst_id} (今日第{today_count + 2}次，+2次)")
+                            time.sleep(2)
+                    else:
+                        log(f"⚠️  超级维护开关未开启，跳过")
+                else:
+                    # 前3次使用普通维护
+                    success = maintain_anchor(inst_id, pos_side, pos_size)
+                    if success:
+                        log(f"✅ 自动维护完成: {inst_id} (今日第{today_count + 1}次)")
+                        time.sleep(2)
             
             # 检查2：保证金是否超出范围
             if margin > margin_max:

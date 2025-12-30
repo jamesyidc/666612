@@ -574,7 +574,7 @@
                     </span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 20px;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                         <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
                             <input type="checkbox" id="autoMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>🟢 自动维护多单-10%</span>
@@ -582,6 +582,14 @@
                         <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
                             <input type="checkbox" id="autoMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>🔴 自动维护空单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: #ff6b35; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="superMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护多单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: #ff6b35; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="superMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护空单-10%</span>
                         </label>
                     </div>
                     <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
@@ -702,6 +710,8 @@
                     const config = configData.config;
                     document.getElementById('autoMaintainLong').checked = config.auto_maintain_long_enabled || false;
                     document.getElementById('autoMaintainShort').checked = config.auto_maintain_short_enabled || false;
+                    document.getElementById('superMaintainLong').checked = config.super_maintain_long_enabled || false;
+                    document.getElementById('superMaintainShort').checked = config.super_maintain_short_enabled || false;
                 }
 
                 // 加载状态
@@ -1628,6 +1638,65 @@ ${closeDetails}
                     console.error('保存配置失败:', error);
                     showToast('⚠️ 配置保存失败', 'error');
                     e.target.checked = !enabled; // 回滚
+                }
+            });
+            
+            // 超级维护开关事件监听
+            document.getElementById('superMaintainLong').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 超级维护多单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(enabled ? '🚀 多单超级维护已开启' : '❌ 多单超级维护已关闭', enabled ? 'success' : 'info');
+                    } else {
+                        showToast('⚠️ 配置保存失败', 'error');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    showToast('⚠️ 配置保存失败', 'error');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            document.getElementById('superMaintainShort').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 超级维护空单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(enabled ? '🚀 空单超级维护已开启' : '❌ 空单超级维护已关闭', enabled ? 'success' : 'info');
+                    } else {
+                        showToast('⚠️ 配置保存失败', 'error');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    showToast('⚠️ 配置保存失败', 'error');
+                    e.target.checked = !enabled;
                 }
             });
             
