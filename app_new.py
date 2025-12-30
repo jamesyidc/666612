@@ -7052,12 +7052,14 @@ def api_escape_top_signals_stats():
         conn = sqlite3.connect('crypto_data.db', timeout=30.0)
         cursor = conn.cursor()
         
-        # 真实的逃顶事件次数（分数>=8的记录数）
+        # 真实的逃顶事件次数（条件：压力线1+压力线2>=8，且压力线1>=1，且压力线2>=1）
         cursor.execute('''
             SELECT COUNT(*) as total
             FROM support_resistance_levels
             WHERE datetime(record_time) >= datetime('now', ? || ' hours')
               AND (alert_scenario_3 + alert_scenario_4) >= 8
+              AND alert_scenario_3 >= 1
+              AND alert_scenario_4 >= 1
         ''', (f'-{hours}',))
         total_escape_events = cursor.fetchone()[0]
         
@@ -7067,6 +7069,8 @@ def api_escape_top_signals_stats():
             FROM support_resistance_levels
             WHERE datetime(record_time) >= datetime('now', ? || ' hours')
               AND (alert_scenario_3 + alert_scenario_4) >= 8
+              AND alert_scenario_3 >= 1
+              AND alert_scenario_4 >= 1
         ''', (f'-{hours}',))
         coin_count = cursor.fetchone()[0]
         
