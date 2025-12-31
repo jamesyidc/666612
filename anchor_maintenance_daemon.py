@@ -22,8 +22,8 @@ TRADING_DB = '/home/user/webapp/trading_decision.db'
 ANCHOR_DB = '/home/user/webapp/anchor_system.db'
 
 # 交易模式配置
-# 可选值: 'paper' (模拟交易) 或 'live' (实盘交易)
-TRADE_MODE = 'paper'  # 默认使用模拟交易（模拟盘）
+# 可选值: 'paper' (模拟交易) 或 'real' (实盘交易)
+TRADE_MODE = 'real'  # 修改为实盘交易（实盘）以支持主账号锚点单维护
 
 # 最小底仓保护配置
 MIN_KEEP_MARGIN = 0.6  # 平仓时必须保留的最小保证金（USDT），防止锚点单被完全平掉
@@ -597,5 +597,6 @@ class AnchorMaintenanceDaemon:
 
 
 if __name__ == '__main__':
-    daemon = AnchorMaintenanceDaemon()
+    # 使用实盘交易模式
+    daemon = AnchorMaintenanceDaemon(trade_mode='real')
     daemon.run()
