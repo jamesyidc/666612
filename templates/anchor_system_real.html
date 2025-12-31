@@ -746,17 +746,6 @@
             </div>
         </div>
 
-        <!-- 操作提示状态栏 -->
-        <div id="operationStatusBar" style="display: none; margin-bottom: 20px; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-                <div style="font-size: 32px;" id="statusIcon">📊</div>
-                <div style="text-align: left;">
-                    <div style="font-size: 24px; font-weight: 700; margin-bottom: 5px;" id="statusTitle">--</div>
-                    <div style="font-size: 16px; font-weight: 600;" id="statusHint">--</div>
-                </div>
-            </div>
-        </div>
-
         <!-- 当前持仓情况 -->
         <div class="card">
             <div class="card-header">
@@ -1315,65 +1304,6 @@
             lastUpdate: null
         };
 
-        // 更新操作提示状态栏
-        function updateOperationStatusBar(stats) {
-            const statusBar = document.getElementById('operationStatusBar');
-            const statusIcon = document.getElementById('statusIcon');
-            const statusTitle = document.getElementById('statusTitle');
-            const statusHint = document.getElementById('statusHint');
-            
-            if (!statusBar || !statusIcon || !statusTitle || !statusHint) return;
-            
-            // 新的触发规则
-            // 触底反弹：profit70 >= 1 AND profit60 >= 2 AND profit50 >= 5 AND profit40 >= 8
-            const isBottomRebound = stats.profit70 >= 1 && stats.profit60 >= 2 && stats.profit50 >= 5 && stats.profit40 >= 8;
-            
-            // 多转空：profit70 == 0 AND profit50 >= 1 AND profit40 >= 3
-            const isLongToShort = stats.profit70 === 0 && stats.profit50 >= 1 && stats.profit40 >= 3;
-            
-            // 多头行情：profitBelow20 >= 8 AND profitBelow10 >= 6 AND lossCount >= 2
-            const isBullMarket = stats.profitBelow20 >= 8 && stats.profitBelow10 >= 6 && stats.lossCount >= 2;
-            
-            if (isBullMarket) {
-                // 显示：多头行情 - 适合做多
-                statusBar.style.display = 'block';
-                statusBar.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-                statusBar.style.border = '3px solid #1d4ed8';
-                statusIcon.textContent = '🚀';
-                statusTitle.textContent = '多头行情';
-                statusTitle.style.color = '#ffffff';
-                statusHint.textContent = '操作提示：适合做多';
-                statusHint.style.color = '#dbeafe';
-                console.log('✅ 状态栏: 多头行情', stats);
-            } else if (isBottomRebound) {
-                // 显示：触底反弹 - 禁止空单
-                statusBar.style.display = 'block';
-                statusBar.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
-                statusBar.style.border = '3px solid #2f855a';
-                statusIcon.textContent = '📈';
-                statusTitle.textContent = '触底反弹';
-                statusTitle.style.color = '#ffffff';
-                statusHint.textContent = '操作提示：禁止空单';
-                statusHint.style.color = '#e6fffa';
-                console.log('✅ 状态栏: 触底反弹', stats);
-            } else if (isLongToShort) {
-                // 显示：多转空 - 禁止多单
-                statusBar.style.display = 'block';
-                statusBar.style.background = 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)';
-                statusBar.style.border = '3px solid #c53030';
-                statusIcon.textContent = '🔄';
-                statusTitle.textContent = '多转空';
-                statusTitle.style.color = '#ffffff';
-                statusHint.textContent = '操作提示：禁止多单';
-                statusHint.style.color = '#fed7d7';
-                console.log('⚠️ 状态栏: 多转空', stats);
-            } else {
-                // 隐藏状态栏
-                statusBar.style.display = 'none';
-                console.log('ℹ️ 状态栏隐藏', stats);
-            }
-        }
-
         // 计算下跌强度分级
         function calculateDeclineStrength(stats) {
             const { profit100, profit90, profit80, profit70, profit60, profit50, profit40 } = stats;
@@ -1749,17 +1679,6 @@
             document.getElementById('profitBelow20Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow20, profitBelow20)}`;
             document.getElementById('profitBelow10Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow10, profitBelow10)}`;
             document.getElementById('lossCountIncrease').textContent = `1小时内: ${calcIncrease(profitHistoryData.lossCount, lossCount)}`;
-            
-            // 更新操作提示状态栏（使用新规则）
-            updateOperationStatusBar({
-                profit70: profit70,
-                profit60: profit60,
-                profit50: profit50,
-                profit40: profit40,
-                profitBelow20: profitBelow20,
-                profitBelow10: profitBelow10,
-                lossCount: lossCount
-            });
             
             // 计算并显示下跌强度
             calculateDeclineStrength({

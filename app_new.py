@@ -13937,7 +13937,7 @@ def maintain_anchor_order():
         leverage_path = '/api/v5/account/set-leverage'
         leverage_body = {
             'instId': inst_id,
-            'lever': str(lever),
+            'lever': '10',
             'mgnMode': 'isolated',
             'posSide': pos_side
         }

@@ -9,8 +9,8 @@
     "last_reset": "2025-12-31 10:44:26"
   },
   "Wu666666_CRV-USDT-SWAP_long": {
-    "count": 1,
-    "last_maintenance": "2026-01-01 00:37:13",
+    "count": 2,
+    "last_maintenance": "2026-01-01 01:41:28",
     "last_reset": "2025-12-31 11:47:12"
   },
   "Wu666666_UNI-USDT-SWAP_long": {
@@ -42,7 +42,7 @@
     "last_maintenance": "2026-01-01 00:51:28"
   },
   "Wu666666_FIL-USDT-SWAP_long": {
-    "count": 1,
-    "last_maintenance": "2026-01-01 01:25:04"
+    "count": 2,
+    "last_maintenance": "2026-01-01 01:42:54"
   }
 }
