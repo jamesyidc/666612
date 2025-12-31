@@ -1,5 +1,62 @@
 [
   {
+    "id": 8,
+    "account_name": "JAMESYI",
+    "inst_id": "LDO-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 17.0,
+    "open_order_id": "3175916053337202688",
+    "open_size": 170.0,
+    "open_fills": [
+      {
+        "trade_id": "214369521",
+        "qty": 170.0,
+        "price": 0.5845,
+        "value": 99.36500000000001,
+        "fee": 0.0496825,
+        "fee_currency": "USDT",
+        "profit": -0.0012999999999998568,
+        "net_profit": -0.054781099999999854
+      }
+    ],
+    "open_total_qty": 170.0,
+    "open_avg_price": 0.5845,
+    "open_total_fee": 0.0496825,
+    "close_order_id": "3175916182991527936",
+    "close_size": 156.0,
+    "close_fills": [
+      {
+        "trade_id": "214369523",
+        "qty": 13.0,
+        "price": 0.5844,
+        "value": 7.597200000000001,
+        "fee": 0.0037986,
+        "fee_currency": "USDT",
+        "profit": -0.0012999999999998568,
+        "net_profit": -0.054781099999999854
+      },
+      {
+        "trade_id": "214369522",
+        "qty": 143.0,
+        "price": 0.5844,
+        "value": 83.56920000000001,
+        "fee": 0.0417846,
+        "fee_currency": "USDT"
+      }
+    ],
+    "close_total_qty": 156.0,
+    "close_avg_price": 0.5844,
+    "close_total_fee": 0.0455832,
+    "remaining_size": 14.0,
+    "total_fee": 0.0952657,
+    "total_cost": 0.11086569999999828,
+    "fee_rate": 0.11157419614552233,
+    "total_profit": -0.015599999999998282,
+    "net_profit": -0.054781099999999854,
+    "created_at": "2025-12-31 03:34:41",
+    "status": "success"
+  },
+  {
     "id": 7,
     "account_name": "JAMESYI",
     "inst_id": "CRV-USDT-SWAP",

@@ -16030,10 +16030,6 @@ def get_sub_account_take_profit_records():
             'traceback': traceback.format_exc()
         })
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
-
 # 测试页面路由
 @app.route('/test-positions')
 def test_positions_page():
@@ -16044,3 +16040,6 @@ def test_positions_page():
 def sub_account_trades_page():
     """子账户交易详情页面"""
     return render_template('sub_account_trades.html')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)
