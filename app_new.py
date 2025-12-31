@@ -13672,49 +13672,29 @@ def super_maintain_anchor_order():
         # 向下取整到lot_size的整数倍
         buy_size = int(buy_size_raw / lot_size) * lot_size
         
-        print(f"💰 维护数量: {buy_size} (原始: {buy_size_raw:.2f}, lot_size: {lot_size})")
+        print(f"💰 新开仓数量: {buy_size} (原始: {buy_size_raw:.2f}, lot_size: {lot_size})")
         
-        # 🔄 优化后的流程：先平仓再开仓（避免保证金不足）
+        # 计算保留目标：target_margin × 杠杆 / 标记价格
+        keep_size_raw = (target_margin * lever) / mark_price
+        keep_size = int(keep_size_raw / lot_size) * lot_size
+        
+        # 计算需要平仓的数量 = 旧持仓 + 新开仓 - 最终保留
+        total_pos_size = current_pos_size + buy_size
+        close_size_raw = total_pos_size - keep_size
+        close_size = int(close_size_raw / lot_size) * lot_size if close_size_raw > 0 else 0
+        
+        print(f"📊 仓位计算:")
+        print(f"   当前持仓: {current_pos_size} 张")
+        print(f"   新开仓: {buy_size} 张")
+        print(f"   总持仓: {total_pos_size} 张")
+        print(f"   最终保留: {keep_size} 张 (目标保证金 {target_margin}U)")
+        print(f"   需要平仓: {close_size} 张")
+        
+        # 🔄 优化后的流程：先开仓再平仓（更省手续费）
         order_path = '/api/v5/trade/order'
         
-        # 第一步：平掉旧仓位（释放保证金）
-        print(f"📊 第1步：平掉旧持仓 {current_pos_size} 张（释放保证金）")
-        close_side = 'buy' if pos_side == 'short' else 'sell'
-        
-        close_order_body = {
-            'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
-            'side': close_side,
-            'posSide': pos_side,
-            'ordType': 'market',
-            'sz': str(current_pos_size)  # 使用原始持仓量（可以是小数）
-        }
-        
-        headers = get_headers('POST', order_path, close_order_body)
-        close_response = requests.post(
-            OKEX_REST_URL + order_path,
-            headers=headers,
-            json=close_order_body,
-            timeout=10
-        )
-        close_data = close_response.json()
-        
-        if close_data.get('code') != '0':
-            return jsonify({
-                'success': False,
-                'message': f'平仓失败: {close_data.get("msg")}',
-                'error_code': close_data.get('code')
-            })
-        
-        close_order_id = close_data['data'][0]['ordId']
-        print(f"✅ 平仓订单提交成功: {close_order_id}")
-        
-        # 等待3秒让订单成交
-        import time
-        time.sleep(3)
-        
-        # 第二步：开仓买入100U（使用释放的保证金）
-        print(f"📊 第2步：开仓买入 {buy_size} 张（{maintenance_amount}U）")
+        # 第一步：开仓新持仓（维护金额对应的仓位）
+        print(f"📊 第1步：开仓新持仓 {buy_size} 张（{maintenance_amount}U）")
         buy_side = 'sell' if pos_side == 'short' else 'buy'
         
         buy_order_body = {
@@ -13747,75 +13727,54 @@ def super_maintain_anchor_order():
         print(f"✅ 开仓订单提交成功: {buy_order_id}")
         
         # 等待3秒让订单成交
+        import time
         time.sleep(3)
         
-        # 查询开仓后的持仓
-        pos_response = requests.get(OKEX_REST_URL + position_path, headers=get_headers('GET', position_path), timeout=10)
-        pos_data = pos_response.json()
-        
-        new_pos_size = 0
-        if pos_data.get('code') == '0' and pos_data.get('data'):
-            for position in pos_data['data']:
-                if position.get('posSide') == pos_side:
-                    new_pos_size = abs(float(position.get('pos', 0)))
-                    break
-        
-        print(f"📊 开仓后持仓: {new_pos_size} 张")
-        
-        # 第三步：卖出到保留10U
-        # 计算保留目标：target_margin × 杠杆 / 标记价格
-        keep_size_raw = (target_margin * lever) / mark_price
-        keep_size = int(keep_size_raw / lot_size) * lot_size
-        
-        # 计算卖出数量
-        sell_size_raw = new_pos_size - keep_size
-        sell_size = int(sell_size_raw / lot_size) * lot_size
-        
-        if sell_size <= 0:
-            print(f"⚠️  无需再平仓，当前持仓已小于等于目标")
+        # 第二步：平仓多余持仓，保留目标保证金
+        if close_size <= 0:
+            print(f"⚠️  无需平仓，当前持仓已达到目标")
             return jsonify({
                 'success': True,
-                'message': '超级维护完成（无需再平仓）',
+                'message': '超级维护完成（无需平仓）',
                 'data': {
-                    'close_order_id': close_order_id,
                     'buy_order_id': buy_order_id,
                     'buy_size': buy_size,
-                    'new_pos_size': new_pos_size,
+                    'close_size': 0,
                     'keep_size': keep_size
                 }
             })
         
-        print(f"📊 第3步：卖出多余持仓 {sell_size} 张（保留: {keep_size} 张 = {target_margin}U）")
-        sell_side = 'buy' if pos_side == 'short' else 'sell'
+        print(f"📊 第2步：平仓多余持仓 {close_size} 张（保留: {keep_size} 张 = {target_margin}U）")
+        close_side = 'buy' if pos_side == 'short' else 'sell'
         
-        sell_order_body = {
+        close_order_body = {
             'instId': inst_id,
             'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
-            'side': sell_side,
+            'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(sell_size)
+            'sz': str(close_size)
         }
         
-        headers = get_headers('POST', order_path, sell_order_body)
-        sell_response = requests.post(
+        headers = get_headers('POST', order_path, close_order_body)
+        close_response = requests.post(
             OKEX_REST_URL + order_path,
             headers=headers,
-            json=sell_order_body,
+            json=close_order_body,
             timeout=10
         )
-        sell_data = sell_response.json()
+        close_data = close_response.json()
         
-        if sell_data.get('code') != '0':
+        if close_data.get('code') != '0':
             return jsonify({
                 'success': False,
-                'message': f'卖出失败: {sell_data.get("msg")}',
+                'message': f'平仓失败: {close_data.get("msg")}',
                 'buy_order_id': buy_order_id,
-                'error_code': sell_data.get('code')
+                'error_code': close_data.get('code')
             })
         
-        sell_order_id = sell_data['data'][0]['ordId']
-        print(f"✅ 第3步平仓订单提交成功: {sell_order_id}")
+        close_order_id = close_data['data'][0]['ordId']
+        print(f"✅ 第2步平仓订单提交成功: {close_order_id}")
         
         # 保存超级维护记录（计数+1）
         try:
@@ -13937,9 +13896,9 @@ def maintain_anchor_order():
         #         'max_count': 3
         #     })
         
-        # 🔄 优化后的流程：先平仓再开仓（避免保证金不足）
-        # 第一步：平掉旧持仓（释放保证金）
-        print(f"📊 第1步：平掉旧持仓 {pos_size} 张（释放保证金）")
+        # 🔄 优化后的流程：先开仓再平仓（节省手续费）
+        # 第一步：开仓新持仓
+        print(f"📊 第1步：开仓新持仓 {order_size} 张（维护金额: {maintenance_amount}U）")
         
         # 生成签名
         def generate_signature(timestamp, method, request_path, body=''):
@@ -13966,61 +13925,40 @@ def maintain_anchor_order():
         
         order_path = '/api/v5/trade/order'
         
-        # 平掉旧持仓（全部）
-        old_close_side = 'buy' if pos_side == 'short' else 'sell'
-        
-        old_close_order_body = {
+        # 设置杠杆为10倍
+        leverage_path = '/api/v5/account/set-leverage'
+        leverage_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
-            'side': old_close_side,
-            'posSide': pos_side,
-            'ordType': 'market',
-            'sz': str(pos_size)  # 全部平掉（支持小数持仓）
+            'lever': str(lever),
+            'mgnMode': 'isolated',
+            'posSide': pos_side
         }
-        
-        headers = get_headers('POST', order_path, old_close_order_body)
-        old_close_response = requests.post(
-            OKEX_REST_URL + order_path,
+        headers = get_headers('POST', leverage_path, leverage_body)
+        leverage_response = requests.post(
+            OKEX_REST_URL + leverage_path,
             headers=headers,
-            json=old_close_order_body,
+            json=leverage_body,
             timeout=10
         )
+        leverage_result = leverage_response.json()
+        if leverage_result.get('code') == '0':
+            print(f"✅ 杠杆设置成功: {lever}x")
+        else:
+            print(f"⚠️ 杠杆设置失败: {leverage_result}")
         
-        old_close_result = old_close_response.json()
-        
-        if old_close_result.get('code') != '0':
-            error_msg = old_close_result.get('msg', '未知错误')
-            error_code = old_close_result.get('code', '未知代码')
-            print(f"❌ 平掉旧持仓失败 - Code: {error_code}, Message: {error_msg}")
-            return jsonify({
-                'success': False,
-                'message': f"平掉旧持仓失败: {error_msg}",
-                'error_code': error_code,
-                'full_response': old_close_result
-            })
-        
-        old_close_order_id = old_close_result['data'][0]['ordId']
-        print(f"✅ 平掉旧持仓订单提交成功: {old_close_order_id}")
-        
-        # 等待订单成交
         import time
-        print(f"⏳ 等待3秒确保订单成交...")
-        time.sleep(3)
         
-        # 第二步：开仓 - 买入10倍数量（市价单）
-        print(f"📊 第2步：开仓买入 {order_size} 张（10倍底仓）")
-        
-        # 确定开仓方向：如果当前是空单，就开空单；如果是多单，就开多单
-        side = 'sell' if pos_side == 'short' else 'buy'
+        # 确定开仓方向
+        open_side = 'sell' if pos_side == 'short' else 'buy'
         
         open_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
-            'side': side,
+            'tdMode': 'isolated',
+            'side': open_side,
             'posSide': pos_side,
-            'ordType': 'market',  # 市价单
+            'ordType': 'market',
             'sz': str(order_size),
-            'lever': '10'  # 10倍杠杆
+            'lever': str(lever)
         }
         
         headers = get_headers('POST', order_path, open_order_body)
@@ -14077,77 +14015,84 @@ def maintain_anchor_order():
                 print(f"⚠️ 订单未完全成交，状态: {order_state}")
                 # 继续尝试平仓
         
-        # 获取交易对的最小交易单位
-        instruments_path = f'/api/v5/public/instruments?instType=SWAP&instId={inst_id}'
-        instruments_response = requests.get(
-            OKEX_REST_URL + instruments_path,
-            timeout=10
-        )
-        instruments_data = instruments_response.json()
         
-        # 获取lot size（合约面值）
-        lot_size = 1  # 默认
-        if instruments_data.get('code') == '0' and instruments_data.get('data'):
-            lot_size_str = instruments_data['data'][0].get('ctVal', '1')
-            lot_size = float(lot_size_str)
-            print(f"📊 {inst_id} 的合约面值: {lot_size}")
+        # 第二步：平掉多余持仓，保留target_margin对应的数量
+        print(f"📊 第2步：平到目标保证金 {target_margin}U（平掉多余持仓）")
         
-        # 第三步：平掉92% - 计算平仓数量，并按lot size取整
-        print(f"📊 第3步：平掉92%持仓（保留8%底仓）")
-        close_size_raw = order_size * 0.92
-        # 向下取整到lot size的倍数
         import math
-        close_size = math.floor(close_size_raw / lot_size) * lot_size
         
-        # 确保至少保留1个lot size
-        if close_size < lot_size:
-            close_size = lot_size
+        # 计算应该保留的数量
+        keep_size_raw = (target_margin * lever) / mark_price
+        keep_size = math.floor(keep_size_raw)
         
-        print(f"📊 准备平仓: {close_size} (原始: {close_size_raw}, lot_size: {lot_size})")
+        # 确保至少保留0.6U的保证金
+        MIN_MARGIN = 0.6
+        min_keep_size = math.ceil((MIN_MARGIN * lever) / mark_price)
+        if keep_size < min_keep_size:
+            print(f"⚠️ 保留数量 {keep_size} 张小于最小要求 {min_keep_size} 张（最小保证金 {MIN_MARGIN}U），强制设置为 {min_keep_size} 张")
+            keep_size = min_keep_size
         
-        # 平仓方向与开仓相反
-        close_side = 'buy' if pos_side == 'short' else 'sell'
+        # 计算总持仓：原持仓 + 新开仓
+        total_pos_size = pos_size + order_size
         
-        close_order_body = {
-            'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金  # 逐仓模式
-            'side': close_side,
-            'posSide': pos_side,
-            'ordType': 'market',
-            'sz': str(close_size)
-        }
+        # 计算需要平掉的数量
+        close_size = max(0, total_pos_size - keep_size)
         
-        print(f"📝 平仓请求参数: {close_order_body}")
+        print(f"📊 仓位计算:")
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   新开仓: {order_size} 张")
+        print(f"   总持仓: {total_pos_size} 张")
+        print(f"   最终保留: {keep_size} 张 = {target_margin}U")
+        print(f"   需要平仓: {close_size} 张")
         
-        headers = get_headers('POST', order_path, close_order_body)
-        close_response = requests.post(
-            OKEX_REST_URL + order_path,
-            headers=headers,
-            json=close_order_body,
-            timeout=10
-        )
-        
-        close_result = close_response.json()
-        print(f"📝 OKEx平仓响应: {close_result}")
-        
-        if close_result.get('code') != '0':
-            error_msg = close_result.get('msg', '未知错误')
-            error_code = close_result.get('code', '未知代码')
-            print(f"❌ 平仓失败 - Code: {error_code}, Message: {error_msg}")
+        if close_size <= 0:
+            print(f"✅ 跳过第2步：不需要平仓（close_size={close_size}）")
+            close_order_id = 'SKIPPED'
+        else:
+            # 平仓方向与开仓相反
+            close_side = 'buy' if pos_side == 'short' else 'sell'
             
-            return jsonify({
-                'success': False,
-                'message': f"平仓失败: {error_msg} (开仓订单ID: {open_order_id})",
-                'error_code': error_code,
-                'open_order_id': open_order_id,
-                'full_response': close_result
-            })
-        
-        close_order_id = close_result['data'][0]['ordId']
-        
-        # 等待平仓订单成交
-        print(f"⏳ 等待3秒确保平仓订单成交...")
-        time.sleep(3)
+            close_order_body = {
+                'instId': inst_id,
+                'tdMode': 'isolated',
+                'side': close_side,
+                'posSide': pos_side,
+                'ordType': 'market',
+                'sz': str(close_size)
+            }
+            
+            print(f"📝 平仓请求参数: {close_order_body}")
+            
+            headers = get_headers('POST', order_path, close_order_body)
+            close_response = requests.post(
+                OKEX_REST_URL + order_path,
+                headers=headers,
+                json=close_order_body,
+                timeout=10
+            )
+            
+            close_result = close_response.json()
+            print(f"📝 OKEx平仓响应: {close_result}")
+            
+            if close_result.get('code') != '0':
+                error_msg = close_result.get('msg', '未知错误')
+                error_code = close_result.get('code', '未知代码')
+                print(f"❌ 平仓失败 - Code: {error_code}, Message: {error_msg}")
+                
+                return jsonify({
+                    'success': False,
+                    'message': f"平仓失败: {error_msg} (开仓订单ID: {open_order_id})",
+                    'error_code': error_code,
+                    'open_order_id': open_order_id,
+                    'full_response': close_result
+                })
+            
+            close_order_id = close_result['data'][0]['ordId']
+            print(f"✅ 第2步平仓订单提交成功: {close_order_id}")
+            
+            # 等待平仓订单成交
+            print(f"⏳ 等待3秒确保平仓订单成交...")
+            time.sleep(3)
         
         # 查询开仓订单的成交明细（fills）
         fills_path = f'/api/v5/trade/fills?instId={inst_id}&ordId={open_order_id}'
@@ -14293,14 +14238,13 @@ def maintain_anchor_order():
             else:
                 records = []
             
-            # 添加新记录（优化后流程：先平旧仓→开新仓→平到92%）
+            # 添加新记录（优化后流程：先开新仓→平到目标保证金）
             new_record = {
                 'id': len(records) + 1,
                 'account_name': 'JAMESYI',  # 账户名称（后续可从配置读取）
                 'inst_id': inst_id,
                 'pos_side': pos_side,
                 'original_size': pos_size,
-                'old_close_order_id': old_close_order_id,  # 平掉旧持仓的订单ID
                 'open_order_id': open_order_id,
                 'open_size': order_size,
                 'open_fills': open_fills,
