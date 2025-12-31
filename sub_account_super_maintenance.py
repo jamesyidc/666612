@@ -125,17 +125,17 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
         
         # 根据维护次数确定参数
         if current_count == 0:
-            # 第1次：买入100U，留10U
+            # 第1次维护：买入100U，留10U
             maintenance_amount = 100
             target_margin = 10
         elif current_count == 1:
-            # 第2次：买入100U，留20U
+            # 第2次维护：买入100U，留10U（不是20U！）
             maintenance_amount = 100
-            target_margin = 20
+            target_margin = 10
         elif current_count == 2:
-            # 第3次：买入200U，留30U，设置-20%止损
+            # 第3次维护：买入200U，留20U，设置-20%止损
             maintenance_amount = 200
-            target_margin = 30
+            target_margin = 20
         else:
             log(f"⚠️  今日维护次数已达上限: {current_count}/{MAX_MAINTENANCE_COUNT}")
             return False

@@ -136,7 +136,12 @@ def adjust_margin(account, inst_id, pos_side, current_margin, target_margin, pos
             # 计算安全可转出金额：需要考虑维持保证金和安全缓冲
             notional = pos_size * mark_price  # 持仓名义价值
             maintenance_margin = notional * 0.004  # 维持保证金率约0.4%（根据具体币种可能不同）
-            safety_buffer = 1.5  # 1.5U安全缓冲
+            
+            # 对于大持仓，使用更大的安全缓冲
+            if notional > 500:
+                safety_buffer = notional * 0.02  # 2%的安全缓冲
+            else:
+                safety_buffer = 1.5  # 1.5U安全缓冲
             
             # 转出后必须保留：维持保证金 + 安全缓冲
             min_required_margin = maintenance_margin + safety_buffer
@@ -155,9 +160,16 @@ def adjust_margin(account, inst_id, pos_side, current_margin, target_margin, pos
                 return False
             
             # 选择较小的：要转出的金额 vs 最大可转出金额
-            # 但为了避免OKEx 59301错误，每次最多转出5U
-            ideal_reduce = min(margin_diff, max_transferable)
-            reduce_amount = min(ideal_reduce, 5.0)  # 每次最多5U
+            # 但为了避免OKEx 59301错误，对大持仓使用更保守的策略
+            if notional > 500:
+                # 大持仓：每次最多转出最大可转出的30%
+                safe_reduce = max_transferable * 0.3
+                ideal_reduce = min(margin_diff, safe_reduce)
+            else:
+                # 小持仓：每次最多5U
+                ideal_reduce = min(margin_diff, max_transferable)
+            
+            reduce_amount = min(ideal_reduce, 5.0)  # 最终限制5U/次
             
             log(f"   🔧 保证金过多: {current_margin:.2f}U，目标: {target_margin}U")
             log(f"   💡 理想转出: {ideal_reduce:.2f}U，实际转出: {reduce_amount:.2f}U (限制5U/次)")
@@ -237,12 +249,18 @@ def check_and_correct(account):
             # 获取维护次数
             maintenance_count, record = get_maintenance_record(account_name, inst_id, pos_side)
             
-            # 确定目标保证金
+            # 确定目标保证金和目标持仓名义价值
             if maintenance_count in [0, 1]:
+                # 维护次数0或1：目标10U保证金，约100U持仓
                 target_margin = 10.0
+                target_notional = 100.0  # 目标持仓名义价值
+                tolerance = 0.5  # 保证金允许范围9.5-10.5U
                 margin_range = "9.5-10.5U"
             elif maintenance_count == 2:
+                # 维护次数2：目标20U保证金，约200U持仓
                 target_margin = 20.0
+                target_notional = 200.0
+                tolerance = 1.0  # 保证金允许范围19-21U
                 margin_range = "19-21U"
             else:
                 log(f"   ⚠️  {inst_id} {pos_side}: 维护次数异常({maintenance_count})，跳过")
@@ -253,7 +271,58 @@ def check_and_correct(account):
             log(f"      当前保证金: {current_margin:.2f}U")
             log(f"      目标保证金: {target_margin}U (允许范围: {margin_range})")
             
-            # 检查是否在允许范围内
+            # 获取详细持仓信息
+            position_detail = get_position(account, inst_id, pos_side)
+            if not position_detail:
+                log(f"      ❌ 无法获取详细持仓信息")
+                continue
+            
+            pos_size = position_detail['pos_size']
+            mark_price = position_detail['mark_price']
+            current_notional = pos_size * mark_price
+            
+            log(f"      持仓量: {pos_size}")
+            log(f"      标记价格: {mark_price:.4f}")
+            log(f"      持仓名义价值: {current_notional:.2f}U")
+            log(f"      目标名义价值: {target_notional:.2f}U")
+            
+            # 1. 先检查持仓名义价值是否过大
+            if current_notional > target_notional * 1.5:
+                log(f"      ⚠️  持仓过大({current_notional:.2f}U > {target_notional*1.5:.2f}U)，需要先平仓")
+                
+                # 计算需要平掉的数量
+                target_pos_size = target_notional / mark_price
+                close_size = int(pos_size - target_pos_size)
+                
+                if close_size > 0:
+                    log(f"      📤 平仓 {close_size} 张 (从{pos_size}张降到{target_pos_size:.2f}张)")
+                    
+                    # 调用平仓API
+                    try:
+                        response = requests.post('http://localhost:5000/api/anchor/close-sub-account-position',
+                                               json={
+                                                   'account_name': account_name,
+                                                   'inst_id': inst_id,
+                                                   'pos_side': pos_side,
+                                                   'close_size': close_size,
+                                                   'reason': '纠错机制：持仓过大'
+                                               },
+                                               timeout=30)
+                        result = response.json()
+                        
+                        if result.get('success'):
+                            log(f"      ✅ 平仓成功")
+                            # 等待5秒再继续
+                            time.sleep(5)
+                        else:
+                            log(f"      ❌ 平仓失败: {result.get('message')}")
+                            # 平仓失败，跳过保证金调整
+                            continue
+                    except Exception as e:
+                        log(f"      ❌ 平仓异常: {e}")
+                        continue
+            
+            # 2. 检查保证金是否在允许范围内
             if maintenance_count in [0, 1]:
                 in_range = 9.5 <= current_margin <= 10.5
             elif maintenance_count == 2:
@@ -265,16 +334,9 @@ def check_and_correct(account):
                 log(f"      ✅ 保证金在允许范围内")
                 continue
             
-            # 需要调整
+            # 3. 调整保证金
             log(f"      ⚠️  保证金超出范围，需要调整")
             
-            # 获取详细持仓信息
-            position_detail = get_position(account, inst_id, pos_side)
-            if not position_detail:
-                log(f"      ❌ 无法获取详细持仓信息")
-                continue
-            
-            # 调整保证金
             success = adjust_margin(
                 account, inst_id, pos_side,
                 current_margin, target_margin,

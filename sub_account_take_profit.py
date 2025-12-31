@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 import traceback
 
 # 配置
-CHECK_INTERVAL = 30  # 30秒检查一次
+CHECK_INTERVAL = 10  # 10秒检查一次（从30秒改为10秒）
 PROFIT_THRESHOLD = 30  # 盈利30%触发止盈
 TAKE_PROFIT_RATIO = 0.5  # 止盈50%仓位
 MAIN_ACCOUNT_LOSS_THRESHOLD = 0  # 主账户反向交易对亏损即触发
