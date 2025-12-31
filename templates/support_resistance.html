@@ -2689,7 +2689,7 @@
         function loadGlobalTrendData() {
             console.log('📊 开始加载全局趋势数据...');
             
-            fetch('/api/support-resistance/snapshots?all=true')
+            fetch('/api/support-resistance/snapshots?all=true&_t=' + Date.now())
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {
