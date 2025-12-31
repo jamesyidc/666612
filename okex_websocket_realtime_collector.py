@@ -38,31 +38,40 @@ kline_cache = {
 
 def init_database():
     """初始化数据库"""
-    conn = sqlite3.connect('crypto_data.db')
-    cursor = conn.cursor()
-    
-    # 确保表存在
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS okex_technical_indicators (
-            symbol TEXT NOT NULL,
-            timeframe TEXT NOT NULL,
-            current_price REAL,
-            rsi_14 REAL,
-            sar REAL,
-            sar_position TEXT,
-            sar_quadrant INTEGER,
-            sar_count_label TEXT,
-            bb_upper REAL,
-            bb_middle REAL,
-            bb_lower REAL,
-            record_time TEXT,
-            PRIMARY KEY (symbol, timeframe)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-    print("✅ 数据库初始化完成")
+    conn = None
+    try:
+        conn = sqlite3.connect('crypto_data.db')
+        cursor = conn.cursor()
+        
+        # 确保表存在
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS okex_technical_indicators (
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                current_price REAL,
+                rsi_14 REAL,
+                sar REAL,
+                sar_position TEXT,
+                sar_quadrant INTEGER,
+                sar_count_label TEXT,
+                bb_upper REAL,
+                bb_middle REAL,
+                bb_lower REAL,
+                record_time TEXT,
+                PRIMARY KEY (symbol, timeframe)
+            )
+        ''')
+        
+        conn.commit()
+        print("✅ 数据库初始化完成")
+    except Exception as e:
+        print(f"❌ 数据库初始化失败: {e}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 def calculate_indicators(klines):
     """
@@ -146,27 +155,42 @@ def save_indicators(symbol, timeframe, indicators):
     if not indicators:
         return
     
-    conn = sqlite3.connect('crypto_data.db')
-    cursor = conn.cursor()
-    
-    record_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    cursor.execute('''
-        INSERT OR REPLACE INTO okex_technical_indicators
-        (symbol, timeframe, current_price, rsi_14, sar, sar_position, sar_quadrant, sar_count_label,
-         bb_upper, bb_middle, bb_lower, record_time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        symbol, timeframe,
-        indicators['current_price'], indicators['rsi_14'],
-        indicators['sar'], indicators['sar_position'], indicators['sar_quadrant'],
-        indicators['sar_count_label'],
-        indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'],
-        record_time
-    ))
-    
-    conn.commit()
-    conn.close()
+    conn = None
+    try:
+        conn = sqlite3.connect('crypto_data.db', timeout=30.0)
+        conn.execute('PRAGMA busy_timeout=30000')
+        cursor = conn.cursor()
+        
+        record_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO okex_technical_indicators
+            (symbol, timeframe, current_price, rsi_14, sar, sar_position, sar_quadrant, sar_count_label,
+             bb_upper, bb_middle, bb_lower, record_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            symbol, timeframe,
+            indicators['current_price'], indicators['rsi_14'],
+            indicators['sar'], indicators['sar_position'], indicators['sar_quadrant'],
+            indicators['sar_count_label'],
+            indicators['bb_upper'], indicators['bb_middle'], indicators['bb_lower'],
+            record_time
+        ))
+        
+        conn.commit()
+    except Exception as e:
+        logging.error(f"❌ 保存指标失败: {e}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 async def subscribe_klines(websocket, symbols, timeframe):
     """订阅K线频道"""

@@ -310,6 +310,7 @@ class PanicWashCollector:
         if not data:
             return False
         
+        conn = None
         try:
             # 使用北京时间
             beijing_tz = pytz.timezone('Asia/Shanghai')
@@ -338,14 +339,24 @@ class PanicWashCollector:
             ))
             
             conn.commit()
-            conn.close()
             
             logging.info(f"💾 数据保存成功: {record_time}")
             return True
             
         except Exception as e:
             logging.error(f"❌ 数据保存失败: {str(e)}")
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
             return False
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
     
     def collect_once(self):
         """

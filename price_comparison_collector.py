@@ -53,8 +53,10 @@ def get_price_at_time(cursor, symbol, hours_ago):
 
 def calculate_comparison(symbol):
     """计算价格对比数据"""
+    conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        conn.execute('PRAGMA busy_timeout=30000')
         cursor = conn.cursor()
         
         # 1. 获取当前价格
@@ -67,7 +69,6 @@ def calculate_comparison(symbol):
         
         result = cursor.fetchone()
         if not result:
-            conn.close()
             return None
             
         current_price = float(result[0])
@@ -103,7 +104,6 @@ def calculate_comparison(symbol):
         ))
         
         conn.commit()
-        conn.close()
         
         return {
             'symbol': symbol,
@@ -115,7 +115,18 @@ def calculate_comparison(symbol):
         
     except Exception as e:
         log(f"❌ {symbol} 计算比价失败: {e}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
         return None
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
 
 def main():
     """主函数"""
