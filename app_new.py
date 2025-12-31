@@ -6828,7 +6828,16 @@ def api_support_resistance_latest_signal():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 获取最新的快照
+        # 获取最新的实时数据时间（从support_resistance_levels表）
+        cursor.execute('''
+            SELECT MAX(record_time) as latest_time
+            FROM support_resistance_levels
+        ''')
+        
+        time_row = cursor.fetchone()
+        latest_time = time_row['latest_time'] if time_row else None
+        
+        # 获取最新的快照（如果有）
         cursor.execute('''
             SELECT 
                 snapshot_time, snapshot_date,
@@ -6849,9 +6858,8 @@ def api_support_resistance_latest_signal():
                 'message': '暂无快照数据'
             })
         
-        # 注意：数据库中存储的已经是北京时间，不需要再次转换
-        # 数据采集脚本使用 datetime.now(pytz.timezone('Asia/Shanghai')) 存储
-        snapshot_time_str = row['snapshot_time']  # 已经是北京时间
+        # 使用实时数据的最新时间，而不是快照时间
+        snapshot_time_str = latest_time if latest_time else row['snapshot_time']
         
         scenario_1 = row['scenario_1_count'] or 0
         scenario_2 = row['scenario_2_count'] or 0
