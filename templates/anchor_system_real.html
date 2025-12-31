@@ -803,6 +803,9 @@
                             <span>🚀 超级维护空单-10%</span>
                         </label>
                     </div>
+                    <button id="closeAllSubAccountPositions" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'">
+                        🚨 一键全部平仓
+                    </button>
                     <div style="font-size: 13px; opacity: 0.9;">
                         账户数量: <strong id="subAccountCount">--</strong>
                     </div>
@@ -2453,6 +2456,41 @@ ${closeDetails}
                     console.error('保存配置失败:', error);
                     showToast('⚠️ 配置保存失败', 'error');
                     e.target.checked = !enabled;
+                }
+            });
+            
+            // 一键全部平仓按钮
+            document.getElementById('closeAllSubAccountPositions').addEventListener('click', async function() {
+                // 二次确认
+                const confirmMessage = '⚠️ 确认要平掉所有子账户持仓吗？\n\n这将关闭所有子账户的所有持仓，此操作不可撤销！';
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+                
+                console.log('🚨 开始执行一键全部平仓...');
+                showToast('🔄 正在平仓所有持仓...', 'info');
+                
+                try {
+                    const response = await fetch('/api/sub-account/close-all-positions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast(`✅ 平仓完成！成功: ${data.success_count}个，失败: ${data.fail_count}个`, 'success');
+                        // 刷新数据
+                        setTimeout(() => {
+                            loadData();
+                        }, 2000);
+                    } else {
+                        showToast(`❌ 平仓失败: ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('一键平仓失败:', error);
+                    showToast('❌ 一键平仓失败', 'error');
                 }
             });
             
