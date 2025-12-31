@@ -635,6 +635,36 @@
             </div>
         </div>
 
+        <!-- 下跌强度分类 -->
+        <div class="card" id="declineStrengthCard">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>📉</span>
+                    市场下跌强度分析
+                </div>
+            </div>
+            <div style="padding: 25px;">
+                <div id="strengthDisplay" style="display: flex; align-items: center; justify-content: space-between; padding: 20px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <div style="font-size: 48px;" id="strengthIcon">📊</div>
+                        <div>
+                            <div style="font-size: 28px; font-weight: 700; color: white; margin-bottom: 5px;" id="strengthName">加载中...</div>
+                            <div style="font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.9);" id="strengthSuggestion">--</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">空单盈利统计</div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 13px;">
+                            <div>≥70%: <span id="count70" style="font-weight: 700;">0</span></div>
+                            <div>≥60%: <span id="count60" style="font-weight: 700;">0</span></div>
+                            <div>≥50%: <span id="count50" style="font-weight: 700;">0</span></div>
+                            <div>≥40%: <span id="count40" style="font-weight: 700;">0</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 操作提示状态栏 -->
         <div id="operationStatusBar" style="display: none; margin-bottom: 20px; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
             <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
@@ -950,6 +980,14 @@
                     renderHourlyStats(hourlyStatsData.stats);
                 }
 
+                // 加载下跌强度分析
+                const strengthRes = await fetch('/api/anchor/decline-strength?trade_mode=real');
+                const strengthData = await strengthRes.json();
+                
+                if (strengthData.success) {
+                    renderDeclineStrength(strengthData.data);
+                }
+
                 // 加载当前持仓情况（实盘模式）
                 const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=real');
                 const positionsData = await positionsRes.json();
@@ -1244,6 +1282,60 @@
             `;
             
             statsElement.innerHTML = html;
+        }
+
+        // 渲染下跌强度分析
+        function renderDeclineStrength(data) {
+            if (!data) return;
+            
+            const display = document.getElementById('strengthDisplay');
+            const icon = document.getElementById('strengthIcon');
+            const name = document.getElementById('strengthName');
+            const suggestion = document.getElementById('strengthSuggestion');
+            const count70 = document.getElementById('count70');
+            const count60 = document.getElementById('count60');
+            const count50 = document.getElementById('count50');
+            const count40 = document.getElementById('count40');
+            
+            // 更新统计数字
+            if (data.statistics) {
+                count70.textContent = data.statistics.profit_70 || 0;
+                count60.textContent = data.statistics.profit_60 || 0;
+                count50.textContent = data.statistics.profit_50 || 0;
+                count40.textContent = data.statistics.profit_40 || 0;
+            }
+            
+            // 根据强度级别设置图标和颜色
+            let bgGradient = '';
+            let iconEmoji = '📊';
+            
+            switch(data.strength_level) {
+                case 1:
+                    bgGradient = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+                    iconEmoji = '🟢';
+                    break;
+                case 2:
+                    bgGradient = 'linear-gradient(135deg, #ed8936 0%, #dd6b20 100%)';
+                    iconEmoji = '🟡';
+                    break;
+                case 3:
+                    bgGradient = 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)';
+                    iconEmoji = '🔴';
+                    break;
+                case 4:
+                    bgGradient = 'linear-gradient(135deg, #9f7aea 0%, #805ad5 100%)';
+                    iconEmoji = '⚠️';
+                    break;
+                default:
+                    bgGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    iconEmoji = '📊';
+            }
+            
+            // 更新显示
+            display.style.background = bgGradient;
+            icon.textContent = iconEmoji;
+            name.textContent = data.strength_name || '加载中...';
+            suggestion.textContent = data.buy_suggestion || '--';
         }
 
         // 渲染历史极值记录表

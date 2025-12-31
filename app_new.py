@@ -16044,29 +16044,23 @@ def get_decline_strength():
     根据空单盈利情况判断市场下跌强度
     """
     try:
-        trade_mode = request.args.get('trade_mode', 'real')
+        import sys
+        sys.path.append('/home/user/webapp')
+        from anchor_system import get_positions_from_okex
         
-        # 获取当前持仓
-        positions_data = get_current_positions(trade_mode)
-        
-        if not positions_data or not positions_data.get('positions'):
-            return jsonify({
-                'success': False,
-                'message': '无持仓数据'
-            })
-        
-        positions = positions_data['positions']
+        # 获取实盘持仓
+        raw_positions = get_positions_from_okex()
         
         # 统计空单盈利情况
         short_profits = []
-        for pos in positions:
-            if pos.get('pos_side') == 'short':
-                profit_rate = pos.get('profit_rate', 0)
+        for pos in raw_positions:
+            if pos.get('posSide') == 'short':  # OKEx API 使用 posSide
+                profit_rate = float(pos.get('uplRatio', 0)) * 100  # 转换为百分比
                 short_profits.append({
-                    'inst_id': pos.get('inst_id'),
+                    'inst_id': pos.get('instId'),
                     'profit_rate': profit_rate,
-                    'margin': pos.get('margin', 0),
-                    'upl': pos.get('upl', 0)
+                    'margin': float(pos.get('margin', 0)),
+                    'upl': float(pos.get('upl', 0))
                 })
         
         # 计算各盈利区间的空单数量
@@ -16081,34 +16075,35 @@ def get_decline_strength():
         buy_suggestion = ''
         color_class = ''
         
-        # 下跌强度3级（最强）
-        if count_70 <= 2 and count_60 <= 5 and count_50 <= 8 and count_40 <= 11:
-            if count_70 > 0 or count_60 > 1 or count_50 > 4 or count_40 > 5:
-                strength_level = 3
-                strength_name = '下跌强度3级'
-                buy_suggestion = '多单买入点在70-80%'
-                color_class = 'strength-3'
-        
-        # 下跌强度2级（中等）
-        if strength_level == 0 and count_70 == 0 and count_60 <= 1 and count_50 <= 4 and count_40 <= 5:
-            if count_60 > 0 or count_50 > 0 or count_40 > 3:
-                strength_level = 2
-                strength_name = '下跌强度2级'
-                buy_suggestion = '多单买入点在60%'
-                color_class = 'strength-2'
-        
+        # 没有空单的情况
+        if len(short_profits) == 0:
+            strength_name = '无空单持仓'
+            buy_suggestion = '市场上涨或震荡，暂无下跌信号'
+            color_class = 'strength-0'
         # 下跌强度1级（最弱）
-        if strength_level == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 <= 3:
+        elif count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 <= 3:
             strength_level = 1
             strength_name = '下跌强度1级'
             buy_suggestion = '多单买入点在50%'
             color_class = 'strength-1'
-        
-        # 如果都不满足，返回无明显下跌
-        if strength_level == 0:
-            strength_name = '无明显下跌'
-            buy_suggestion = '暂无买入建议'
-            color_class = 'strength-0'
+        # 下跌强度2级（中等）
+        elif count_70 == 0 and count_60 <= 1 and count_50 <= 4 and count_40 <= 5:
+            strength_level = 2
+            strength_name = '下跌强度2级'
+            buy_suggestion = '多单买入点在60%'
+            color_class = 'strength-2'
+        # 下跌强度3级（最强）
+        elif count_70 <= 2 and count_60 <= 5 and count_50 <= 8 and count_40 <= 11:
+            strength_level = 3
+            strength_name = '下跌强度3级'
+            buy_suggestion = '多单买入点在70-80%'
+            color_class = 'strength-3'
+        # 超出范围（极端下跌）
+        else:
+            strength_level = 4
+            strength_name = '极端下跌'
+            buy_suggestion = '市场极度恐慌，谨慎操作'
+            color_class = 'strength-4'
         
         return jsonify({
             'success': True,
