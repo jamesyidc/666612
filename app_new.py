@@ -13654,7 +13654,7 @@ def super_maintain_anchor_order():
         if mark_price == 0:
             return jsonify({
                 'success': False,
-                'message': '无法获取标记价格'
+                'message': f'无法获取标记价格，检查持仓和行情数据'
             })
         
         print(f"📊 标记价格: ${mark_price}, 杠杆: {lever}x")
@@ -15310,7 +15310,12 @@ def maintain_sub_account():
         mark_price = 0
         for position in pos_data.get('data', []):
             if position.get('posSide') == pos_side:
-                mark_price = float(position.get('markPx', 0))
+                # 安全转换：处理空字符串和None
+                mark_px_str = position.get('markPx', '0')
+                try:
+                    mark_price = float(mark_px_str) if mark_px_str and mark_px_str != '' else 0
+                except (ValueError, TypeError):
+                    mark_price = 0
                 break
         
         if mark_price == 0:
@@ -15322,13 +15327,24 @@ def maintain_sub_account():
             )
             ticker_data = ticker_response.json()
             if ticker_data.get('code') == '0' and ticker_data.get('data'):
-                mark_price = float(ticker_data['data'][0].get('last', 0))
+                # 安全转换：处理空字符串和None
+                last_price_str = ticker_data['data'][0].get('last', '0')
+                try:
+                    mark_price = float(last_price_str) if last_price_str and last_price_str != '' else 0
+                except (ValueError, TypeError):
+                    mark_price = 0
         
         if mark_price == 0:
             return jsonify({
                 'success': False,
-                'message': '无法获取标记价格'
+                'message': f'无法获取标记价格，检查持仓和行情数据'
             })
+        
+        print(f"🎯 子账户维护: {account_name} {inst_id} {pos_side}")
+        print(f"   标记价格: {mark_price}")
+        print(f"   维护金额: {maintenance_amount}U")
+        print(f"   目标保证金: {target_margin}U")
+        print(f"   杠杆: {sub_account.get('leverage', 10)}x")
         
         # 计算买入数量：使用动态维护金额
         # pos_size = maintenance_amount * lever / mark_price
