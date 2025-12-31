@@ -37,5 +37,11 @@
     "inst_id": "BCH-USDT-SWAP",
     "pos_side": "long",
     "opened_at": "2025-12-31 04:57:58"
+  },
+  "Wu666666:AAVE-USDT-SWAP:long": {
+    "account_name": "Wu666666",
+    "inst_id": "AAVE-USDT-SWAP",
+    "pos_side": "long",
+    "opened_at": "2025-12-31 13:24:38"
   }
 }

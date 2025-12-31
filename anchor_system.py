@@ -665,75 +665,6 @@ def get_market_data():
         return None
 
 
-def get_decline_strength_level():
-    """
-    获取当前下跌强度级别
-    
-    返回:
-        {
-            'level': 0-3,  # 0=无空单, 1=弱下跌, 2=中等, 3=强下跌
-            'name': '下跌强度X级',
-            'buy_suggestion': '多单买入点在X%'
-        }
-    """
-    try:
-        # 获取所有空单持仓
-        positions = get_positions_from_okex()
-        
-        # 统计空单盈利情况
-        short_profits = []
-        for pos in positions:
-            if pos.get('posSide') == 'short':
-                profit_rate = float(pos.get('uplRatio', 0)) * 100
-                short_profits.append(profit_rate)
-        
-        # 计算各盈利区间的空单数量
-        count_70 = len([p for p in short_profits if p >= 70])
-        count_60 = len([p for p in short_profits if p >= 60])
-        count_50 = len([p for p in short_profits if p >= 50])
-        count_40 = len([p for p in short_profits if p >= 40])
-        
-        # 判断下跌强度
-        if len(short_profits) == 0:
-            return {
-                'level': 0,
-                'name': '无空单持仓',
-                'buy_suggestion': '市场上涨或震荡'
-            }
-        elif count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 <= 3:
-            return {
-                'level': 1,
-                'name': '下跌强度1级',
-                'buy_suggestion': '多单买入点在50%'
-            }
-        elif count_70 == 0 and count_60 <= 1 and count_50 <= 4 and count_40 <= 5:
-            return {
-                'level': 2,
-                'name': '下跌强度2级',
-                'buy_suggestion': '多单买入点在60%'
-            }
-        elif count_70 <= 2 and count_60 <= 5 and count_50 <= 8 and count_40 <= 11:
-            return {
-                'level': 3,
-                'name': '下跌强度3级',
-                'buy_suggestion': '多单买入点在70-80%'
-            }
-        else:
-            return {
-                'level': 4,
-                'name': '极端下跌',
-                'buy_suggestion': '市场极度恐慌'
-            }
-    except Exception as e:
-        print(f"❌ 获取下跌强度失败: {e}")
-        # 返回默认值
-        return {
-            'level': 0,
-            'name': '未知',
-            'buy_suggestion': '谨慎操作'
-        }
-
-
 def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
     """格式化告警消息"""
     inst_id = position.get('instId')
@@ -750,36 +681,28 @@ def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
     # 确定方向
     direction = "做空" if pos_side == "short" else "做多"
     
-    # 获取下跌强度（用于开多单预警）
-    decline_strength = get_decline_strength_level()
-    
     # 告警类型 - 修改为开仓预警
     if alert_type == "profit_target":
         alert_emoji = "📈"
         alert_title = "【锚点系统触发 - 开仓多头预警】"
         
-        # 根据下跌强度分级调整预警文本
-        if decline_strength['level'] == 1:
-            # 1级强度：空单盈利>=50%
-            if profit_rate >= 50:
-                signal_type = f"做空盈利{profit_rate:.1f}%，下跌强度1级，建议开仓做多（买入点在50%）"
-            else:
-                signal_type = f"做空盈利{profit_rate:.1f}%，建议开仓做多"
-        elif decline_strength['level'] == 2:
-            # 2级强度：空单盈利>=60%
-            if profit_rate >= 60:
-                signal_type = f"做空盈利{profit_rate:.1f}%，下跌强度2级，建议开仓做多（买入点在60%）"
-            else:
-                signal_type = f"做空盈利{profit_rate:.1f}%，建议开仓做多"
-        elif decline_strength['level'] == 3:
-            # 3级强度：空单盈利>=70%
-            if profit_rate >= 70:
-                signal_type = f"做空盈利{profit_rate:.1f}%，下跌强度3级，建议开仓做多（买入点在70-80%）"
-            else:
-                signal_type = f"做空盈利{profit_rate:.1f}%，建议开仓做多"
+        # 根据盈利率来判断下跌强度分级
+        if profit_rate >= 70:
+            # 盈利>=70%：下跌强度3级
+            signal_type = f"做空盈利{profit_rate:.1f}%，下跌强度3级，建议开仓做多（买入点在70-80%）"
+            decline_strength_level = 3
+        elif profit_rate >= 60:
+            # 盈利>=60%：下跌强度2级
+            signal_type = f"做空盈利{profit_rate:.1f}%，下跌强度2级，建议开仓做多（买入点在60%）"
+            decline_strength_level = 2
+        elif profit_rate >= 50:
+            # 盈利>=50%：下跌强度1级
+            signal_type = f"做空盈利{profit_rate:.1f}%，下跌强度1级，建议开仓做多（买入点在50%）"
+            decline_strength_level = 1
         else:
-            # 默认：40%预警
+            # 盈利<50%：默认40%预警
             signal_type = f"做空盈利{profit_rate:.1f}%，建议开仓做多"
+            decline_strength_level = 0
     else:
         alert_emoji = "📉"
         alert_title = "【锚点系统触发 - 开仓空头预警】"
@@ -829,11 +752,13 @@ def format_alert_message(position, profit_rate, alert_type, cycle_count=None):
 """
     
     # 添加下跌强度信息（仅开多单预警时显示）
-    if alert_type == "profit_target":
+    if alert_type == "profit_target" and 'decline_strength_level' in locals() and decline_strength_level > 0:
+        strength_names = {1: '下跌强度1级', 2: '下跌强度2级', 3: '下跌强度3级'}
+        buy_points = {1: '50%', 2: '60%', 3: '70-80%'}
         message += f"""
 🔥 <b>下跌强度分析</b>
-当前强度: {decline_strength['name']}
-{decline_strength['buy_suggestion']}
+当前强度: {strength_names.get(decline_strength_level, '未知')}
+多单买入点在{buy_points.get(decline_strength_level, '未知')}
 """
     
     # 获取BTC和ETH的24小时涨跌幅
