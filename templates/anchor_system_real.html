@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Version: 2026-01-01-04:20 删除市场下跌强度分析卡片 -->
+    <!-- Version: 2026-01-01-04:25 重新添加市场下跌等级分析卡片（在历史极值和当前持仓之间） -->
     <title>🔴 实盘锚点系统 - OKEx持仓监控</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
@@ -704,6 +704,39 @@
             </div>
         </div>
 
+        <!-- 市场下跌等级分析 -->
+        <div class="card" id="declineStrengthCard">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>📉</span>
+                    市场下跌等级分析
+                </div>
+            </div>
+            <div style="padding: 25px;">
+                <div id="strengthDisplay" style="display: flex; align-items: center; justify-content: space-between; padding: 20px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <div style="font-size: 48px;" id="strengthIcon">📊</div>
+                        <div>
+                            <div style="font-size: 28px; font-weight: 700; color: white; margin-bottom: 5px;" id="strengthName">加载中...</div>
+                            <div style="font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.9);" id="strengthSuggestion">--</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right; color: white;">
+                        <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">空单盈利统计</div>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 13px;">
+                            <div>≥100%: <span id="count100" style="font-weight: 700;">0</span></div>
+                            <div>≥90%: <span id="count90" style="font-weight: 700;">0</span></div>
+                            <div>≥80%: <span id="count80" style="font-weight: 700;">0</span></div>
+                            <div>≥70%: <span id="count70" style="font-weight: 700;">0</span></div>
+                            <div>≥60%: <span id="count60" style="font-weight: 700;">0</span></div>
+                            <div>≥50%: <span id="count50" style="font-weight: 700;">0</span></div>
+                            <div>≥40%: <span id="count40" style="font-weight: 700;">0</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 当前持仓情况 -->
         <div class="card">
             <div class="card-header">
@@ -1009,6 +1042,14 @@
                 
                 if (hourlyStatsData.success) {
                     renderHourlyStats(hourlyStatsData.stats);
+                }
+
+                // 加载下跌等级分析
+                const strengthRes = await fetch('/api/anchor/decline-strength?trade_mode=real');
+                const strengthData = await strengthRes.json();
+                
+                if (strengthData.success) {
+                    renderDeclineStrength(strengthData.data);
                 }
 
                 // 加载当前持仓情况（实盘模式）
@@ -1387,6 +1428,70 @@
             `;
             
             statsElement.innerHTML = html;
+        }
+
+        // 渲染下跌等级分析
+        function renderDeclineStrength(data) {
+            if (!data) return;
+            
+            const display = document.getElementById('strengthDisplay');
+            const icon = document.getElementById('strengthIcon');
+            const name = document.getElementById('strengthName');
+            const suggestion = document.getElementById('strengthSuggestion');
+            const count100 = document.getElementById('count100');
+            const count90 = document.getElementById('count90');
+            const count80 = document.getElementById('count80');
+            const count70 = document.getElementById('count70');
+            const count60 = document.getElementById('count60');
+            const count50 = document.getElementById('count50');
+            const count40 = document.getElementById('count40');
+            
+            // 更新统计数字
+            if (data.statistics) {
+                count100.textContent = data.statistics.profit_100 || 0;
+                count90.textContent = data.statistics.profit_90 || 0;
+                count80.textContent = data.statistics.profit_80 || 0;
+                count70.textContent = data.statistics.profit_70 || 0;
+                count60.textContent = data.statistics.profit_60 || 0;
+                count50.textContent = data.statistics.profit_50 || 0;
+                count40.textContent = data.statistics.profit_40 || 0;
+            }
+            
+            // 根据强度级别设置图标和颜色
+            let bgGradient = '';
+            let iconEmoji = '📊';
+            
+            switch(data.strength_level) {
+                case 5:
+                    bgGradient = 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)';
+                    iconEmoji = '🔥🔥🔥🔥🔥';
+                    break;
+                case 4:
+                    bgGradient = 'linear-gradient(135deg, #991b1b 0%, #b91c1c 100%)';
+                    iconEmoji = '🔥🔥🔥🔥';
+                    break;
+                case 3:
+                    bgGradient = 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)';
+                    iconEmoji = '🔥🔥🔥';
+                    break;
+                case 2:
+                    bgGradient = 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)';
+                    iconEmoji = '🔥🔥';
+                    break;
+                case 1:
+                    bgGradient = 'linear-gradient(135deg, #fbbf24 0%, #fcd34d 100%)';
+                    iconEmoji = '🔥';
+                    break;
+                default:
+                    bgGradient = 'linear-gradient(135deg, #10b981 0%, #34d399 100%)';
+                    iconEmoji = '✅';
+            }
+            
+            // 更新显示
+            display.style.background = bgGradient;
+            icon.textContent = iconEmoji;
+            name.textContent = data.strength_name || '加载中...';
+            suggestion.textContent = data.buy_suggestion || '--';
         }
 
         // 渲染历史极值记录表
