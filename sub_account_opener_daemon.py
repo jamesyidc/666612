@@ -208,14 +208,16 @@ def open_position_on_sub_account(sub_account, inst_id, pos_side, size_usdt):
         last_price = float(ticker_data['data'][0]['last'])
         
         # 计算开仓数量（张数）
-        # size_usdt / last_price = 持仓价值（币）
-        # 假设每张合约面值为1个币（大多数永续合约）
-        size = round(size_usdt / last_price)
+        # 保证金 = (持仓价值 / 杠杆)
+        # 持仓价值 = 张数 × 价格 × 合约面值(1)
+        # 所以：张数 = (保证金 × 杠杆) / 价格
+        lever = 10  # 固定10倍杠杆
+        size = round((size_usdt * lever) / last_price)
         
         if size < 1:
             size = 1  # 至少1张
         
-        print(f"📊 准备开仓: {inst_id} {pos_side} 数量:{size}张 价格:${last_price:.4f}")
+        print(f"📊 准备开仓: {inst_id} {pos_side} 数量:{size}张 价格:${last_price:.4f} 杠杆:{lever}x 目标保证金:{size_usdt}U")
         
         # 下单（逐仓模式）
         request_path = '/api/v5/trade/order'

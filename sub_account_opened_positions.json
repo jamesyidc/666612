@@ -13,5 +13,17 @@
     "open_size": 266.0,
     "open_price": 0.375,
     "created_at": "2025-12-31 02:29:35"
+  },
+  "Wu666666:LDO-USDT-SWAP:long": {
+    "account_name": "Wu666666",
+    "inst_id": "LDO-USDT-SWAP",
+    "pos_side": "long",
+    "opened_at": "2025-12-31 04:07:35"
+  },
+  "Wu666666:UNI-USDT-SWAP:long": {
+    "account_name": "Wu666666",
+    "inst_id": "UNI-USDT-SWAP",
+    "pos_side": "long",
+    "opened_at": "2025-12-31 04:07:38"
   }
 }

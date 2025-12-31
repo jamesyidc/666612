@@ -13066,12 +13066,18 @@ def get_sub_account_positions():
                             # 获取维护次数
                             maintenance_count = 0
                             try:
-                                with open('sub_account_maintenance_count.json', 'r', encoding='utf-8') as f:
-                                    counts = json_lib.load(f)
+                                with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+                                    maintenance_data = json_lib.load(f)
                                 today = get_china_today()
-                                key = f"{account_name}:{pos['instId']}:{pos['posSide']}:{today}"
-                                maintenance_count = counts.get(key, 0)
-                            except:
+                                # Key格式: Wu666666_CRV-USDT-SWAP_long
+                                key = f"{account_name}_{pos['instId']}_{pos['posSide']}"
+                                if key in maintenance_data:
+                                    record = maintenance_data[key]
+                                    # 检查日期是否是今天
+                                    if record.get('date') == today:
+                                        maintenance_count = record.get('count', 0)
+                            except Exception as e:
+                                print(f"读取维护次数失败: {e}")
                                 pass
                             
                             all_positions.append({
