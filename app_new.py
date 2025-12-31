@@ -15442,35 +15442,9 @@ def maintain_sub_account():
         print(f"   最终保留: {keep_size} 张")
         print(f"   需要平仓: {close_size} 张")
         
-        # ========== 第1步：设置逐仓杠杆（必须！）==========
-        print(f"📊 第1步：设置逐仓杠杆 {lever}x")
-        leverage_path = '/api/v5/account/set-leverage'
-        leverage_body = {
-            'instId': inst_id,
-            'lever': str(lever),
-            'mgnMode': 'isolated',  # 逐仓模式
-            'posSide': pos_side
-        }
-        
-        leverage_headers = get_headers('POST', leverage_path, leverage_body)
-        leverage_response = requests.post(
-            OKEX_REST_URL + leverage_path,
-            headers=leverage_headers,
-            json=leverage_body,
-            timeout=10
-        )
-        
-        leverage_result = leverage_response.json()
-        print(f"📥 设置杠杆响应: code={leverage_result.get('code')}, msg={leverage_result.get('msg')}")
-        
-        if leverage_result.get('code') != '0':
-            # 杠杆设置失败，但可能已经是目标杠杆了，继续尝试开仓
-            print(f"⚠️  杠杆设置失败（可能已经是目标杠杆）: {leverage_result.get('msg')}")
-        else:
-            print(f"✅ 杠杆设置成功: {lever}x")
-        
-        # 等待杠杆设置生效
-        time.sleep(1)
+        # ========== 第1步：全仓模式使用账户设置的杠杆，无需单独设置 ==========
+        print(f"📊 第1步：全仓模式，使用账户设置的杠杆")
+        # 全仓模式不需要为每个订单设置杠杆，使用账户级别的杠杆设置
         
         # ========== 第2步：开仓新持仓（维护金额对应的仓位）==========
         print(f"📊 第2步：开仓新持仓 {new_order_size} 张（维护金额 {maintenance_amount}U）")
@@ -15479,12 +15453,12 @@ def maintain_sub_account():
         
         open_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
+            'tdMode': 'cross',  # 全仓模式：使用账户所有可用余额作为保证金
             'side': side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(new_order_size),
-            'lever': str(lever)  # 逐仓模式需要指定杠杆
+            'sz': str(new_order_size)
+            # 全仓模式不需要指定杠杆，使用账户设置的杠杆
         }
         
         headers = get_headers('POST', order_path, open_order_body)
@@ -15531,7 +15505,7 @@ def maintain_sub_account():
             
             close_order_body = {
                 'instId': inst_id,
-                'tdMode': 'isolated',  # 逐仓模式
+                'tdMode': 'cross',  # 全仓模式
                 'side': close_side,
                 'posSide': pos_side,
                 'ordType': 'market',

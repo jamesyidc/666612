@@ -15,7 +15,7 @@ import traceback
 # 配置
 CHECK_INTERVAL = 30  # 30秒检查一次
 TRIGGER_RATE = -10  # 触发维护的收益率阈值
-MAINTENANCE_AMOUNT = 50  # 维护金额50U（降低以避免余额不足）
+MAINTENANCE_AMOUNT = 20  # 维护金额20U（进一步降低以确保成功）
 MAX_MAINTENANCE_COUNT = 3  # 最大维护次数
 STOP_LOSS_RATE = -20  # 止损线
 
@@ -115,18 +115,18 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
         # 获取当前维护次数
         current_count = get_maintenance_count(account_name, inst_id, pos_side)
         
-        # 根据维护次数确定参数（降低维护金额以避免余额不足）
+        # 根据维护次数确定参数（进一步降低维护金额）
         if current_count == 0:
-            # 第1次维护：买入50U，留10U（从100U降低到50U）
-            maintenance_amount = 50
+            # 第1次维护：买入20U，留10U
+            maintenance_amount = 20
             target_margin = 10
         elif current_count == 1:
-            # 第2次维护：买入50U，留20U（从100U降低到50U）
-            maintenance_amount = 50
+            # 第2次维护：买入20U，留20U
+            maintenance_amount = 20
             target_margin = 20
         elif current_count == 2:
-            # 第3次维护：买入100U，留20U，设置-20%止损（从200U降低到100U）
-            maintenance_amount = 100
+            # 第3次维护：买入50U，留20U，设置-20%止损
+            maintenance_amount = 50
             target_margin = 20
         else:
             log(f"⚠️  今日维护次数已达上限: {current_count}/{MAX_MAINTENANCE_COUNT}")
