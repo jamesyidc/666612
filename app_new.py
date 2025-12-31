@@ -13688,7 +13688,7 @@ def super_maintain_anchor_order():
             'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(int(current_pos_size))  # 全部平掉
+            'sz': str(current_pos_size)  # 使用原始持仓量（可以是小数）
         }
         
         headers = get_headers('POST', order_path, close_order_body)
@@ -13975,7 +13975,7 @@ def maintain_anchor_order():
             'side': old_close_side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(int(pos_size))  # 全部平掉
+            'sz': str(pos_size)  # 全部平掉（支持小数持仓）
         }
         
         headers = get_headers('POST', order_path, old_close_order_body)
