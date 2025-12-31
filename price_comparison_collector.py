@@ -141,10 +141,19 @@ def main():
         result = calculate_comparison(symbol)
         
         if result:
+            # 格式化百分比，处理None值
+            change_24h = result['change_24h_percent']
+            change_48h = result['change_48h_percent']
+            change_7d = result['change_7d_percent']
+            
+            change_24h_str = f"{change_24h:+.2f}%" if change_24h is not None else "N/A"
+            change_48h_str = f"{change_48h:+.2f}%" if change_48h is not None else "N/A"
+            change_7d_str = f"{change_7d:+.2f}%" if change_7d is not None else "N/A"
+            
             log(f"✅ {symbol} | 当前价: ${result['current_price']:.4f} | "
-                f"24h: {result['change_24h_percent']:+.2f}% | "
-                f"48h: {result['change_48h_percent']:+.2f}% | "
-                f"7d: {result['change_7d_percent']:+.2f}%")
+                f"24h: {change_24h_str} | "
+                f"48h: {change_48h_str} | "
+                f"7d: {change_7d_str}")
             success_count += 1
         else:
             failed_count += 1

@@ -16037,6 +16037,105 @@ def get_sub_account_take_profit_records():
         })
 
 # 测试页面路由
+@app.route('/api/anchor/decline-strength', methods=['GET'])
+def get_decline_strength():
+    """
+    获取下跌强度分类
+    根据空单盈利情况判断市场下跌强度
+    """
+    try:
+        trade_mode = request.args.get('trade_mode', 'real')
+        
+        # 获取当前持仓
+        positions_data = get_current_positions(trade_mode)
+        
+        if not positions_data or not positions_data.get('positions'):
+            return jsonify({
+                'success': False,
+                'message': '无持仓数据'
+            })
+        
+        positions = positions_data['positions']
+        
+        # 统计空单盈利情况
+        short_profits = []
+        for pos in positions:
+            if pos.get('pos_side') == 'short':
+                profit_rate = pos.get('profit_rate', 0)
+                short_profits.append({
+                    'inst_id': pos.get('inst_id'),
+                    'profit_rate': profit_rate,
+                    'margin': pos.get('margin', 0),
+                    'upl': pos.get('upl', 0)
+                })
+        
+        # 计算各盈利区间的空单数量
+        count_70 = len([p for p in short_profits if p['profit_rate'] >= 70])
+        count_60 = len([p for p in short_profits if p['profit_rate'] >= 60])
+        count_50 = len([p for p in short_profits if p['profit_rate'] >= 50])
+        count_40 = len([p for p in short_profits if p['profit_rate'] >= 40])
+        
+        # 判断下跌强度
+        strength_level = 0
+        strength_name = ''
+        buy_suggestion = ''
+        color_class = ''
+        
+        # 下跌强度3级（最强）
+        if count_70 <= 2 and count_60 <= 5 and count_50 <= 8 and count_40 <= 11:
+            if count_70 > 0 or count_60 > 1 or count_50 > 4 or count_40 > 5:
+                strength_level = 3
+                strength_name = '下跌强度3级'
+                buy_suggestion = '多单买入点在70-80%'
+                color_class = 'strength-3'
+        
+        # 下跌强度2级（中等）
+        if strength_level == 0 and count_70 == 0 and count_60 <= 1 and count_50 <= 4 and count_40 <= 5:
+            if count_60 > 0 or count_50 > 0 or count_40 > 3:
+                strength_level = 2
+                strength_name = '下跌强度2级'
+                buy_suggestion = '多单买入点在60%'
+                color_class = 'strength-2'
+        
+        # 下跌强度1级（最弱）
+        if strength_level == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 <= 3:
+            strength_level = 1
+            strength_name = '下跌强度1级'
+            buy_suggestion = '多单买入点在50%'
+            color_class = 'strength-1'
+        
+        # 如果都不满足，返回无明显下跌
+        if strength_level == 0:
+            strength_name = '无明显下跌'
+            buy_suggestion = '暂无买入建议'
+            color_class = 'strength-0'
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'strength_level': strength_level,
+                'strength_name': strength_name,
+                'buy_suggestion': buy_suggestion,
+                'color_class': color_class,
+                'statistics': {
+                    'total_shorts': len(short_profits),
+                    'profit_70': count_70,
+                    'profit_60': count_60,
+                    'profit_50': count_50,
+                    'profit_40': count_40
+                },
+                'short_positions': short_profits
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'获取下跌强度失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/test-positions')
 def test_positions_page():
     """持仓数据测试页面"""
