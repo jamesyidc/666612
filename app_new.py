@@ -15402,12 +15402,12 @@ def maintain_sub_account():
         
         open_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',
+            'tdMode': 'cross',  # 改用全仓模式，避免逐仓保证金不足问题
             'side': side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(order_size),
-            'lever': str(lever)
+            'sz': str(order_size)
+            # 全仓模式不需要指定杠杆，使用账户级别杠杆
         }
         
         headers = get_headers('POST', order_path, open_order_body)
@@ -15446,7 +15446,7 @@ def maintain_sub_account():
         
         close_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',
+            'tdMode': 'cross',  # 全仓模式
             'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
