@@ -428,110 +428,110 @@ def import_to_database(data, content):
             conn = sqlite3.connect(DB_PATH, timeout=60)
             conn.execute("PRAGMA journal_mode=WAL")  # 启用WAL模式，提高并发性能
             cursor = conn.cursor()
-        
-        # 检查数据是否已存在
-        log(f"   🔍 检查数据是否已存在...")
-        cursor.execute("""
-            SELECT COUNT(*) FROM crypto_snapshots 
-            WHERE snapshot_time = ?
-        """, (data['snapshot_time'],))
-        
-        exists = cursor.fetchone()[0] > 0
-        
-        if exists:
-            log(f"   ℹ️  数据库中已存在该时间的记录: {data['snapshot_time']}")
+            
+            # 检查数据是否已存在
+            log(f"   🔍 检查数据是否已存在...")
+            cursor.execute("""
+                SELECT COUNT(*) FROM crypto_snapshots 
+                WHERE snapshot_time = ?
+            """, (data['snapshot_time'],))
+            
+            exists = cursor.fetchone()[0] > 0
+            
+            if exists:
+                log(f"   ℹ️  数据库中已存在该时间的记录: {data['snapshot_time']}")
+                conn.close()
+                return False
+            
+            # 注释掉旧的验证逻辑 - rush_up=0和rush_down=0是正常的市场状态（震荡无序）
+            # if data['rush_up'] == 0 and data['rush_down'] == 0:
+            #     log(f"   ⚠️  数据无效：rush_up和rush_down均为0，跳过本次保存")
+            #     conn.close()
+            #     return False
+            
+            # 插入新数据到crypto_snapshots
+            log(f"   📝 准备插入新记录到 crypto_snapshots 表...")
+            cursor.execute("""
+                INSERT INTO crypto_snapshots 
+                (snapshot_time, snapshot_date, rush_up, rush_down, diff, count, status, count_score_display, count_score_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+            """, (
+                data['snapshot_time'],
+                data['snapshot_date'],
+                data['rush_up'],
+                data['rush_down'],
+                data['diff'],
+                data['count'],
+                data['status'],
+                data['count_score_display'],
+                data['count_score_type']
+            ))
+            
+            # 获取刚插入的snapshot_id
+            snapshot_id = cursor.lastrowid
+            log(f"   ✅ 快照数据插入成功 (ID: {snapshot_id})")
+            
+            # 解析并导入币种数据
+            log(f"   🪙 开始解析币种数据...")
+            coins = parse_coin_data(content)
+            
+            if coins:
+                log(f"   📊 找到 {len(coins)} 个币种数据")
+                coin_count = 0
+                
+                for coin in coins:
+                    try:
+                        cursor.execute("""
+                            INSERT INTO crypto_coin_data 
+                            (snapshot_id, snapshot_time, symbol, index_order, change, rush_up, rush_down, 
+                             update_time, high_price, high_time, decline, change_24h, rank, current_price, 
+                             ratio1, ratio2, priority_level, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
+                        """, (
+                            snapshot_id,
+                            data['snapshot_time'],
+                            coin['symbol'],
+                            coin['index_order'],
+                            coin['change'],
+                            coin['rush_up'],
+                            coin['rush_down'],
+                            coin['update_time'],
+                            coin['high_price'],
+                            coin['high_time'],
+                            coin['decline'],
+                            coin['change_24h'],
+                            coin['rank'],
+                            coin['current_price'],
+                            coin['ratio1'],
+                            coin['ratio2'],
+                            coin['priority_level']
+                        ))
+                        coin_count += 1
+                    except Exception as e:
+                        log(f"   ⚠️  导入币种 {coin.get('symbol', 'Unknown')} 失败: {e}")
+                        continue
+                
+                log(f"   ✅ 成功导入 {coin_count} 个币种数据")
+            else:
+                log(f"   ⚠️  未找到币种数据")
+            
+            log(f"   💾 提交事务...")
+            conn.commit()
+            
+            # 验证插入
+            cursor.execute("SELECT COUNT(*) FROM crypto_snapshots WHERE snapshot_time = ?", (data['snapshot_time'],))
+            verify_count = cursor.fetchone()[0]
+            
             conn.close()
-            return False
-        
-        # 注释掉旧的验证逻辑 - rush_up=0和rush_down=0是正常的市场状态（震荡无序）
-        # if data['rush_up'] == 0 and data['rush_down'] == 0:
-        #     log(f"   ⚠️  数据无效：rush_up和rush_down均为0，跳过本次保存")
-        #     conn.close()
-        #     return False
-        
-        # 插入新数据到crypto_snapshots
-        log(f"   📝 准备插入新记录到 crypto_snapshots 表...")
-        cursor.execute("""
-            INSERT INTO crypto_snapshots 
-            (snapshot_time, snapshot_date, rush_up, rush_down, diff, count, status, count_score_display, count_score_type, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
-        """, (
-            data['snapshot_time'],
-            data['snapshot_date'],
-            data['rush_up'],
-            data['rush_down'],
-            data['diff'],
-            data['count'],
-            data['status'],
-            data['count_score_display'],
-            data['count_score_type']
-        ))
-        
-        # 获取刚插入的snapshot_id
-        snapshot_id = cursor.lastrowid
-        log(f"   ✅ 快照数据插入成功 (ID: {snapshot_id})")
-        
-        # 解析并导入币种数据
-        log(f"   🪙 开始解析币种数据...")
-        coins = parse_coin_data(content)
-        
-        if coins:
-            log(f"   📊 找到 {len(coins)} 个币种数据")
-            coin_count = 0
             
-            for coin in coins:
-                try:
-                    cursor.execute("""
-                        INSERT INTO crypto_coin_data 
-                        (snapshot_id, snapshot_time, symbol, index_order, change, rush_up, rush_down, 
-                         update_time, high_price, high_time, decline, change_24h, rank, current_price, 
-                         ratio1, ratio2, priority_level, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'))
-                    """, (
-                        snapshot_id,
-                        data['snapshot_time'],
-                        coin['symbol'],
-                        coin['index_order'],
-                        coin['change'],
-                        coin['rush_up'],
-                        coin['rush_down'],
-                        coin['update_time'],
-                        coin['high_price'],
-                        coin['high_time'],
-                        coin['decline'],
-                        coin['change_24h'],
-                        coin['rank'],
-                        coin['current_price'],
-                        coin['ratio1'],
-                        coin['ratio2'],
-                        coin['priority_level']
-                    ))
-                    coin_count += 1
-                except Exception as e:
-                    log(f"   ⚠️  导入币种 {coin.get('symbol', 'Unknown')} 失败: {e}")
-                    continue
+            if verify_count > 0:
+                log(f"   ✅ 数据库插入成功并已验证")
+                log(f"   📊 记录详情: {data['snapshot_time']} | 急涨:{data['rush_up']} 急跌:{data['rush_down']} | 计次:{data['count']} {data['count_score_display']} | {data['status']}")
+                return True
+            else:
+                log(f"   ❌ 插入验证失败")
+                return False
             
-            log(f"   ✅ 成功导入 {coin_count} 个币种数据")
-        else:
-            log(f"   ⚠️  未找到币种数据")
-        
-        log(f"   💾 提交事务...")
-        conn.commit()
-        
-        # 验证插入
-        cursor.execute("SELECT COUNT(*) FROM crypto_snapshots WHERE snapshot_time = ?", (data['snapshot_time'],))
-        verify_count = cursor.fetchone()[0]
-        
-        conn.close()
-        
-        if verify_count > 0:
-            log(f"   ✅ 数据库插入成功并已验证")
-            log(f"   📊 记录详情: {data['snapshot_time']} | 急涨:{data['rush_up']} 急跌:{data['rush_down']} | 计次:{data['count']} {data['count_score_display']} | {data['status']}")
-            return True
-        else:
-            log(f"   ❌ 插入验证失败")
-            return False
-        
     except sqlite3.OperationalError as e:
         if "database is locked" in str(e) and attempt < max_retries - 1:
             log(f"   ⚠️  数据库被锁定，{retry_delay}秒后重试... (尝试 {attempt + 1}/{max_retries})")
