@@ -19,6 +19,9 @@ MAINTENANCE_AMOUNT = 20  # 维护金额20U（进一步降低以确保成功）
 MAX_MAINTENANCE_COUNT = 3  # 最大维护次数
 STOP_LOSS_RATE = -20  # 止损线
 
+# 跳过列表：这些币种暂时不维护（已知问题币种）
+SKIP_INSTRUMENTS = ['STX-USDT-SWAP']  # STX存在OKEx 51008错误，暂时跳过
+
 def get_china_time():
     """获取北京时间"""
     return datetime.now(timezone(timedelta(hours=8)))
@@ -223,6 +226,11 @@ def main_loop():
                 pos_size = pos.get('pos_size', 0)
                 
                 log(f"  检查 {inst_id} {pos_side}: 收益率 {profit_rate:.2f}%")
+                
+                # 跳过黑名单中的币种
+                if inst_id in SKIP_INSTRUMENTS:
+                    log(f"    ⏭️  已跳过（在黑名单中）")
+                    continue
                 
                 # 检查是否触发准备维护或立即维护
                 should_maintain = False
