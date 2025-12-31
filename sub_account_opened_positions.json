@@ -61,5 +61,11 @@
     "open_size": 591.0,
     "open_price": 1.69,
     "created_at": "2025-12-31 14:49:05"
+  },
+  "Wu666666:DOT-USDT-SWAP:long": {
+    "account_name": "Wu666666",
+    "inst_id": "DOT-USDT-SWAP",
+    "pos_side": "long",
+    "opened_at": "2025-12-31 16:25:11"
   }
 }

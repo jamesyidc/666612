@@ -1,28 +1,28 @@
 {
-    "Wu666666_CRO-USDT-SWAP_long": {
-        "count": 3,
-        "last_maintenance": "2026-01-01 00:05:25"
-    },
-    "Wu666666_TON-USDT-SWAP_long": {
-        "count": 0,
-        "last_maintenance": "2025-12-31 10:39:58",
-        "last_reset": "2025-12-31 10:44:26"
-    },
-    "Wu666666_CRV-USDT-SWAP_long": {
-        "count": 1,
-        "last_maintenance": "2025-12-31 11:55:24",
-        "last_reset": "2025-12-31 11:47:12"
-    },
-    "Wu666666_UNI-USDT-SWAP_long": {
-        "count": 2,
-        "last_maintenance": "2025-12-31 18:33:57"
-    },
-    "Wu666666_BCH-USDT-SWAP_long": {
-        "count": 1,
-        "last_maintenance": "2025-12-31 22:06:48"
-    },
-    "Wu666666_AAVE-USDT-SWAP_long": {
-        "count": 2,
-        "last_maintenance": "2026-01-01 00:04:21"
-    }
+  "Wu666666_CRO-USDT-SWAP_long": {
+    "count": 3,
+    "last_maintenance": "2026-01-01 00:05:25"
+  },
+  "Wu666666_TON-USDT-SWAP_long": {
+    "count": 0,
+    "last_maintenance": "2025-12-31 10:39:58",
+    "last_reset": "2025-12-31 10:44:26"
+  },
+  "Wu666666_CRV-USDT-SWAP_long": {
+    "count": 2,
+    "last_maintenance": "2026-01-01 00:24:48",
+    "last_reset": "2025-12-31 11:47:12"
+  },
+  "Wu666666_UNI-USDT-SWAP_long": {
+    "count": 2,
+    "last_maintenance": "2025-12-31 18:33:57"
+  },
+  "Wu666666_BCH-USDT-SWAP_long": {
+    "count": 1,
+    "last_maintenance": "2025-12-31 22:06:48"
+  },
+  "Wu666666_AAVE-USDT-SWAP_long": {
+    "count": 2,
+    "last_maintenance": "2026-01-01 00:04:21"
+  }
 }
