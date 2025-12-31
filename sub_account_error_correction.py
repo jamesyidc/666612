@@ -119,6 +119,48 @@ def get_position(account, inst_id, pos_side):
         log(f"❌ 获取持仓失败 {inst_id} {pos_side}: {e}")
         return None
 
+def adjust_leverage(account, inst_id, pos_side, current_lever, target_lever=10):
+    """调整杠杆倍数到目标值"""
+    try:
+        if current_lever == target_lever:
+            log(f"   ✓ 杠杆倍数正确: {current_lever}x")
+            return True
+        
+        log(f"   ⚠️ 杠杆倍数不正确: {current_lever}x，目标: {target_lever}x")
+        
+        # 调用OKEx API设置杠杆倍数
+        path = '/api/v5/account/set-leverage'
+        
+        body = {
+            'instId': inst_id,
+            'lever': str(target_lever),
+            'mgnMode': 'isolated',  # 逐仓
+            'posSide': pos_side
+        }
+        
+        headers = get_headers('POST', path, body,
+                            account['api_key'], account['secret_key'], account['passphrase'])
+        
+        response = requests.post(OKEX_REST_URL + path, 
+                               headers=headers,
+                               json=body,
+                               timeout=30)
+        
+        result = response.json()
+        
+        if result.get('code') == '0':
+            log(f"   ✅ 杠杆倍数调整成功: {current_lever}x → {target_lever}x")
+            return True
+        else:
+            log(f"   ❌ 杠杆倍数调整失败: {result.get('msg', 'Unknown error')}")
+            log(f"      完整响应: {result}")
+            return False
+            
+    except Exception as e:
+        log(f"   ❌ 调整杠杆倍数异常: {e}")
+        log(traceback.format_exc())
+        return False
+
 def adjust_margin(account, inst_id, pos_side, current_margin, target_margin, pos_size, mark_price, lever):
     """调整保证金到目标值（逐仓模式）"""
     try:
@@ -280,13 +322,22 @@ def check_and_correct(account):
             pos_size = position_detail['pos_size']
             mark_price = position_detail['mark_price']
             current_notional = pos_size * mark_price
+            current_lever = position_detail['lever']  # 当前杠杆倍数
             
             log(f"      持仓量: {pos_size}")
             log(f"      标记价格: {mark_price:.4f}")
             log(f"      持仓名义价值: {current_notional:.2f}U")
             log(f"      目标名义价值: {target_notional:.2f}U")
+            log(f"      当前杠杆: {current_lever}x")
             
-            # 1. 先检查持仓名义价值是否过大
+            # 1. 先检查并调整杠杆倍数
+            if current_lever != 10:
+                log(f"      ⚠️  杠杆倍数不正确: {current_lever}x (目标: 10x)")
+                adjust_leverage(account, inst_id, pos_side, current_lever, target_lever=10)
+                # 调整杠杆后等待3秒
+                time.sleep(3)
+            
+            # 2. 检查持仓名义价值是否过大
             if current_notional > target_notional * 1.5:
                 log(f"      ⚠️  持仓过大({current_notional:.2f}U > {target_notional*1.5:.2f}U)，需要先平仓")
                 
@@ -322,7 +373,7 @@ def check_and_correct(account):
                         log(f"      ❌ 平仓异常: {e}")
                         continue
             
-            # 2. 检查保证金是否在允许范围内
+            # 3. 检查保证金是否在允许范围内
             if maintenance_count in [0, 1]:
                 in_range = 9.5 <= current_margin <= 10.5
             elif maintenance_count == 2:
@@ -334,7 +385,7 @@ def check_and_correct(account):
                 log(f"      ✅ 保证金在允许范围内")
                 continue
             
-            # 3. 调整保证金
+            # 4. 调整保证金
             log(f"      ⚠️  保证金超出范围，需要调整")
             
             success = adjust_margin(
