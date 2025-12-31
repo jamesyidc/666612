@@ -13898,7 +13898,7 @@ def maintain_anchor_order():
         
         # 🔄 优化后的流程：先开仓再平仓（节省手续费）
         # 第一步：开仓新持仓
-        print(f"📊 第1步：开仓新持仓 {order_size} 张（维护金额: {maintenance_amount}U）")
+        print(f"📊 第1步：开仓新持仓 {order_size} 张（10倍底仓数量）")
         
         # 生成签名
         def generate_signature(timestamp, method, request_path, body=''):

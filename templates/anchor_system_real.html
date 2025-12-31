@@ -515,6 +515,18 @@
 
         <!-- 空单盈利分级统计 -->
         <div class="stats-grid" style="margin-top: 20px;">
+            <div class="stat-card" style="border: 2px solid #7c2d12; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                <div class="stat-icon">🌟</div>
+                <div class="stat-label" style="color: #7c2d12;">空单盈利≥90%</div>
+                <div class="stat-value" id="profit90Plus" style="color: #7c2d12; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #7c2d12;" id="profit90Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #b91c1c; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                <div class="stat-icon">💎</div>
+                <div class="stat-label" style="color: #991b1b;">空单盈利≥80%</div>
+                <div class="stat-value" id="profit80Plus" style="color: #b91c1c; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #991b1b;" id="profit80Increase">1小时内: --</div>
+            </div>
             <div class="stat-card" style="border: 2px solid #dc2626; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
                 <div class="stat-icon">🔥</div>
                 <div class="stat-label" style="color: #991b1b;">空单盈利≥70%</div>
@@ -1239,6 +1251,8 @@
 
         // 存储历史盈利数据用于计算1小时内增量
         let profitHistoryData = {
+            profit90: [],
+            profit80: [],
             profit70: [],
             profit60: [],
             profit50: [],
@@ -1470,6 +1484,8 @@
                 tbody.innerHTML = '<tr><td colspan="13" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
                 // 清空盈利统计显示
+                document.getElementById('profit90Plus').textContent = '0';
+                document.getElementById('profit80Plus').textContent = '0';
                 document.getElementById('profit70Plus').textContent = '0';
                 document.getElementById('profit60Plus').textContent = '0';
                 document.getElementById('profit50Plus').textContent = '0';
@@ -1477,6 +1493,8 @@
                 document.getElementById('profitBelow20').textContent = '0';
                 document.getElementById('profitBelow10').textContent = '0';
                 document.getElementById('lossCount').textContent = '0';
+                document.getElementById('profit90Increase').textContent = '1小时内: --';
+                document.getElementById('profit80Increase').textContent = '1小时内: --';
                 document.getElementById('profit70Increase').textContent = '1小时内: --';
                 document.getElementById('profit60Increase').textContent = '1小时内: --';
                 document.getElementById('profit50Increase').textContent = '1小时内: --';
@@ -1504,6 +1522,8 @@
             `;
 
             // 统计做空持仓各盈利级别
+            const profit90 = shortPositions.filter(item => item.profit_rate >= 90).length;
+            const profit80 = shortPositions.filter(item => item.profit_rate >= 80).length;
             const profit70 = shortPositions.filter(item => item.profit_rate >= 70).length;
             const profit60 = shortPositions.filter(item => item.profit_rate >= 60).length;
             const profit50 = shortPositions.filter(item => item.profit_rate >= 50).length;
@@ -1514,6 +1534,8 @@
             const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
             
             // 更新顶部统计卡片
+            document.getElementById('profit90Plus').textContent = profit90;
+            document.getElementById('profit80Plus').textContent = profit80;
             document.getElementById('profit70Plus').textContent = profit70;
             document.getElementById('profit60Plus').textContent = profit60;
             document.getElementById('profit50Plus').textContent = profit50;
@@ -1529,6 +1551,8 @@
             // 保存当前数据到历史
             if (!profitHistoryData.lastUpdate || now - profitHistoryData.lastUpdate > 60000) {
                 // 每分钟记录一次
+                profitHistoryData.profit90.push({ time: now, count: profit90 });
+                profitHistoryData.profit80.push({ time: now, count: profit80 });
                 profitHistoryData.profit70.push({ time: now, count: profit70 });
                 profitHistoryData.profit60.push({ time: now, count: profit60 });
                 profitHistoryData.profit50.push({ time: now, count: profit50 });
@@ -1539,6 +1563,8 @@
                 profitHistoryData.lastUpdate = now;
                 
                 // 清理超过1小时的数据
+                profitHistoryData.profit90 = profitHistoryData.profit90.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit80 = profitHistoryData.profit80.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit70 = profitHistoryData.profit70.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit60 = profitHistoryData.profit60.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit50 = profitHistoryData.profit50.filter(d => d.time > oneHourAgo);
@@ -1562,6 +1588,8 @@
                 }
             }
             
+            document.getElementById('profit90Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit90, profit90)}`;
+            document.getElementById('profit80Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit80, profit80)}`;
             document.getElementById('profit70Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit70, profit70)}`;
             document.getElementById('profit60Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit60, profit60)}`;
             document.getElementById('profit50Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit50, profit50)}`;
