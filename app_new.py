@@ -15571,6 +15571,27 @@ def maintain_sub_account():
         with open(maintenance_file, 'w', encoding='utf-8') as f:
             json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
+        # 🔍 维护后自动验证和纠错
+        print(f"\n{'='*60}")
+        print(f"🔍 启动维护后自动验证...")
+        try:
+            from maintenance_verifier import verify_and_correct
+            verify_result = verify_and_correct(
+                account_name=account_name,
+                inst_id=inst_id,
+                pos_side=pos_side,
+                target_margin=target_margin,
+                maintenance_count=record['count']
+            )
+            print(f"✅ 验证完成: {verify_result.get('message')}")
+            if verify_result.get('corrected'):
+                print(f"⚠️ 已执行自动纠错")
+        except Exception as e:
+            print(f"❌ 验证过程出错: {e}")
+            import traceback
+            traceback.print_exc()
+        print(f"{'='*60}\n")
+        
         return jsonify({
             'success': True,
             'message': f'维护成功！第{record["count"]}次维护',
