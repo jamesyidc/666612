@@ -418,10 +418,16 @@ def parse_coin_data(content):
 
 def import_to_database(data, content):
     """导入数据到数据库（首页监控系统）"""
-    try:
-        log(f"   🔌 连接数据库: {DB_PATH}")
-        conn = sqlite3.connect(DB_PATH, timeout=30)
-        cursor = conn.cursor()
+    import time
+    max_retries = 5
+    retry_delay = 2  # 秒
+    
+    for attempt in range(max_retries):
+        try:
+            log(f"   🔌 连接数据库: {DB_PATH} (尝试 {attempt + 1}/{max_retries})")
+            conn = sqlite3.connect(DB_PATH, timeout=60)
+            conn.execute("PRAGMA journal_mode=WAL")  # 启用WAL模式，提高并发性能
+            cursor = conn.cursor()
         
         # 检查数据是否已存在
         log(f"   🔍 检查数据是否已存在...")
@@ -526,11 +532,29 @@ def import_to_database(data, content):
             log(f"   ❌ 插入验证失败")
             return False
         
+    except sqlite3.OperationalError as e:
+        if "database is locked" in str(e) and attempt < max_retries - 1:
+            log(f"   ⚠️  数据库被锁定，{retry_delay}秒后重试... (尝试 {attempt + 1}/{max_retries})")
+            try:
+                conn.close()
+            except:
+                pass
+            time.sleep(retry_delay)
+            continue  # 重试
+        else:
+            log(f"   ❌ 数据库操作失败: {e}")
+            import traceback
+            log(f"   错误详情: {traceback.format_exc()}")
+            return False
     except Exception as e:
         log(f"   ❌ 数据库操作失败: {e}")
         import traceback
         log(f"   错误详情: {traceback.format_exc()}")
         return False
+    
+    # 如果所有重试都失败
+    log(f"   ❌ 达到最大重试次数({max_retries})，导入失败")
+    return False
 
 def get_root_folder_id_and_create_today_folder():
     """

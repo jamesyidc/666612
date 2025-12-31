@@ -15201,6 +15201,11 @@ def maintain_sub_account():
         pos_side = data.get('pos_side')
         pos_size = float(data.get('pos_size', 0))
         
+        # 新增参数：支持动态维护金额和目标保证金
+        maintenance_amount = float(data.get('amount', 100))  # 维护金额，默认100U
+        target_margin = float(data.get('target_margin', 10))  # 目标保证金，默认10U
+        maintenance_count = int(data.get('maintenance_count', 0))  # 当前维护次数
+        
         if not all([account_name, inst_id, pos_side]):
             return jsonify({
                 'success': False,
@@ -15318,15 +15323,22 @@ def maintain_sub_account():
                 'message': '无法获取标记价格'
             })
         
-        # 计算买入数量：100U的持仓
-        # pos_size = 100 * lever / mark_price
+        # 计算买入数量：使用动态维护金额
+        # pos_size = maintenance_amount * lever / mark_price
         lever = int(sub_account.get('leverage', 10))
-        buy_amount_usdt = sub_account.get('buy_amount_usdt', 100)
-        order_size = (buy_amount_usdt * lever) / mark_price
+        order_size = (maintenance_amount * lever) / mark_price
         
         # 向下取整到合约最小单位
         import math
         order_size = math.floor(order_size)
+        
+        # 计算平仓数量：保留target_margin对应的仓位
+        # 保留的仓位 = target_margin * lever / mark_price
+        keep_size = math.floor((target_margin * lever) / mark_price)
+        close_size = order_size - keep_size
+        
+        if close_size < 0:
+            close_size = 0  # 如果计算出负数，不平仓
         
         # 第一步：开仓
         order_path = '/api/v5/trade/order'
@@ -15365,8 +15377,8 @@ def maintain_sub_account():
         import time
         time.sleep(2)
         
-        # 第二步：平掉92%
-        close_size = math.floor(order_size * 0.92)
+        # 第二步：平掉多余仓位，保留target_margin对应的数量
+        # close_size已经在前面计算好了
         close_side = 'buy' if pos_side == 'short' else 'sell'
         
         close_order_body = {

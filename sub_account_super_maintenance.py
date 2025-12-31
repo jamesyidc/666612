@@ -120,9 +120,31 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
     try:
         account_name = account_config['account_name']
         
+        # 获取当前维护次数
+        current_count = get_maintenance_count(account_name, inst_id, pos_side)
+        
+        # 根据维护次数确定参数
+        if current_count == 0:
+            # 第1次：买入100U，留10U
+            maintenance_amount = 100
+            target_margin = 10
+        elif current_count == 1:
+            # 第2次：买入100U，留20U
+            maintenance_amount = 100
+            target_margin = 20
+        elif current_count == 2:
+            # 第3次：买入200U，留30U，设置-20%止损
+            maintenance_amount = 200
+            target_margin = 30
+        else:
+            log(f"⚠️  今日维护次数已达上限: {current_count}/{MAX_MAINTENANCE_COUNT}")
+            return False
+        
         log(f"🔧 执行超级维护: {inst_id} {pos_side}")
         log(f"   当前收益率: {profit_rate:.2f}%")
-        log(f"   维护金额: {MAINTENANCE_AMOUNT}U")
+        log(f"   当前维护次数: {current_count}/{MAX_MAINTENANCE_COUNT}")
+        log(f"   本次维护金额: {maintenance_amount}U")
+        log(f"   本次目标保证金: {target_margin}U")
         
         # 调用后端API执行维护
         response = requests.post('http://localhost:5000/api/anchor/maintain-sub-account', 
@@ -131,7 +153,9 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
                                     'inst_id': inst_id,
                                     'pos_side': pos_side,
                                     'pos_size': pos_size,
-                                    'amount': MAINTENANCE_AMOUNT
+                                    'amount': maintenance_amount,
+                                    'target_margin': target_margin,
+                                    'maintenance_count': current_count
                                 },
                                 timeout=120)
         
@@ -145,6 +169,11 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
             log(f"   开仓订单ID: {result.get('open_order_id', 'N/A')}")
             log(f"   平仓订单ID: {result.get('close_order_id', 'N/A')}")
             log(f"   今日维护次数: {new_count}/{MAX_MAINTENANCE_COUNT}")
+            
+            # 第3次维护后设置止损
+            if new_count == 3:
+                log(f"⚠️  已完成第3次维护，设置-20%止损线...")
+                # TODO: 调用设置止损API
             
             # 如果维护次数=2，设置止损
             if new_count == 2:
