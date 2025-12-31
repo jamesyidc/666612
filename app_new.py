@@ -15442,29 +15442,27 @@ def maintain_sub_account():
         print(f"   目标保证金: {target_margin}U")
         print(f"   杠杆: {sub_account.get('leverage', 10)}x")
         
-        # 计算买入数量：使用动态维护金额
-        # pos_size = maintenance_amount * lever / mark_price
-        lever = int(sub_account.get('leverage', 10))
-        order_size_raw = (maintenance_amount * lever) / mark_price
-        
-        # 向下取整到合约最小单位
+        # ========== 计算开仓和平仓数量（先开再平逻辑）==========
         import math
-        order_size = math.floor(order_size_raw)
+        lever = int(sub_account.get('leverage', 10))
         
-        # 重要：如果order_size计算为0，说明维护金额太小，至少开1张
-        if order_size == 0 and order_size_raw > 0:
-            order_size = 1
-            print(f"⚠️  order_size计算为 {order_size_raw:.2f}，向下取整为0，强制开仓1张")
+        # 新开仓的数量：使用动态维护金额
+        new_order_size_raw = (maintenance_amount * lever) / mark_price
+        new_order_size = math.floor(new_order_size_raw)
         
-        # 如果order_size仍然是0，返回错误
-        if order_size == 0:
+        # 重要：如果new_order_size计算为0，说明维护金额太小，至少开1张
+        if new_order_size == 0 and new_order_size_raw > 0:
+            new_order_size = 1
+            print(f"⚠️  new_order_size计算为 {new_order_size_raw:.2f}，向下取整为0，强制开仓1张")
+        
+        # 如果new_order_size仍然是0，返回错误
+        if new_order_size == 0:
             return jsonify({
                 'success': False,
                 'message': f'维护金额太小，无法开仓。当前价格 {mark_price}，建议增加维护金额至少到 {math.ceil(mark_price / lever)}U'
             })
         
-        # 计算平仓数量：保留target_margin对应的仓位
-        # 保留的仓位 = target_margin * lever / mark_price
+        # 计算最终保留的仓位：target_margin对应的仓位
         keep_size_raw = (target_margin * lever) / mark_price
         keep_size = math.floor(keep_size_raw)
         
@@ -15477,94 +15475,25 @@ def maintain_sub_account():
             keep_size = min_keep_size
             print(f"⚠️  keep_size计算为 {keep_size_raw:.2f}（{old_keep_size} 张），但为满足最小保证金0.6U要求，强制保留 {keep_size} 张")
         
-        # 如果order_size <= keep_size，不需要平仓
-        if order_size <= keep_size:
+        # 计算需要平掉的数量 = 旧持仓 + 新开仓 - 最终保留
+        # 例如：旧持仓10U(100张) + 新开100U(1000张) - 保留10U(100张) = 平掉1000张
+        total_pos_size = pos_size + new_order_size
+        close_size = total_pos_size - keep_size
+        
+        # 确保close_size不为负数
+        if close_size < 0:
             close_size = 0
-            print(f"⚠️  order_size ({order_size}) <= keep_size ({keep_size})，跳过第3步平仓")
-        else:
-            close_size = order_size - keep_size
+            print(f"⚠️  计算出的close_size为负数，设为0（无需平仓）")
         
-        # ========== 第1步：平掉旧持仓（释放保证金）==========
-        old_close_order_id = None
-        if pos_size > 0:
-            print(f"📊 第1步：平掉旧持仓 {pos_size} 张（释放保证金）")
-            old_close_side = 'buy' if pos_side == 'short' else 'sell'
-            
-            order_path = '/api/v5/trade/order'
-            old_close_body = {
-                'instId': inst_id,
-                'tdMode': 'isolated',
-                'side': old_close_side,
-                'posSide': pos_side,
-                'ordType': 'market',
-                'sz': str(pos_size)  # 全部平掉（支持小数持仓）
-            }
-            
-            headers = get_headers('POST', order_path, old_close_body)
-            old_close_response = requests.post(
-                OKEX_REST_URL + order_path,
-                headers=headers,
-                json=old_close_body,
-                timeout=10
-            )
-            
-            old_close_result = old_close_response.json()
-            print(f"📤 平仓请求: {old_close_body}")
-            print(f"📥 OKEx响应: code={old_close_result.get('code')}, msg={old_close_result.get('msg')}")
-            
-            if old_close_result.get('code') != '0':
-                print(f"❌ 平掉旧持仓失败: {old_close_result}")
-                return jsonify({
-                    'success': False,
-                    'message': f"平掉旧持仓失败: {old_close_result.get('msg', '未知错误')}",
-                    'error_code': old_close_result.get('code'),
-                    'full_response': str(old_close_result)
-                })
-            
-            old_close_order_id = old_close_result['data'][0]['ordId']
-            print(f"✅ 旧持仓平仓订单ID: {old_close_order_id}")
-            
-            # 等待平仓完成
-            time.sleep(2)
-        else:
-            print(f"📊 第1步：跳过（无旧持仓需要平掉）")
+        print(f"📊 仓位计算:")
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   新开仓: {new_order_size} 张")
+        print(f"   总持仓: {total_pos_size} 张")
+        print(f"   最终保留: {keep_size} 张")
+        print(f"   需要平仓: {close_size} 张")
         
-        # 第零步：向逐仓仓位增加保证金（逐仓必须）- 现在改为注释，因为已经平掉旧持仓释放了保证金
-        # 计算所需保证金：维护金额 / 杠杆 + 手续费缓冲（3%）
-        # 注释原因：第1步已经平掉旧持仓，释放了保证金到账户余额，开新仓时会自动使用
-        # required_margin = maintenance_amount / lever * 1.03  # 加3%手续费和滑点缓冲
-        
-        # margin_path = '/api/v5/account/position/margin-balance'
-        # margin_body = {
-        #     'instId': inst_id,
-        #     'posSide': pos_side,
-        #     'type': 'add',  # 增加保证金
-        #     'amt': str(round(required_margin, 2)),
-        #     'ccy': 'USDT'
-        # }
-        
-        # print(f"💰 增加逐仓保证金: {required_margin:.2f} USDT 到 {inst_id} {pos_side}")
-        # headers = get_headers('POST', margin_path, margin_body)
-        # margin_response = requests.post(
-        #     OKEX_REST_URL + margin_path,
-        #     headers=headers,
-        #     json=margin_body,
-        #     timeout=10
-        # )
-        
-        # margin_result = margin_response.json()
-        # print(f"📥 保证金增加响应: code={margin_result.get('code')}, msg={margin_result.get('msg')}")
-        
-        # # 如果保证金增加失败，继续尝试（可能已经有足够保证金或是新仓位）
-        # if margin_result.get('code') != '0':
-        #     print(f"⚠️  保证金增加失败（可能是新仓位或已有足够保证金）: {margin_result.get('msg')}")
-        # else:
-        #     print(f"✅ 保证金增加成功")
-        #     # 等待保证金生效
-        #     time.sleep(1)
-        
-        # ========== 第1.5步：设置逐仓杠杆（必须！）==========
-        print(f"📊 第1.5步：设置逐仓杠杆 {lever}x")
+        # ========== 第1步：设置逐仓杠杆（必须！）==========
+        print(f"📊 第1步：设置逐仓杠杆 {lever}x")
         leverage_path = '/api/v5/account/set-leverage'
         leverage_body = {
             'instId': inst_id,
@@ -15593,8 +15522,8 @@ def maintain_sub_account():
         # 等待杠杆设置生效
         time.sleep(1)
         
-        # ========== 第2步：开仓新持仓 ==========
-        print(f"📊 第2步：开仓新持仓 {order_size} 张")
+        # ========== 第2步：开仓新持仓（维护金额对应的仓位）==========
+        print(f"📊 第2步：开仓新持仓 {new_order_size} 张（维护金额 {maintenance_amount}U）")
         order_path = '/api/v5/trade/order'
         side = 'sell' if pos_side == 'short' else 'buy'
         
@@ -15604,7 +15533,7 @@ def maintain_sub_account():
             'side': side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(order_size),
+            'sz': str(new_order_size),
             'lever': str(lever)  # 逐仓模式需要指定杠杆
         }
         
@@ -15629,9 +15558,14 @@ def maintain_sub_account():
                 'success': False,
                 'message': f"开仓失败: {open_result.get('msg', '未知错误')}",
                 'error_code': open_result.get('code'),
-                'full_response': str(open_result)  # 添加完整响应
+                'full_response': str(open_result)
             })
         
+        open_order_id = open_result['data'][0]['ordId']
+        print(f"✅ 开仓订单ID: {open_order_id}")
+        
+        # 等待开仓完成
+        time.sleep(2)
         open_order_id = open_result['data'][0]['ordId']
         
         # 等待订单成交
@@ -15705,8 +15639,8 @@ def maintain_sub_account():
                 'pos_side': pos_side,
                 'open_order_id': open_order_id,
                 'close_order_id': close_order_id,
-                'order_size': order_size,
-                'close_size': close_size,
+                'order_size': new_order_size,  # 新开仓的数量
+                'close_size': close_size,  # 平仓的数量
                 'today_count': record['count'],
                 'max_count': max_count
             }
