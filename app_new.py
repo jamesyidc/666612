@@ -15673,6 +15673,81 @@ def open_sub_account_position():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor/reset-sub-maintenance-count', methods=['POST'])
+def reset_sub_maintenance_count():
+    """清零子账户今日维护次数（新API）"""
+    try:
+        import json as json_lib
+        from datetime import datetime
+        import pytz
+        
+        data = request.json
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        
+        if not all([account_name, inst_id, pos_side]):
+            return jsonify({
+                'success': False,
+                'message': '缺少必要参数'
+            })
+        
+        # 读取维护记录文件
+        maintenance_file = 'sub_account_maintenance.json'
+        try:
+            with open(maintenance_file, 'r', encoding='utf-8') as f:
+                maintenance_data = json_lib.load(f)
+        except FileNotFoundError:
+            maintenance_data = {}
+        
+        # 构建记录键
+        record_key = f"{account_name}_{inst_id}_{pos_side}"
+        
+        # 获取当前北京时间的日期
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        today_date = now_beijing.strftime('%Y-%m-%d')
+        
+        # 检查是否存在今日记录
+        if record_key not in maintenance_data:
+            return jsonify({
+                'success': False,
+                'message': '该持仓没有维护记录'
+            })
+        
+        record = maintenance_data[record_key]
+        
+        # 清零今日维护次数
+        old_count = record.get('count', 0)
+        
+        # 重置记录
+        record['count'] = 0
+        record['date'] = today_date
+        record['last_reset'] = now_beijing.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 保存更新后的数据
+        with open(maintenance_file, 'w', encoding='utf-8') as f:
+            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': f'清零成功！原维护次数: {old_count}次',
+            'account_name': account_name,
+            'inst_id': inst_id,
+            'pos_side': pos_side,
+            'old_count': old_count,
+            'new_count': 0,
+            'reset_time': now_beijing.strftime('%Y-%m-%d %H:%M:%S')
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'清零失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 

@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""
+子账户超级维护守护进程
+功能：监控子账户持仓，收益率跌破-10%时自动维护
+"""
+
+import json
+import time
+import requests
+import hmac
+import base64
+from datetime import datetime, timezone, timedelta
+import traceback
+
+# 配置
+CHECK_INTERVAL = 30  # 30秒检查一次
+TRIGGER_RATE = -10  # 触发维护的收益率阈值
+MAINTENANCE_AMOUNT = 100  # 维护金额100U
+MAX_MAINTENANCE_COUNT = 3  # 最大维护次数
+STOP_LOSS_RATE = -20  # 止损线
+
+def get_china_time():
+    """获取北京时间"""
+    return datetime.now(timezone(timedelta(hours=8)))
+
+def get_china_today():
+    """获取北京时间的今天日期"""
+    return get_china_time().strftime('%Y-%m-%d')
+
+def log(msg):
+    """打印日志"""
+    print(f"[{get_china_time().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+
+def load_sub_account_config():
+    """加载子账户配置"""
+    try:
+        with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 获取第一个启用的子账户
+        for acc in config['sub_accounts']:
+            if acc.get('enabled'):
+                return acc
+        return None
+    except Exception as e:
+        log(f"❌ 加载子账户配置失败: {e}")
+        return None
+
+def get_maintenance_count(account_name, inst_id, pos_side):
+    """获取今日维护次数"""
+    try:
+        with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        if key in data:
+            record = data[key]
+            today = get_china_today()
+            if record.get('date') == today:
+                return record.get('count', 0)
+        return 0
+    except FileNotFoundError:
+        return 0
+    except Exception as e:
+        log(f"⚠️ 读取维护次数失败: {e}")
+        return 0
+
+def update_maintenance_count(account_name, inst_id, pos_side):
+    """更新维护次数+1"""
+    try:
+        try:
+            with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {}
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        today = get_china_today()
+        now = get_china_time().strftime('%Y-%m-%d %H:%M:%S')
+        
+        if key not in data:
+            data[key] = {
+                'count': 1,
+                'date': today,
+                'last_maintenance': now
+            }
+        else:
+            record = data[key]
+            if record.get('date') == today:
+                record['count'] = record.get('count', 0) + 1
+            else:
+                record['count'] = 1
+                record['date'] = today
+            record['last_maintenance'] = now
+        
+        with open('sub_account_maintenance.json', 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        return data[key]['count']
+    except Exception as e:
+        log(f"❌ 更新维护次数失败: {e}")
+        return 0
+
+def get_sub_account_positions(account_name):
+    """获取子账户持仓"""
+    try:
+        response = requests.get('http://localhost:5000/api/anchor-system/sub-account-positions', timeout=10)
+        data = response.json()
+        
+        if data.get('success') and data.get('positions'):
+            # 返回该子账户的持仓
+            return [pos for pos in data['positions'] if pos['account_name'] == account_name]
+        return []
+    except Exception as e:
+        log(f"❌ 获取子账户持仓失败: {e}")
+        return []
+
+def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profit_rate):
+    """执行超级维护"""
+    try:
+        account_name = account_config['account_name']
+        
+        log(f"🔧 执行超级维护: {inst_id} {pos_side}")
+        log(f"   当前收益率: {profit_rate:.2f}%")
+        log(f"   维护金额: {MAINTENANCE_AMOUNT}U")
+        
+        # 调用后端API执行维护
+        response = requests.post('http://localhost:5000/api/anchor/maintain-sub-account', 
+                                json={
+                                    'account_name': account_name,
+                                    'inst_id': inst_id,
+                                    'pos_side': pos_side,
+                                    'pos_size': pos_size,
+                                    'amount': MAINTENANCE_AMOUNT
+                                },
+                                timeout=120)
+        
+        result = response.json()
+        
+        if result.get('success'):
+            # 更新维护次数
+            new_count = update_maintenance_count(account_name, inst_id, pos_side)
+            
+            log(f"✅ 超级维护成功!")
+            log(f"   开仓订单ID: {result.get('open_order_id', 'N/A')}")
+            log(f"   平仓订单ID: {result.get('close_order_id', 'N/A')}")
+            log(f"   今日维护次数: {new_count}/{MAX_MAINTENANCE_COUNT}")
+            
+            # 如果维护次数=2，设置止损
+            if new_count == 2:
+                log(f"⚠️ 维护次数达到2次，建议设置-20%止损线")
+            elif new_count >= MAX_MAINTENANCE_COUNT:
+                log(f"🚫 维护次数达到上限({MAX_MAINTENANCE_COUNT}次)，停止超级维护")
+            
+            return True
+        else:
+            log(f"❌ 超级维护失败: {result.get('message', '未知错误')}")
+            return False
+            
+    except Exception as e:
+        log(f"❌ 超级维护异常: {e}")
+        log(traceback.format_exc())
+        return False
+
+def main_loop():
+    """主循环"""
+    log("🚀 子账户超级维护守护进程启动")
+    log(f"⏱️  检查间隔: {CHECK_INTERVAL}秒")
+    log(f"📉 触发阈值: 收益率≤{TRIGGER_RATE}%")
+    log(f"💰 维护金额: {MAINTENANCE_AMOUNT}U")
+    log(f"🔢 最大维护次数: {MAX_MAINTENANCE_COUNT}次")
+    log(f"🛑 止损线: {STOP_LOSS_RATE}%")
+    
+    while True:
+        try:
+            # 加载子账户配置
+            sub_account = load_sub_account_config()
+            if not sub_account:
+                log("❌ 没有启用的子账户，等待30秒后重试")
+                time.sleep(CHECK_INTERVAL)
+                continue
+            
+            account_name = sub_account['account_name']
+            log(f"\n{'='*60}")
+            log(f"🔍 检查账户: {account_name}")
+            
+            # 获取子账户持仓
+            positions = get_sub_account_positions(account_name)
+            log(f"📊 持仓数量: {len(positions)}")
+            
+            if not positions:
+                log("✅ 无持仓")
+                time.sleep(CHECK_INTERVAL)
+                continue
+            
+            # 检查每个持仓
+            for pos in positions:
+                inst_id = pos['inst_id']
+                pos_side = pos['pos_side']
+                profit_rate = pos.get('profit_rate', 0)
+                pos_size = pos.get('pos_size', 0)
+                
+                log(f"  检查 {inst_id} {pos_side}: 收益率 {profit_rate:.2f}%")
+                
+                # 检查是否触发维护条件
+                if profit_rate <= TRIGGER_RATE:
+                    # 获取今日维护次数
+                    count = get_maintenance_count(account_name, inst_id, pos_side)
+                    log(f"    ⚠️ 收益率跌破{TRIGGER_RATE}%，今日维护{count}/{MAX_MAINTENANCE_COUNT}次")
+                    
+                    # 检查是否达到上限
+                    if count >= MAX_MAINTENANCE_COUNT:
+                        log(f"    🚫 维护次数已达上限，跳过")
+                        continue
+                    
+                    # 检查是否达到止损线（维护次数=2时）
+                    if count == 2 and profit_rate <= STOP_LOSS_RATE:
+                        log(f"    🛑 触发止损线({STOP_LOSS_RATE}%)，建议手动平仓")
+                        continue
+                    
+                    # 执行超级维护
+                    success = execute_super_maintenance(sub_account, inst_id, pos_side, pos_size, profit_rate)
+                    
+                    if success:
+                        log(f"    ✅ 超级维护完成")
+                        # 维护成功后等待一段时间
+                        time.sleep(10)
+                    else:
+                        log(f"    ❌ 超级维护失败")
+                else:
+                    log(f"    ✓ 收益率正常")
+            
+            log(f"{'='*60}\n")
+            
+        except Exception as e:
+            log(f"❌ 主循环异常: {e}")
+            log(traceback.format_exc())
+        
+        # 等待下一次检查
+        time.sleep(CHECK_INTERVAL)
+
+if __name__ == '__main__':
+    main_loop()

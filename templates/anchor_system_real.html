@@ -751,12 +751,13 @@
                             <th style="color: #000; width: 9%;">保证金</th>
                             <th style="color: #000; width: 7%;">收益率</th>
                             <th style="color: #000; width: 7%;">今日维护</th>
+                            <th style="color: #000; width: 5%;">清零</th>
                             <th style="color: #000; width: 6%;">状态</th>
                             <th style="color: #000; width: 8%;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="subAccountPositionBody">
-                        <tr><td colspan="14" class="loading">加载中...</td></tr>
+                        <tr><td colspan="15" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1474,6 +1475,27 @@
                                      box-shadow: ${(item.maintenance_count_today || 0) > 0 ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'};">
                             ${(item.maintenance_count_today || 0)}次
                         </span>
+                    </td>
+                    <td style="text-align: center;">
+                        ${(item.maintenance_count_today || 0) > 0 ? `
+                            <button class="btn-reset-maintenance-sub" 
+                                    onclick="resetSubMaintenanceCount('${item.account_name}', '${item.inst_id}', '${item.pos_side}')"
+                                    title="清零今日维护次数"
+                                    style="background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+                                           color: white;
+                                           border: none;
+                                           padding: 4px 10px;
+                                           border-radius: 6px;
+                                           cursor: pointer;
+                                           font-size: 11px;
+                                           font-weight: 600;
+                                           transition: all 0.3s;
+                                           box-shadow: 0 2px 4px rgba(245, 101, 101, 0.3);"
+                                    onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(245, 101, 101, 0.4)';"
+                                    onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(245, 101, 101, 0.3)';">
+                                🔄 清零
+                            </button>
+                        ` : '-'}
                     </td>
                     <td>
                         <span class="badge ${
@@ -2412,6 +2434,41 @@ ${closeDetails}
                 }
             } catch (error) {
                 console.error('清零维护次数错误:', error);
+                alert(`❌ 请求失败: ${error.message}`);
+            }
+        }
+        
+        // 子账户清零函数
+        async function resetSubMaintenanceCount(accountName, instId, posSide) {
+            try {
+                if (!confirm(`确认清零子账户今日维护次数？\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n\n清零后今日维护次数将重置为0`)) {
+                    return;
+                }
+                
+                const response = await fetch('/api/anchor/reset-sub-maintenance-count', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_name: accountName,
+                        inst_id: instId,
+                        pos_side: posSide
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ 子账户维护次数清零成功！\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n原次数: ${result.old_count}次 → 新次数: 0次`);
+                    
+                    // 刷新持仓数据
+                    loadData();
+                } else {
+                    alert(`❌ 清零失败\n\n${result.message || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('清零子账户维护次数错误:', error);
                 alert(`❌ 请求失败: ${error.message}`);
             }
         }
