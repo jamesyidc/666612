@@ -90,9 +90,23 @@ class AnchorMaintenanceDaemon:
             return []
     
     def get_current_price(self, inst_id: str) -> Optional[float]:
-        """获取当前价格 - 从模拟交易数据库获取"""
+        """获取当前价格 - 从OKEx API获取实时价格"""
         try:
-            # 连接 crypto_data.db 获取模拟交易价格
+            import requests
+            
+            # 使用OKEx公开API获取实时标记价格
+            url = f'https://www.okx.com/api/v5/public/mark-price?instType=SWAP&instId={inst_id}'
+            
+            response = requests.get(url, timeout=5)
+            data = response.json()
+            
+            if data.get('code') == '0' and data.get('data'):
+                mark_price = float(data['data'][0]['markPx'])
+                print(f"  📊 {inst_id} 实时标记价格: {mark_price}")
+                return mark_price
+            
+            # 如果API失败，尝试从数据库获取（作为备用）
+            print(f"  ⚠️  OKEx API获取失败，尝试从数据库获取...")
             crypto_conn = sqlite3.connect('/home/user/webapp/crypto_data.db', timeout=5.0)
             crypto_cursor = crypto_conn.cursor()
             
@@ -109,6 +123,7 @@ class AnchorMaintenanceDaemon:
             crypto_conn.close()
             
             if price_row and price_row[0]:
+                print(f"  📊 {inst_id} 数据库价格: {price_row[0]}")
                 return float(price_row[0])
             
             return None
