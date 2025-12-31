@@ -532,25 +532,25 @@ def import_to_database(data, content):
                 log(f"   ❌ 插入验证失败")
                 return False
             
-    except sqlite3.OperationalError as e:
-        if "database is locked" in str(e) and attempt < max_retries - 1:
-            log(f"   ⚠️  数据库被锁定，{retry_delay}秒后重试... (尝试 {attempt + 1}/{max_retries})")
-            try:
-                conn.close()
-            except:
-                pass
-            time.sleep(retry_delay)
-            continue  # 重试
-        else:
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and attempt < max_retries - 1:
+                log(f"   ⚠️  数据库被锁定，{retry_delay}秒后重试... (尝试 {attempt + 1}/{max_retries})")
+                try:
+                    conn.close()
+                except:
+                    pass
+                time.sleep(retry_delay)
+                continue  # 重试
+            else:
+                log(f"   ❌ 数据库操作失败: {e}")
+                import traceback
+                log(f"   错误详情: {traceback.format_exc()}")
+                return False
+        except Exception as e:
             log(f"   ❌ 数据库操作失败: {e}")
             import traceback
             log(f"   错误详情: {traceback.format_exc()}")
             return False
-    except Exception as e:
-        log(f"   ❌ 数据库操作失败: {e}")
-        import traceback
-        log(f"   错误详情: {traceback.format_exc()}")
-        return False
     
     # 如果所有重试都失败
     log(f"   ❌ 达到最大重试次数({max_retries})，导入失败")
