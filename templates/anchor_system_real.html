@@ -379,7 +379,28 @@
 <body>
     <div class="container">
         <!-- 版本检测标记 -->
-        <div id="page-version" data-version="2025-12-29-v2" style="display: none;"></div>
+        <div id="page-version" data-version="2026-01-01-v3" style="display: none;"></div>
+        
+        <!-- 强制缓存刷新 -->
+        <script>
+            // 检测版本并强制刷新
+            const expectedVersion = "2026-01-01-v3";
+            const cachedVersion = localStorage.getItem('page-version');
+            if (cachedVersion !== expectedVersion) {
+                console.log('🔄 检测到新版本，清除缓存并刷新...');
+                localStorage.setItem('page-version', expectedVersion);
+                // 清除所有缓存
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                    });
+                }
+                // 如果不是首次加载，强制刷新
+                if (cachedVersion) {
+                    window.location.reload(true);
+                }
+            }
+        </script>
         
         <div class="header">
             <h1>
