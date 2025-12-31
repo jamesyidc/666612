@@ -36,3 +36,4 @@ pm2/
 
 # 依赖包
 node_modules/
+crypto_data.db.corrupted_*
