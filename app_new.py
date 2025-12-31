@@ -15363,6 +15363,39 @@ def maintain_sub_account():
         if close_size < 0:
             close_size = 0  # 如果计算出负数，不平仓
         
+        # 第零步：向逐仓仓位增加保证金（逐仓必须）
+        # 计算所需保证金：维护金额 / 杠杆 + 手续费缓冲（3%）
+        required_margin = maintenance_amount / lever * 1.03  # 加3%手续费和滑点缓冲
+        
+        margin_path = '/api/v5/account/position/margin-balance'
+        margin_body = {
+            'instId': inst_id,
+            'posSide': pos_side,
+            'type': 'add',  # 增加保证金
+            'amt': str(round(required_margin, 2)),
+            'ccy': 'USDT'
+        }
+        
+        print(f"💰 增加逐仓保证金: {required_margin:.2f} USDT 到 {inst_id} {pos_side}")
+        headers = get_headers('POST', margin_path, margin_body)
+        margin_response = requests.post(
+            OKEX_REST_URL + margin_path,
+            headers=headers,
+            json=margin_body,
+            timeout=10
+        )
+        
+        margin_result = margin_response.json()
+        print(f"📥 保证金增加响应: code={margin_result.get('code')}, msg={margin_result.get('msg')}")
+        
+        # 如果保证金增加失败，继续尝试（可能已经有足够保证金或是新仓位）
+        if margin_result.get('code') != '0':
+            print(f"⚠️  保证金增加失败（可能是新仓位或已有足够保证金）: {margin_result.get('msg')}")
+        else:
+            print(f"✅ 保证金增加成功")
+            # 等待保证金生效
+            time.sleep(1)
+        
         # 第一步：开仓
         order_path = '/api/v5/trade/order'
         side = 'sell' if pos_side == 'short' else 'buy'
@@ -15387,11 +15420,18 @@ def maintain_sub_account():
         
         open_result = open_response.json()
         
+        # 详细日志：打印OKEx响应
+        print(f"📤 开仓请求: {open_order_body}")
+        print(f"📥 OKEx响应: code={open_result.get('code')}, msg={open_result.get('msg')}")
+        if open_result.get('code') != '0':
+            print(f"❌ 完整响应: {open_result}")
+        
         if open_result.get('code') != '0':
             return jsonify({
                 'success': False,
                 'message': f"开仓失败: {open_result.get('msg', '未知错误')}",
-                'error_code': open_result.get('code')
+                'error_code': open_result.get('code'),
+                'full_response': str(open_result)  # 添加完整响应
             })
         
         open_order_id = open_result['data'][0]['ordId']
