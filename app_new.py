@@ -13681,7 +13681,7 @@ def super_maintain_anchor_order():
         
         buy_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
             'side': buy_side,
             'posSide': pos_side,
             'ordType': 'market',
@@ -13753,7 +13753,7 @@ def super_maintain_anchor_order():
         
         sell_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
             'side': sell_side,
             'posSide': pos_side,
             'ordType': 'market',
@@ -13926,7 +13926,7 @@ def maintain_anchor_order():
         
         open_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金  # 逐仓模式
             'side': side,
             'posSide': pos_side,
             'ordType': 'market',  # 市价单
@@ -14021,7 +14021,7 @@ def maintain_anchor_order():
         
         close_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金  # 逐仓模式
             'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
@@ -14359,7 +14359,7 @@ def maintain_anchor_order():
                                     close_side = 'buy' if pos_side == 'short' else 'sell'
                                     adjustment_body = {
                                         'instId': inst_id,
-                                        'tdMode': 'isolated',
+                                        'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
                                         'side': close_side,
                                         'posSide': pos_side,
                                         'ordType': 'market',
@@ -15664,7 +15664,7 @@ def close_sub_account_position():
         
         close_order_body = {
             'instId': inst_id,
-            'tdMode': 'isolated',
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
             'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
@@ -15867,7 +15867,7 @@ def open_sub_account_position():
         
         body = json_lib.dumps({
             'instId': inst_id,
-            'tdMode': 'isolated',
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
             'side': side,
             'ordType': 'market',
             'sz': str(int(open_size)),

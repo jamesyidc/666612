@@ -134,7 +134,7 @@ def adjust_leverage(account, inst_id, pos_side, current_lever, target_lever=10):
         body = {
             'instId': inst_id,
             'lever': str(target_lever),
-            'mgnMode': 'isolated',  # 逐仓
+            'mgnMode': 'isolated',  # 逐仓模式
             'posSide': pos_side
         }
         
