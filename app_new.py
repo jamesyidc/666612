@@ -15460,45 +15460,49 @@ def maintain_sub_account():
             close_size = 0  # 如果计算出负数，不平仓
         
         # ========== 第1步：平掉旧持仓（释放保证金）==========
-        print(f"📊 第1步：平掉旧持仓 {pos_size} 张（释放保证金）")
-        old_close_side = 'buy' if pos_side == 'short' else 'sell'
-        
-        order_path = '/api/v5/trade/order'
-        old_close_body = {
-            'instId': inst_id,
-            'tdMode': 'isolated',
-            'side': old_close_side,
-            'posSide': pos_side,
-            'ordType': 'market',
-            'sz': str(pos_size)  # 全部平掉（支持小数持仓）
-        }
-        
-        headers = get_headers('POST', order_path, old_close_body)
-        old_close_response = requests.post(
-            OKEX_REST_URL + order_path,
-            headers=headers,
-            json=old_close_body,
-            timeout=10
-        )
-        
-        old_close_result = old_close_response.json()
-        print(f"📤 平仓请求: {old_close_body}")
-        print(f"📥 OKEx响应: code={old_close_result.get('code')}, msg={old_close_result.get('msg')}")
-        
-        if old_close_result.get('code') != '0':
-            print(f"❌ 平掉旧持仓失败: {old_close_result}")
-            return jsonify({
-                'success': False,
-                'message': f"平掉旧持仓失败: {old_close_result.get('msg', '未知错误')}",
-                'error_code': old_close_result.get('code'),
-                'full_response': str(old_close_result)
-            })
-        
-        old_close_order_id = old_close_result['data'][0]['ordId']
-        print(f"✅ 旧持仓平仓订单ID: {old_close_order_id}")
-        
-        # 等待平仓完成
-        time.sleep(2)
+        old_close_order_id = None
+        if pos_size > 0:
+            print(f"📊 第1步：平掉旧持仓 {pos_size} 张（释放保证金）")
+            old_close_side = 'buy' if pos_side == 'short' else 'sell'
+            
+            order_path = '/api/v5/trade/order'
+            old_close_body = {
+                'instId': inst_id,
+                'tdMode': 'isolated',
+                'side': old_close_side,
+                'posSide': pos_side,
+                'ordType': 'market',
+                'sz': str(pos_size)  # 全部平掉（支持小数持仓）
+            }
+            
+            headers = get_headers('POST', order_path, old_close_body)
+            old_close_response = requests.post(
+                OKEX_REST_URL + order_path,
+                headers=headers,
+                json=old_close_body,
+                timeout=10
+            )
+            
+            old_close_result = old_close_response.json()
+            print(f"📤 平仓请求: {old_close_body}")
+            print(f"📥 OKEx响应: code={old_close_result.get('code')}, msg={old_close_result.get('msg')}")
+            
+            if old_close_result.get('code') != '0':
+                print(f"❌ 平掉旧持仓失败: {old_close_result}")
+                return jsonify({
+                    'success': False,
+                    'message': f"平掉旧持仓失败: {old_close_result.get('msg', '未知错误')}",
+                    'error_code': old_close_result.get('code'),
+                    'full_response': str(old_close_result)
+                })
+            
+            old_close_order_id = old_close_result['data'][0]['ordId']
+            print(f"✅ 旧持仓平仓订单ID: {old_close_order_id}")
+            
+            # 等待平仓完成
+            time.sleep(2)
+        else:
+            print(f"📊 第1步：跳过（无旧持仓需要平掉）")
         
         # 第零步：向逐仓仓位增加保证金（逐仓必须）- 现在改为注释，因为已经平掉旧持仓释放了保证金
         # 计算所需保证金：维护金额 / 杠杆 + 手续费缓冲（3%）
@@ -15533,6 +15537,36 @@ def maintain_sub_account():
         #     print(f"✅ 保证金增加成功")
         #     # 等待保证金生效
         #     time.sleep(1)
+        
+        # ========== 第1.5步：设置逐仓杠杆（必须！）==========
+        print(f"📊 第1.5步：设置逐仓杠杆 {lever}x")
+        leverage_path = '/api/v5/account/set-leverage'
+        leverage_body = {
+            'instId': inst_id,
+            'lever': str(lever),
+            'mgnMode': 'isolated',  # 逐仓模式
+            'posSide': pos_side
+        }
+        
+        leverage_headers = get_headers('POST', leverage_path, leverage_body)
+        leverage_response = requests.post(
+            OKEX_REST_URL + leverage_path,
+            headers=leverage_headers,
+            json=leverage_body,
+            timeout=10
+        )
+        
+        leverage_result = leverage_response.json()
+        print(f"📥 设置杠杆响应: code={leverage_result.get('code')}, msg={leverage_result.get('msg')}")
+        
+        if leverage_result.get('code') != '0':
+            # 杠杆设置失败，但可能已经是目标杠杆了，继续尝试开仓
+            print(f"⚠️  杠杆设置失败（可能已经是目标杠杆）: {leverage_result.get('msg')}")
+        else:
+            print(f"✅ 杠杆设置成功: {lever}x")
+        
+        # 等待杠杆设置生效
+        time.sleep(1)
         
         # ========== 第2步：开仓新持仓 ==========
         print(f"📊 第2步：开仓新持仓 {order_size} 张")
