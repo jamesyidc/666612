@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>子账户交易详情 - 止盈记录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            color: #718096;
+            font-size: 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .stat-value.profit {
+            color: #38a169;
+        }
+
+        .stat-value.loss {
+            color: #e53e3e;
+        }
+
+        .controls {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .controls label {
+            color: #2d3748;
+            font-weight: 500;
+        }
+
+        .controls select, .controls button {
+            padding: 10px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .controls select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .controls button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            font-weight: 500;
+        }
+
+        .controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 25px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .table-header h2 {
+            color: #2d3748;
+            font-size: 24px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+        }
+
+        thead th {
+            padding: 15px 20px;
+            text-align: left;
+            color: #2d3748;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.3s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #f7fafc;
+        }
+
+        tbody td {
+            padding: 20px;
+            color: #4a5568;
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.rule1 {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .badge.rule2 {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+
+        .profit-positive {
+            color: #38a169;
+            font-weight: 600;
+        }
+
+        .profit-negative {
+            color: #e53e3e;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #718096;
+            font-size: 18px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 50px;
+            color: #a0aec0;
+            font-size: 16px;
+        }
+
+        .refresh-time {
+            color: #a0aec0;
+            font-size: 12px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 子账户交易详情</h1>
+            <p class="subtitle">实时监控子账户止盈记录与盈亏统计</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">总交易次数</div>
+                <div class="stat-value" id="totalTrades">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总盈利</div>
+                <div class="stat-value profit" id="totalProfit">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总平仓金额</div>
+                <div class="stat-value" id="totalAmount">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均单笔盈利</div>
+                <div class="stat-value" id="avgProfit">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">规则1触发次数</div>
+                <div class="stat-value" id="rule1Count">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">规则2触发次数</div>
+                <div class="stat-value" id="rule2Count">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <label for="daysSelect">查询范围：</label>
+            <select id="daysSelect">
+                <option value="1">今天</option>
+                <option value="3">最近3天</option>
+                <option value="7" selected>最近7天</option>
+                <option value="15">最近15天</option>
+                <option value="30">最近30天</option>
+            </select>
+            <button onclick="loadRecords()">🔄 刷新数据</button>
+        </div>
+
+        <div class="table-container">
+            <div class="table-header">
+                <h2>止盈记录明细</h2>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>账户</th>
+                        <th>交易对</th>
+                        <th>方向</th>
+                        <th>平仓数量</th>
+                        <th>平仓金额 (U)</th>
+                        <th>预估盈利 (U)</th>
+                        <th>收益率</th>
+                        <th>触发规则</th>
+                    </tr>
+                </thead>
+                <tbody id="recordsBody">
+                    <tr><td colspan="9" class="loading">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="refresh-time" id="refreshTime">-</div>
+    </div>
+
+    <script>
+        // 加载记录
+        async function loadRecords() {
+            const days = document.getElementById('daysSelect').value;
+            const tbody = document.getElementById('recordsBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">加载中...</td></tr>';
+
+            try {
+                const response = await fetch(`/api/sub-account/take-profit-records?days=${days}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // 更新统计数据
+                    document.getElementById('totalTrades').textContent = data.stats.total_records;
+                    document.getElementById('totalProfit').textContent = `$${data.stats.total_profit.toFixed(2)}`;
+                    document.getElementById('totalAmount').textContent = `$${data.stats.total_closed_amount.toFixed(2)}`;
+                    document.getElementById('avgProfit').textContent = `$${data.stats.avg_profit_per_trade.toFixed(2)}`;
+                    document.getElementById('rule1Count').textContent = data.stats.rule1_count;
+                    document.getElementById('rule2Count').textContent = data.stats.rule2_count;
+
+                    // 设置盈利颜色
+                    const profitEl = document.getElementById('totalProfit');
+                    if (data.stats.total_profit >= 0) {
+                        profitEl.className = 'stat-value profit';
+                    } else {
+                        profitEl.className = 'stat-value loss';
+                    }
+
+                    // 渲染表格
+                    if (data.records.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="9" class="no-data">暂无交易记录</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.records.map(record => `
+                            <tr>
+                                <td>${record.timestamp}</td>
+                                <td>${record.account_name}</td>
+                                <td><strong>${record.inst_id}</strong></td>
+                                <td>${record.pos_side === 'long' ? '多' : '空'}</td>
+                                <td>${record.close_size}</td>
+                                <td>$${record.close_amount ? record.close_amount.toFixed(2) : '-'}</td>
+                                <td class="${record.estimated_profit >= 0 ? 'profit-positive' : 'profit-negative'}">
+                                    $${record.estimated_profit ? record.estimated_profit.toFixed(2) : '-'}
+                                </td>
+                                <td class="${record.profit_rate >= 0 ? 'profit-positive' : 'profit-negative'}">
+                                    ${record.profit_rate ? (record.profit_rate * 100).toFixed(2) : '-'}%
+                                </td>
+                                <td>
+                                    <span class="badge ${record.rule}">
+                                        ${record.rule === 'rule1' ? '规则1: 盈利>30%' : '规则2: 主账户逆向亏损'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+
+                    // 更新刷新时间
+                    document.getElementById('refreshTime').textContent = 
+                        `最后更新: ${new Date().toLocaleString('zh-CN')}`;
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="9" class="no-data">加载失败: ${data.message}</td></tr>`;
+                }
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="9" class="no-data">加载失败: ${error.message}</td></tr>`;
+            }
+        }
+
+        // 监听下拉选择变化
+        document.getElementById('daysSelect').addEventListener('change', loadRecords);
+
+        // 页面加载时获取数据
+        loadRecords();
+
+        // 自动刷新（每30秒）
+        setInterval(loadRecords, 30000);
+    </script>
+</body>
+</html>

@@ -1,5 +1,90 @@
 [
   {
+    "id": 7,
+    "account_name": "JAMESYI",
+    "inst_id": "CRV-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 287.0,
+    "open_order_id": "3175909849089171456",
+    "open_size": 2870.0,
+    "open_fills": [
+      {
+        "trade_id": "379928143",
+        "qty": 580.0,
+        "price": 0.3726,
+        "value": 216.108,
+        "fee": 0.108054,
+        "fee_currency": "USDT",
+        "profit": 0.0,
+        "net_profit": -0.1717686
+      },
+      {
+        "trade_id": "379928142",
+        "qty": 2290.0,
+        "price": 0.3726,
+        "value": 853.254,
+        "fee": 0.426627,
+        "fee_currency": "USDT",
+        "profit": 0.0,
+        "net_profit": -0.5320728
+      }
+    ],
+    "open_total_qty": 2870.0,
+    "open_avg_price": 0.37260000000000004,
+    "open_total_fee": 0.534681,
+    "close_order_id": "3175909981696286720",
+    "close_size": 2640.0,
+    "close_fills": [
+      {
+        "trade_id": "379928149",
+        "qty": 342.0,
+        "price": 0.3726,
+        "value": 127.4292,
+        "fee": 0.0637146,
+        "fee_currency": "USDT",
+        "profit": 0.0,
+        "net_profit": -0.1717686
+      },
+      {
+        "trade_id": "379928148",
+        "qty": 566.0,
+        "price": 0.3726,
+        "value": 210.89159999999998,
+        "fee": 0.1054458,
+        "fee_currency": "USDT",
+        "profit": 0.0,
+        "net_profit": -0.5320728
+      },
+      {
+        "trade_id": "379928147",
+        "qty": 895.0,
+        "price": 0.3726,
+        "value": 333.477,
+        "fee": 0.1667385,
+        "fee_currency": "USDT"
+      },
+      {
+        "trade_id": "379928146",
+        "qty": 837.0,
+        "price": 0.3726,
+        "value": 311.8662,
+        "fee": 0.1559331,
+        "fee_currency": "USDT"
+      }
+    ],
+    "close_total_qty": 2640.0,
+    "close_avg_price": 0.3726,
+    "close_total_fee": 0.491832,
+    "remaining_size": 230.0,
+    "total_fee": 1.026513,
+    "total_cost": 1.0265130000001466,
+    "fee_rate": 0.09599303135889871,
+    "total_profit": -1.4654943925052066e-13,
+    "net_profit": -0.5320728,
+    "created_at": "2025-12-31 03:31:36",
+    "status": "success"
+  },
+  {
     "id": 6,
     "account_name": "JAMESYI",
     "inst_id": "TON-USDT-SWAP",

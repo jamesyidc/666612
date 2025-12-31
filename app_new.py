@@ -15953,6 +15953,83 @@ def reset_main_account_maintenance_count():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sub-account/take-profit-records', methods=['GET'])
+def get_sub_account_take_profit_records():
+    """获取子账户止盈记录"""
+    try:
+        import json as json_lib
+        from datetime import datetime, timedelta
+        
+        # 获取查询参数
+        account_name = request.args.get('account_name')
+        days = int(request.args.get('days', 7))  # 默认查询最近7天
+        
+        # 读取止盈记录文件
+        records_file = 'sub_account_take_profit_records.json'
+        try:
+            with open(records_file, 'r', encoding='utf-8') as f:
+                all_records = json_lib.load(f)
+        except FileNotFoundError:
+            all_records = []
+        
+        # 计算时间范围
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # 过滤记录
+        filtered_records = []
+        total_profit = 0
+        total_closed_amount = 0
+        
+        for record in all_records:
+            # 按账户名过滤
+            if account_name and record.get('account_name') != account_name:
+                continue
+            
+            # 按时间范围过滤
+            record_time = datetime.strptime(record['timestamp'], '%Y-%m-%d %H:%M:%S')
+            if record_time < start_date or record_time > end_date:
+                continue
+            
+            filtered_records.append(record)
+            
+            # 统计数据
+            if 'estimated_profit' in record:
+                total_profit += record['estimated_profit']
+            if 'close_amount' in record:
+                total_closed_amount += record['close_amount']
+        
+        # 按时间倒序排序
+        filtered_records.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        # 统计信息
+        stats = {
+            'total_records': len(filtered_records),
+            'total_profit': round(total_profit, 2),
+            'total_closed_amount': round(total_closed_amount, 2),
+            'avg_profit_per_trade': round(total_profit / len(filtered_records), 2) if len(filtered_records) > 0 else 0,
+            'rule1_count': len([r for r in filtered_records if r.get('rule') == 'rule1']),
+            'rule2_count': len([r for r in filtered_records if r.get('rule') == 'rule2']),
+            'date_range': {
+                'start': start_date.strftime('%Y-%m-%d'),
+                'end': end_date.strftime('%Y-%m-%d')
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'records': filtered_records,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'获取记录失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
@@ -15962,3 +16039,8 @@ if __name__ == '__main__':
 def test_positions_page():
     """持仓数据测试页面"""
     return render_template('test_positions.html')
+
+@app.route('/sub-account-trades')
+def sub_account_trades_page():
+    """子账户交易详情页面"""
+    return render_template('sub_account_trades.html')
