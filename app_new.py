@@ -13135,10 +13135,53 @@ def get_sub_account_positions():
                 except Exception as e:
                     print(f"读取本地持仓记录失败: {e}")
         
+        # 合并同一账户、同一币种、同一方向的持仓（逐仓模式）
+        merged_positions = {}
+        for pos in all_positions:
+            # 创建合并键：账户名_币种_方向
+            merge_key = f"{pos['account_name']}_{pos['inst_id']}_{pos['pos_side']}"
+            
+            if merge_key in merged_positions:
+                # 已存在，合并数据
+                existing = merged_positions[merge_key]
+                
+                # 计算加权平均开仓价
+                total_value = existing['avg_price'] * existing['pos_size'] + pos['avg_price'] * pos['pos_size']
+                total_size = existing['pos_size'] + pos['pos_size']
+                if total_size > 0:
+                    weighted_avg_price = total_value / total_size
+                else:
+                    weighted_avg_price = existing['avg_price']
+                
+                # 合并数据
+                existing['pos_size'] += pos['pos_size']
+                existing['avg_price'] = weighted_avg_price
+                existing['margin'] += pos['margin']
+                existing['upl'] += pos['upl']
+                existing['notional_usd'] += pos['notional_usd']
+                
+                # 重新计算收益率（基于总保证金）
+                if existing['margin'] > 0:
+                    existing['profit_rate'] = (existing['upl'] / existing['margin']) * 100
+                else:
+                    existing['profit_rate'] = 0
+                
+                # 维护次数取最大值
+                existing['maintenance_count'] = max(existing['maintenance_count'], pos['maintenance_count'])
+                
+                # 标记价格使用最新的（假设最后一个是最新的）
+                existing['mark_price'] = pos['mark_price']
+            else:
+                # 新持仓，直接添加
+                merged_positions[merge_key] = pos.copy()
+        
+        # 转换为列表
+        final_positions = list(merged_positions.values())
+        
         return jsonify({
             'success': True,
-            'positions': all_positions,
-            'total': len(all_positions)
+            'positions': final_positions,
+            'total': len(final_positions)
         })
     
     except Exception as e:
