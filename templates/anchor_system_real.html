@@ -1631,12 +1631,33 @@
                         ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
                     </td>
                     <td>
-                        <span style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;
-                                     background: ${maintenanceCount > 0 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#e2e8f0'};
-                                     color: ${maintenanceCount > 0 ? 'white' : '#718096'};
-                                     box-shadow: ${maintenanceCount > 0 ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'};">
-                            ${maintenanceCount}次
-                        </span>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <span style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 13px;
+                                         background: ${maintenanceCount > 0 ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#e2e8f0'};
+                                         color: ${maintenanceCount > 0 ? 'white' : '#718096'};
+                                         box-shadow: ${maintenanceCount > 0 ? '0 2px 4px rgba(102, 126, 234, 0.3)' : 'none'};">
+                                ${maintenanceCount}次
+                            </span>
+                            ${maintenanceCount > 0 ? `
+                                <button class="btn-reset-maintenance" 
+                                        onclick="resetMaintenanceCount('${item.account_name}', '${item.inst_id}', '${item.pos_side}')"
+                                        title="清零今日维护次数"
+                                        style="background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+                                               color: white;
+                                               border: none;
+                                               padding: 4px 8px;
+                                               border-radius: 6px;
+                                               cursor: pointer;
+                                               font-size: 11px;
+                                               font-weight: 600;
+                                               transition: all 0.3s;
+                                               box-shadow: 0 2px 4px rgba(245, 101, 101, 0.3);"
+                                        onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(245, 101, 101, 0.4)';"
+                                        onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(245, 101, 101, 0.3)';">
+                                    🔄 清零
+                                </button>
+                            ` : ''}
+                        </div>
                     </td>
                     <td>
                         <span class="badge ${
@@ -2356,6 +2377,41 @@ ${closeDetails}
                 }
             } catch (error) {
                 console.error('子账户维护错误:', error);
+                alert(`❌ 请求失败: ${error.message}`);
+            }
+        }
+
+        // 清零今日维护次数
+        async function resetMaintenanceCount(accountName, instId, posSide) {
+            try {
+                if (!confirm(`确认清零今日维护次数？\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n\n清零后今日维护次数将重置为0`)) {
+                    return;
+                }
+                
+                const response = await fetch('/api/anchor/reset-maintenance-count', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_name: accountName,
+                        inst_id: instId,
+                        pos_side: posSide
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ 维护次数清零成功！\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}`);
+                    
+                    // 刷新持仓数据
+                    loadData();
+                } else {
+                    alert(`❌ 清零失败\n\n${result.message || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('清零维护次数错误:', error);
                 alert(`❌ 请求失败: ${error.message}`);
             }
         }
