@@ -33,6 +33,63 @@ def get_maintenance_count_today(inst_id, pos_side):
         log(f"❌ 获取维护次数失败: {e}")
         return 0
 
+def get_main_account_maintenance_count(inst_id, pos_side):
+    """获取主账户今日超级维护次数"""
+    try:
+        with open('main_account_maintenance.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        key = f"{inst_id}_{pos_side}"
+        if key in data:
+            record = data[key]
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
+            if record.get('date') == today:
+                return record.get('count', 0)
+        return 0
+    except FileNotFoundError:
+        return 0
+    except Exception as e:
+        log(f"⚠️ 读取主账户维护次数失败: {e}")
+        return 0
+
+def update_main_account_maintenance_count(inst_id, pos_side):
+    """更新主账户维护次数+1"""
+    try:
+        try:
+            with open('main_account_maintenance.json', 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {}
+        
+        key = f"{inst_id}_{pos_side}"
+        from datetime import datetime
+        today = datetime.now().strftime('%Y-%m-%d')
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        if key not in data:
+            data[key] = {
+                'count': 1,
+                'date': today,
+                'last_maintenance': now
+            }
+        else:
+            record = data[key]
+            if record.get('date') == today:
+                record['count'] = record.get('count', 0) + 1
+            else:
+                record['count'] = 1
+                record['date'] = today
+            record['last_maintenance'] = now
+        
+        with open('main_account_maintenance.json', 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        return data[key]['count']
+    except Exception as e:
+        log(f"❌ 更新主账户维护次数失败: {e}")
+        return 0
+
 def get_config():
     """获取自动维护配置"""
     try:
@@ -85,22 +142,59 @@ def maintain_anchor(inst_id, pos_side, pos_size):
         return False
 
 def super_maintain_anchor(inst_id, pos_side, pos_size):
-    """执行超级维护锚点单（买入100U，保留10U），计数+1"""
+    """执行超级维护锚点单（递增式维护），计数+1"""
     try:
+        # 获取今日超级维护次数
+        current_count = get_main_account_maintenance_count(inst_id, pos_side)
+        
+        # 根据维护次数确定参数
+        if current_count == 0:
+            # 第1次：买入100U，留10U
+            maintenance_amount = 100
+            target_margin = 10
+        elif current_count == 1:
+            # 第2次：买入100U，留20U
+            maintenance_amount = 100
+            target_margin = 20
+        elif current_count == 2:
+            # 第3次：买入200U，留30U，设置-20%止损
+            maintenance_amount = 200
+            target_margin = 30
+        else:
+            log(f"⚠️  主账户今日超级维护次数已达上限: {current_count}/3")
+            return False
+        
         log(f"🚀 开始超级维护: {inst_id} {pos_side} {pos_size}")
+        log(f"   当前超级维护次数: {current_count}/3")
+        log(f"   本次维护金额: {maintenance_amount}U")
+        log(f"   本次目标保证金: {target_margin}U")
+        
         response = requests.post(
             f"{BASE_URL}/api/anchor/super-maintain-anchor",
             json={
                 'inst_id': inst_id,
                 'pos_side': pos_side,
-                'current_pos_size': pos_size
+                'current_pos_size': pos_size,
+                'maintenance_amount': maintenance_amount,
+                'target_margin': target_margin
             },
             timeout=30
         )
         data = response.json()
         if data.get('success'):
+            # 更新维护次数
+            new_count = update_main_account_maintenance_count(inst_id, pos_side)
+            
             log(f"✅ 超级维护成功: {inst_id}")
             log(f"   📊 买入: {data['data'].get('buy_size', 0)}, 卖出: {data['data'].get('sell_size', 0)}, 保留: {data['data'].get('keep_size', 0)}")
+            log(f"   今日超级维护次数: {new_count}/3")
+            
+            # 第3次维护后设置止损
+            if new_count == 3:
+                log(f"⚠️  已完成第3次维护，建议设置-20%止损线...")
+            elif new_count == 2:
+                log(f"⚠️ 超级维护次数达到2次，下次将是最后一次维护")
+            
             return True
         else:
             log(f"❌ 超级维护失败: {data.get('message')}")
@@ -209,38 +303,32 @@ def check_and_maintain():
                 should_maintain = True
             
             if should_maintain:
-                # 检查今天的维护次数
-                today_count = get_maintenance_count_today(inst_id, pos_side)
-                log(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/5")
+                # 获取今天的超级维护次数（独立计数）
+                super_count = get_main_account_maintenance_count(inst_id, pos_side)
+                log(f"📊 {inst_id} {pos_side} 今日超级维护次数: {super_count}/3")
                 
-                # 判断使用哪种维护方式
-                if today_count >= 5:
-                    log(f"🛑 已达到每日维护上限(5次)，停止维护")
+                # 判断是否达到上限
+                if super_count >= 3:
+                    log(f"🛑 已达到每日超级维护上限(3次)，停止维护")
                     continue
-                elif today_count >= 3:
-                    # 第4次和第5次使用超级维护（计数各+1）
-                    should_super = False
-                    if pos_side == 'long' and super_maintain_long:
-                        log(f"🚀 多单维护次数={today_count}，触发超级维护（第{today_count + 1}次）")
-                        should_super = True
-                    elif pos_side == 'short' and super_maintain_short:
-                        log(f"🚀 空单维护次数={today_count}，触发超级维护（第{today_count + 1}次）")
-                        should_super = True
-                    
-                    if should_super:
-                        # 执行超级维护（计数+1）
-                        success = super_maintain_anchor(inst_id, pos_side, pos_size)
-                        if success:
-                            log(f"✅ 超级维护完成: {inst_id} (今日第{today_count + 1}次)")
-                            time.sleep(2)
-                    else:
-                        log(f"⚠️  超级维护开关未开启，跳过")
-                else:
-                    # 前3次使用普通维护（计数各+1）
-                    success = maintain_anchor(inst_id, pos_side, pos_size)
+                
+                # 判断是否启用超级维护
+                should_super = False
+                if pos_side == 'long' and super_maintain_long:
+                    log(f"🚀 多单触发超级维护（第{super_count + 1}次）")
+                    should_super = True
+                elif pos_side == 'short' and super_maintain_short:
+                    log(f"🚀 空单触发超级维护（第{super_count + 1}次）")
+                    should_super = True
+                
+                if should_super:
+                    # 执行超级维护（递增式，计数+1）
+                    success = super_maintain_anchor(inst_id, pos_side, pos_size)
                     if success:
-                        log(f"✅ 自动维护完成: {inst_id} (今日第{today_count + 1}次)")
+                        log(f"✅ 超级维护完成: {inst_id} (今日第{super_count + 1}次)")
                         time.sleep(2)
+                else:
+                    log(f"⚠️  超级维护开关未开启，跳过")
             
             # 检查2：保证金是否超出范围
             if margin > margin_max:
