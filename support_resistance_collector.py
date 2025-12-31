@@ -353,9 +353,11 @@ def save_to_database(data: Dict) -> bool:
         conn.execute("PRAGMA busy_timeout = 60000")
         cursor = conn.cursor()
         
-        # 使用 Python UTC 时间而不是 SQLite datetime函数
+        # 使用北京时间
         from datetime import datetime as dt_class
-        utc_now = dt_class.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        import pytz
+        china_tz = pytz.timezone('Asia/Shanghai')
+        beijing_now = dt_class.now(china_tz).strftime('%Y-%m-%d %H:%M:%S')
         
         cursor.execute('''
             INSERT INTO support_resistance_levels (
@@ -386,7 +388,7 @@ def save_to_database(data: Dict) -> bool:
             int(data['alert_48h_low']), int(data['alert_48h_high']),
             int(data['alert_triggered']),
             data['baseline_price_24h'], data['price_change_24h'], data['change_percent_24h'],
-            utc_now
+            beijing_now
         ))
         
         conn.commit()
