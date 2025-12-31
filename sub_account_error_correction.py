@@ -138,6 +138,8 @@ def adjust_leverage(account, inst_id, pos_side, current_lever, target_lever=10):
             'posSide': pos_side
         }
         
+        log(f"   🔧 请求参数: {json.dumps(body)}")
+        
         headers = get_headers('POST', path, body,
                             account['api_key'], account['secret_key'], account['passphrase'])
         
