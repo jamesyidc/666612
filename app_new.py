@@ -15445,19 +15445,42 @@ def maintain_sub_account():
         # 计算买入数量：使用动态维护金额
         # pos_size = maintenance_amount * lever / mark_price
         lever = int(sub_account.get('leverage', 10))
-        order_size = (maintenance_amount * lever) / mark_price
+        order_size_raw = (maintenance_amount * lever) / mark_price
         
         # 向下取整到合约最小单位
         import math
-        order_size = math.floor(order_size)
+        order_size = math.floor(order_size_raw)
+        
+        # 重要：如果order_size计算为0，说明维护金额太小，至少开1张
+        if order_size == 0 and order_size_raw > 0:
+            order_size = 1
+            print(f"⚠️  order_size计算为 {order_size_raw:.2f}，向下取整为0，强制开仓1张")
+        
+        # 如果order_size仍然是0，返回错误
+        if order_size == 0:
+            return jsonify({
+                'success': False,
+                'message': f'维护金额太小，无法开仓。当前价格 {mark_price}，建议增加维护金额至少到 {math.ceil(mark_price / lever)}U'
+            })
         
         # 计算平仓数量：保留target_margin对应的仓位
         # 保留的仓位 = target_margin * lever / mark_price
-        keep_size = math.floor((target_margin * lever) / mark_price)
-        close_size = order_size - keep_size
+        keep_size_raw = (target_margin * lever) / mark_price
+        keep_size = math.floor(keep_size_raw)
         
-        if close_size < 0:
-            close_size = 0  # 如果计算出负数，不平仓
+        # 重要：如果计算出的keep_size大于0但被向下取整成0，至少保留1张
+        if keep_size_raw > 0 and keep_size == 0:
+            keep_size = 1
+            print(f"⚠️  keep_size计算为 {keep_size_raw:.2f}，向下取整为0，强制保留1张")
+        
+        # 如果order_size == keep_size，不需要平仓
+        if order_size == keep_size:
+            close_size = 0
+            print(f"⚠️  order_size ({order_size}) == keep_size ({keep_size})，跳过第3步平仓")
+        else:
+            close_size = order_size - keep_size
+            if close_size < 0:
+                close_size = 0  # 如果计算出负数，不平仓
         
         # ========== 第1步：平掉旧持仓（释放保证金）==========
         old_close_order_id = None
@@ -15614,38 +15637,43 @@ def maintain_sub_account():
         time.sleep(2)
         
         # ========== 第3步：平掉多余仓位，保留target_margin对应的数量 ==========
-        print(f"📊 第3步：平到目标保证金，平掉 {close_size} 张")
-        # close_size已经在前面计算好了
-        close_side = 'buy' if pos_side == 'short' else 'sell'
-        
-        close_order_body = {
-            'instId': inst_id,
-            'tdMode': 'isolated',  # 逐仓模式
-            'side': close_side,
-            'posSide': pos_side,
-            'ordType': 'market',
-            'sz': str(close_size)
-        }
-        
-        headers = get_headers('POST', order_path, close_order_body)
-        close_response = requests.post(
-            OKEX_REST_URL + order_path,
-            headers=headers,
-            json=close_order_body,
-            timeout=10
-        )
-        
-        close_result = close_response.json()
-        
-        if close_result.get('code') != '0':
-            return jsonify({
-                'success': False,
-                'message': f"平仓失败: {close_result.get('msg', '未知错误')} (开仓订单ID: {open_order_id})",
-                'error_code': close_result.get('code'),
-                'open_order_id': open_order_id
-            })
-        
-        close_order_id = close_result['data'][0]['ordId']
+        close_order_id = None
+        if close_size > 0:
+            print(f"📊 第3步：平到目标保证金，平掉 {close_size} 张")
+            # close_size已经在前面计算好了
+            close_side = 'buy' if pos_side == 'short' else 'sell'
+            
+            close_order_body = {
+                'instId': inst_id,
+                'tdMode': 'isolated',  # 逐仓模式
+                'side': close_side,
+                'posSide': pos_side,
+                'ordType': 'market',
+                'sz': str(close_size)
+            }
+            
+            headers = get_headers('POST', order_path, close_order_body)
+            close_response = requests.post(
+                OKEX_REST_URL + order_path,
+                headers=headers,
+                json=close_order_body,
+                timeout=10
+            )
+            
+            close_result = close_response.json()
+            
+            if close_result.get('code') != '0':
+                return jsonify({
+                    'success': False,
+                    'message': f"平仓失败: {close_result.get('msg', '未知错误')} (开仓订单ID: {open_order_id})",
+                    'error_code': close_result.get('code'),
+                    'open_order_id': open_order_id
+                })
+            
+            close_order_id = close_result['data'][0]['ordId']
+        else:
+            print(f"📊 第3步：跳过（close_size={close_size}，无需平仓）")
+            close_order_id = "SKIPPED"
         
         # 维护成功，更新维护次数
         if record.get('date') != today_date:
