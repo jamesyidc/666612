@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- Version: 2026-01-01-02:30 下跌强度逻辑全面更新 -->
+    <!-- Version: 2026-01-01-03:00 删除市场下跌硬度分析模块，更新下跌强度规则 -->
     <title>🔴 实盘锚点系统 - OKEx持仓监控</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
@@ -500,40 +500,7 @@
             </div>
         </div>
 
-        <!-- 下跌强度分级显示 -->
-        <div class="card" style="margin-bottom: 30px; border: 3px solid #667eea; background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);">
-            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                <div class="card-title" style="color: white;">
-                    <span>📉</span>
-                    市场下跌强度分析
-                </div>
-            </div>
-            <div style="padding: 30px;">
-                <div id="declineStrengthDisplay" style="text-align: center;">
-                    <div style="font-size: 48px; font-weight: 800; margin-bottom: 15px;" id="strengthLevel">
-                        --
-                    </div>
-                    <div style="font-size: 24px; font-weight: 600; margin-bottom: 10px;" id="strengthTitle">
-                        正在计算...
-                    </div>
-                    <div style="font-size: 18px; color: #4a5568; font-weight: 500;" id="strengthSuggestion">
-                        --
-                    </div>
-                    <div style="margin-top: 20px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-radius: 10px;">
-                        <div style="font-size: 14px; color: #4a5568; line-height: 1.8;">
-                            <strong>统计数据：</strong><br>
-                            空单盈利≥100%: <strong id="stat100">--</strong> 个 | 
-                            ≥90%: <strong id="stat90">--</strong> 个 | 
-                            ≥80%: <strong id="stat80">--</strong> 个 | 
-                            ≥70%: <strong id="stat70">--</strong> 个 | 
-                            ≥60%: <strong id="stat60">--</strong> 个 | 
-                            ≥50%: <strong id="stat50">--</strong> 个 | 
-                            ≥40%: <strong id="stat40">--</strong> 个
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- 市场下跌硬度分析模块已删除 -->
 
         <!-- 统计卡片 -->
         <div class="stats-grid">
@@ -1339,45 +1306,45 @@
             let bgColor = '';
             let icon = '';
             
-            // 下跌强度5级：极端下跌
-            // 空单盈利≥100%的数量≤2 且 ≥90%的数量≤10 且 ≥80%的数量≤10 且 ≥70%的数量≤2 且 ≥60%的数量≤10 且 ≥50%的数量≤10 且 ≥40%的数量≤11
-            if (profit100 <= 2 && profit90 <= 10 && profit80 <= 10 && profit70 <= 2 && profit60 <= 10 && profit50 <= 10 && profit40 <= 11) {
+            // 下跌等级5：极端下跌
+            // 空单盈利≥100%的数量≥1
+            if (profit100 >= 1) {
                 level = 5;
                 title = '下跌强度5级 - 极端下跌';
                 suggestion = '多单买入点在100%以上';
                 bgColor = 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)';
                 icon = '🔥🔥🔥🔥🔥';
             }
-            // 下跌强度4级：超高强度下跌
-            // 空单盈利≥100%的数量≤0 且 ≥90%的数量≤2 且 ≥80%的数量≤10 且 ≥70%的数量≤10 且 ≥60%的数量≤10 且 ≥50%的数量≤10 且 ≥40%的数量≤11
-            else if (profit100 <= 0 && profit90 <= 2 && profit80 <= 10 && profit70 <= 10 && profit60 <= 10 && profit50 <= 10 && profit40 <= 11) {
+            // 下跌等级4：超高强度下跌
+            // 空单盈利≥100%=0 且 ≥90%≥1 且 ≥80%≥1
+            else if (profit100 === 0 && profit90 >= 1 && profit80 >= 1) {
                 level = 4;
                 title = '下跌强度4级 - 超高强度下跌';
                 suggestion = '多单买入点在90%';
                 bgColor = 'linear-gradient(135deg, #991b1b 0%, #b91c1c 100%)';
                 icon = '🔥🔥🔥🔥';
             }
-            // 下跌强度3级：高强度下跌
-            // 空单盈利≥100%的数量≤0 且 ≥90%的数量≤0 且 ≥80%的数量≤0 且 ≥70%的数量≤2 且 ≥60%的数量≤10 且 ≥50%的数量≤10 且 ≥40%的数量≤11
-            else if (profit100 <= 0 && profit90 <= 0 && profit80 <= 0 && profit70 <= 2 && profit60 <= 10 && profit50 <= 10 && profit40 <= 11) {
+            // 下跌等级3：高强度下跌
+            // 空单盈利≥100%=0 且 ≥90%=0 且 ≥80%=0 且 ≥70%≥1 且 ≥60%≥2
+            else if (profit100 === 0 && profit90 === 0 && profit80 === 0 && profit70 >= 1 && profit60 >= 2) {
                 level = 3;
                 title = '下跌强度3级 - 高强度下跌';
                 suggestion = '多单买入点在70-80%';
                 bgColor = 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)';
                 icon = '🔥🔥🔥';
             }
-            // 下跌强度2级：中等强度下跌
-            // 空单盈利≥100%的数量≥0 且 ≥90%的数量≥0 且 ≥80%的数量≤0 且 ≥70%的数量=0 且 ≥60%的数量≤1 且 ≥50%的数量≤4 且 ≥40%的数量≤5
-            else if (profit100 >= 0 && profit90 >= 0 && profit80 <= 0 && profit70 === 0 && profit60 <= 1 && profit50 <= 4 && profit40 <= 5) {
+            // 下跌等级2：中等强度下跌
+            // 空单盈利≥100%=0 且 ≥90%=0 且 ≥80%=0 且 ≥70%=0 且 ≥60%≥2
+            else if (profit100 === 0 && profit90 === 0 && profit80 === 0 && profit70 === 0 && profit60 >= 2) {
                 level = 2;
                 title = '下跌强度2级 - 中等强度下跌';
                 suggestion = '多单买入点在60%';
                 bgColor = 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)';
                 icon = '🔥🔥';
             }
-            // 下跌强度1级：轻微下跌
-            // 空单盈利≥100%的数量≥0 且 ≥90%的数量≥0 且 ≥80%的数量≥0 且 ≥70%的数量=0 且 ≥60%的数量=0 且 ≥50%的数量=0 且 ≥40%的数量≤3
-            else if (profit100 >= 0 && profit90 >= 0 && profit80 >= 0 && profit70 === 0 && profit60 === 0 && profit50 === 0 && profit40 <= 3) {
+            // 下跌等级1：轻微下跌
+            // 空单盈利≥100%=0 且 ≥90%=0 且 ≥80%=0 且 ≥70%=0 且 ≥60%=0 且 ≥50%=0 且 ≥40%≥3
+            else if (profit100 === 0 && profit90 === 0 && profit80 === 0 && profit70 === 0 && profit60 === 0 && profit50 === 0 && profit40 >= 3) {
                 level = 1;
                 title = '下跌强度1级 - 轻微下跌';
                 suggestion = '多单买入点在50%';
@@ -1395,7 +1362,8 @@
             
             console.log('📊 下跌强度判断结果:', { level, title, suggestion });
             
-            // 更新显示
+            // 注意：由于删除了市场下跌硬度分析模块，这里的DOM更新代码将不再有效
+            // 但保留代码以防后续需要
             const levelElement = document.getElementById('strengthLevel');
             const titleElement = document.getElementById('strengthTitle');
             const suggestionElement = document.getElementById('strengthSuggestion');
@@ -1410,15 +1378,6 @@
                 displayElement.style.background = bgColor;
                 displayElement.style.padding = '20px';
                 displayElement.style.borderRadius = '15px';
-                
-                // 更新统计数据
-                document.getElementById('stat100').textContent = profit100;
-                document.getElementById('stat90').textContent = profit90;
-                document.getElementById('stat80').textContent = profit80;
-                document.getElementById('stat70').textContent = profit70;
-                document.getElementById('stat60').textContent = profit60;
-                document.getElementById('stat50').textContent = profit50;
-                document.getElementById('stat40').textContent = profit40;
             }
         }
 
