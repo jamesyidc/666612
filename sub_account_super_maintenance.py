@@ -66,6 +66,40 @@ def get_maintenance_count(account_name, inst_id, pos_side):
         log(f"⚠️ 读取维护次数失败: {e}")
         return 0
 
+def check_maintenance_interval(account_name, inst_id, pos_side, min_interval_minutes=15):
+    """检查距离上次维护是否已经过了足够的时间（默认15分钟）"""
+    try:
+        with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        if key not in data:
+            return True  # 没有维护记录，允许维护
+        
+        last_maintenance_str = data[key].get('last_maintenance')
+        if not last_maintenance_str:
+            return True  # 没有上次维护时间，允许维护
+        
+        # 解析上次维护时间
+        last_maintenance = datetime.strptime(last_maintenance_str, '%Y-%m-%d %H:%M:%S')
+        last_maintenance = last_maintenance.replace(tzinfo=timezone(timedelta(hours=8)))
+        
+        # 计算时间差
+        now = get_china_time()
+        time_diff = (now - last_maintenance).total_seconds() / 60  # 转换为分钟
+        
+        if time_diff < min_interval_minutes:
+            remaining = min_interval_minutes - time_diff
+            log(f"    ⏰ 距离上次维护仅 {time_diff:.1f} 分钟，需等待 {remaining:.1f} 分钟")
+            return False
+        
+        return True
+    except FileNotFoundError:
+        return True  # 文件不存在，允许维护
+    except Exception as e:
+        log(f"⚠️ 检查维护间隔失败: {e}")
+        return True  # 出错时允许维护，避免影响正常流程
+
 def update_maintenance_count(account_name, inst_id, pos_side):
     """更新维护次数+1（不再按日期重置）"""
     try:
@@ -195,6 +229,7 @@ def main_loop():
     log(f"💰 维护金额: {MAINTENANCE_AMOUNT}U")
     log(f"🔢 最大维护次数: {MAX_MAINTENANCE_COUNT}次")
     log(f"🛑 止损线: {STOP_LOSS_RATE}%")
+    log(f"⏰ 维护间隔: 同一币种两次维护之间需间隔15分钟")
     
     while True:
         try:
@@ -251,6 +286,11 @@ def main_loop():
                     # 检查是否达到上限
                     if count >= MAX_MAINTENANCE_COUNT:
                         log(f"    🚫 维护次数已达上限，跳过")
+                        continue
+                    
+                    # 检查维护间隔（同一个币两次维护之间需要间隔15分钟）
+                    if not check_maintenance_interval(account_name, inst_id, pos_side, min_interval_minutes=15):
+                        log(f"    ⏱️  维护间隔不足15分钟，跳过")
                         continue
                     
                     # 检查是否达到止损线（维护次数=2时）
