@@ -52,5 +52,14 @@
     "open_size": 757.0,
     "open_price": 1.321,
     "created_at": "2025-12-31 13:35:42"
+  },
+  "Wu666666_APT-USDT-SWAP_long": {
+    "account_name": "Wu666666",
+    "inst_id": "APT-USDT-SWAP",
+    "pos_side": "long",
+    "order_id": "3177274053781446658",
+    "open_size": 591.0,
+    "open_price": 1.69,
+    "created_at": "2025-12-31 14:49:05"
   }
 }
