@@ -15618,10 +15618,33 @@ def close_sub_account_position():
                 'message': f'未找到持仓: {inst_id} {pos_side}'
             })
         
-        # 提取持仓信息
-        pos_size = abs(float(current_position['pos']))
-        mark_price = float(current_position['markPx'])
-        leverage = float(current_position['lever'])
+        # 提取持仓信息（安全转换，处理空字符串）
+        pos_size = abs(float(current_position['pos']) if current_position['pos'] else 0)
+        
+        # 如果 markPx 为空，尝试从行情API获取
+        mark_price_str = current_position.get('markPx', '')
+        if mark_price_str and mark_price_str.strip():
+            mark_price = float(mark_price_str)
+        else:
+            # 从ticker获取价格
+            ticker_path = f'/api/v5/market/ticker?instId={inst_id}'
+            ticker_headers = get_headers('GET', ticker_path)
+            ticker_response = requests.get(
+                OKEX_REST_URL + ticker_path,
+                headers=ticker_headers,
+                timeout=10
+            )
+            ticker_data = ticker_response.json()
+            if ticker_data.get('code') == '0' and ticker_data.get('data'):
+                mark_price = float(ticker_data['data'][0].get('last', 0))
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '无法获取标记价格'
+                })
+        
+        leverage_str = current_position.get('lever', '10')
+        leverage = float(leverage_str) if leverage_str and leverage_str.strip() else 10.0
         
         # 🛡️ 底仓保护验证
         is_safe, adjusted_close_size, warning_msg = validate_close_request(

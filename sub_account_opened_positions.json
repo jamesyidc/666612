@@ -43,5 +43,14 @@
     "inst_id": "AAVE-USDT-SWAP",
     "pos_side": "long",
     "opened_at": "2025-12-31 13:24:38"
+  },
+  "Wu666666_FIL-USDT-SWAP_long": {
+    "account_name": "Wu666666",
+    "inst_id": "FIL-USDT-SWAP",
+    "pos_side": "long",
+    "order_id": "3177126290733228032",
+    "open_size": 757.0,
+    "open_price": 1.321,
+    "created_at": "2025-12-31 13:35:42"
   }
 }

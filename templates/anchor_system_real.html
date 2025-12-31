@@ -407,6 +407,28 @@
             </div>
         </div>
 
+        <!-- 主账户持仓统计 -->
+        <div class="stats-grid" style="margin-bottom: 30px;">
+            <div class="stat-card" style="border: 2px solid #48bb78; background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);">
+                <div class="stat-icon">💼</div>
+                <div class="stat-label" style="color: #22543d;">主账户总持仓</div>
+                <div class="stat-value" id="mainAccountTotalPositions" style="color: #22543d; font-size: 48px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #22543d;" id="mainAccountPositionDetail">多单: -- | 空单: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #4299e1; background: linear-gradient(135deg, #bee3f8 0%, #90cdf4 100%);">
+                <div class="stat-icon">🏦</div>
+                <div class="stat-label" style="color: #2c5282;">子账户总持仓</div>
+                <div class="stat-value" id="subAccountTotalPositions" style="color: #2c5282; font-size: 48px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #2c5282;" id="subAccountPositionDetail">账户数: -- | 持仓: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #805ad5; background: linear-gradient(135deg, #e9d8fd 0%, #d6bcfa 100%);">
+                <div class="stat-icon">📈</div>
+                <div class="stat-label" style="color: #44337a;">总盈亏</div>
+                <div class="stat-value" id="totalProfitLoss" style="color: #44337a; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #44337a;" id="totalProfitLossDetail">平均收益率: --</div>
+            </div>
+        </div>
+
         <!-- 今日维护统计 -->
         <div class="stats-grid" style="margin-bottom: 30px;">
             <div class="stat-card" style="border: 2px solid #4299e1; background: linear-gradient(135deg, #bee3f8 0%, #90cdf4 100%);">
@@ -994,6 +1016,30 @@
                 
                 if (positionsData.success) {
                     renderCurrentPositions(positionsData.positions);
+                    
+                    // 更新主账户统计卡片
+                    const mainPositions = positionsData.positions || [];
+                    const mainLongCount = mainPositions.filter(p => p.pos_side === 'long').length;
+                    const mainShortCount = mainPositions.filter(p => p.pos_side === 'short').length;
+                    const mainTotalCount = mainPositions.length;
+                    const mainTotalUpl = mainPositions.reduce((sum, p) => sum + (p.upl || 0), 0);
+                    const mainTotalMargin = mainPositions.reduce((sum, p) => sum + (p.margin || 0), 0);
+                    const mainAvgProfitRate = mainTotalMargin > 0 ? (mainTotalUpl / mainTotalMargin * 100) : 0;
+                    
+                    document.getElementById('mainAccountTotalPositions').textContent = mainTotalCount;
+                    document.getElementById('mainAccountPositionDetail').textContent = `多单: ${mainLongCount} | 空单: ${mainShortCount}`;
+                    
+                    // 如果少于22个，显示为红色警告
+                    const mainCard = document.getElementById('mainAccountTotalPositions').closest('.stat-card');
+                    if (mainTotalCount < 22) {
+                        mainCard.style.border = '2px solid #fc8181';
+                        mainCard.style.background = 'linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%)';
+                        document.getElementById('mainAccountTotalPositions').style.color = '#742a2a';
+                        document.getElementById('mainAccountPositionDetail').style.color = '#742a2a';
+                        const label = mainCard.querySelector('.stat-label');
+                        label.style.color = '#742a2a';
+                        label.innerHTML = '⚠️ 主账户总持仓';
+                    }
                 }
 
                 // 加载子账户持仓
@@ -1002,6 +1048,30 @@
                 
                 if (subAccountData.success) {
                     renderSubAccountPositions(subAccountData.positions);
+                    
+                    // 更新子账户统计卡片
+                    const subPositions = subAccountData.positions || [];
+                    const subAccounts = new Set(subPositions.map(p => p.account_name));
+                    const subTotalCount = subPositions.length;
+                    const subAccountCount = subAccounts.size;
+                    
+                    document.getElementById('subAccountTotalPositions').textContent = subTotalCount;
+                    document.getElementById('subAccountPositionDetail').textContent = `账户数: ${subAccountCount} | 持仓: ${subTotalCount}`;
+                    
+                    // 更新总盈亏卡片（合并主账户和子账户）
+                    const mainPositions = positionsData.success ? (positionsData.positions || []) : [];
+                    const allPositions = [...mainPositions, ...subPositions];
+                    const totalUpl = allPositions.reduce((sum, p) => sum + (p.upl || 0), 0);
+                    const totalMargin = allPositions.reduce((sum, p) => sum + (p.margin || 0), 0);
+                    const avgProfitRate = totalMargin > 0 ? (totalUpl / totalMargin * 100) : 0;
+                    
+                    const uplColor = totalUpl >= 0 ? '#22543d' : '#742a2a';
+                    const rateColor = avgProfitRate >= 0 ? '#22543d' : '#742a2a';
+                    
+                    document.getElementById('totalProfitLoss').textContent = `${totalUpl >= 0 ? '+' : ''}${totalUpl.toFixed(2)}`;
+                    document.getElementById('totalProfitLoss').style.color = uplColor;
+                    document.getElementById('totalProfitLossDetail').textContent = `平均收益率: ${avgProfitRate >= 0 ? '+' : ''}${avgProfitRate.toFixed(2)}%`;
+                    document.getElementById('totalProfitLossDetail').style.color = rateColor;
                     
                     // 更新子账户时间
                     const now = new Date();

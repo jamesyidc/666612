@@ -162,12 +162,13 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
         result = response.json()
         
         if result.get('success'):
-            # 更新维护次数
-            new_count = update_maintenance_count(account_name, inst_id, pos_side)
+            # API已经更新了维护次数，从响应中获取
+            data = result.get('data', {})
+            new_count = data.get('today_count', current_count + 1)
             
             log(f"✅ 超级维护成功!")
-            log(f"   开仓订单ID: {result.get('open_order_id', 'N/A')}")
-            log(f"   平仓订单ID: {result.get('close_order_id', 'N/A')}")
+            log(f"   开仓订单ID: {data.get('open_order_id', 'N/A')}")
+            log(f"   平仓订单ID: {data.get('close_order_id', 'N/A')}")
             log(f"   今日维护次数: {new_count}/{MAX_MAINTENANCE_COUNT}")
             
             # 第3次维护后设置止损

@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+"""
+子账户纠错机制
+
+功能：
+1. 检查维护次数和实际保证金是否匹配
+2. 自动调整保证金到目标值
+3. 如果有维护记录但维护次数没有增加，自动修复维护次数
+
+规则：
+- 维护次数0或1：目标10U（允许范围9.5-10.5U）
+- 维护次数2：目标20U（允许范围19-21U）
+"""
+
+import json
+import time
+import requests
+import hmac
+import base64
+import hashlib
+from datetime import datetime, timezone, timedelta
+import traceback
+
+# 配置
+CHECK_INTERVAL = 300  # 5分钟检查一次
+OKEX_REST_URL = 'https://www.okx.com'
+
+def get_china_time():
+    """获取北京时间"""
+    return datetime.now(timezone(timedelta(hours=8)))
+
+def get_china_today():
+    """获取北京时间的今天日期"""
+    return get_china_time().strftime('%Y-%m-%d')
+
+def log(msg):
+    """打印日志"""
+    print(f"[{get_china_time().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+
+def load_config():
+    """加载配置文件"""
+    try:
+        with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        log(f"❌ 加载配置文件失败: {e}")
+        return None
+
+def get_maintenance_record(account_name, inst_id, pos_side):
+    """获取维护记录"""
+    try:
+        with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        if key in data:
+            record = data[key]
+            today = get_china_today()
+            if record.get('date') == today:
+                return record.get('count', 0), record
+        return 0, None
+    except FileNotFoundError:
+        return 0, None
+    except Exception as e:
+        log(f"⚠️ 读取维护记录失败: {e}")
+        return 0, None
+
+def get_signature(timestamp, method, request_path, body, secret_key):
+    """生成OKEx API签名"""
+    if body:
+        body_str = json.dumps(body)
+    else:
+        body_str = ''
+    
+    prehash_string = timestamp + method + request_path + body_str
+    signature = base64.b64encode(
+        hmac.new(secret_key.encode(), prehash_string.encode(), hashlib.sha256).digest()
+    ).decode()
+    return signature
+
+def get_headers(method, request_path, body, api_key, secret_key, passphrase):
+    """生成请求头"""
+    timestamp = datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
+    signature = get_signature(timestamp, method, request_path, body, secret_key)
+    
+    headers = {
+        'OK-ACCESS-KEY': api_key,
+        'OK-ACCESS-SIGN': signature,
+        'OK-ACCESS-TIMESTAMP': timestamp,
+        'OK-ACCESS-PASSPHRASE': passphrase,
+        'Content-Type': 'application/json'
+    }
+    return headers
+
+def get_position(account, inst_id, pos_side):
+    """获取持仓信息"""
+    try:
+        request_path = f'/api/v5/account/positions?instType=SWAP&instId={inst_id}'
+        headers = get_headers('GET', request_path, None, 
+                            account['api_key'], account['secret_key'], account['passphrase'])
+        
+        response = requests.get(OKEX_REST_URL + request_path, headers=headers, timeout=10)
+        result = response.json()
+        
+        if result.get('code') == '0' and result.get('data'):
+            for pos in result['data']:
+                if pos.get('posSide') == pos_side and float(pos.get('pos', 0)) > 0:
+                    return {
+                        'inst_id': inst_id,
+                        'pos_side': pos_side,
+                        'pos_size': float(pos.get('pos', 0)),
+                        'margin': float(pos.get('margin', 0)),
+                        'mark_price': float(pos.get('markPx', 0)),
+                        'lever': int(pos.get('lever', 10)),
+                        'mgn_mode': pos.get('mgnMode', 'cross')
+                    }
+        return None
+    except Exception as e:
+        log(f"❌ 获取持仓失败 {inst_id} {pos_side}: {e}")
+        return None
+
+def adjust_margin(account, inst_id, pos_side, current_margin, target_margin, pos_size, mark_price, lever):
+    """调整保证金到目标值"""
+    try:
+        margin_diff = current_margin - target_margin
+        
+        if abs(margin_diff) < 0.5:
+            log(f"   ✓ 保证金在允许范围内: {current_margin:.2f}U (目标: {target_margin}U)")
+            return True
+        
+        if margin_diff > 0:
+            # 保证金太多，需要平掉一部分
+            excess_margin = margin_diff
+            # 计算需要平掉的张数
+            close_size = int((excess_margin * lever) / mark_price)
+            
+            if close_size < 1:
+                log(f"   ✓ 多余保证金太少({excess_margin:.2f}U)，不需要平仓")
+                return True
+            
+            log(f"   🔧 保证金过多: {current_margin:.2f}U，目标: {target_margin}U")
+            log(f"   📉 平仓 {close_size} 张以减少 {excess_margin:.2f}U 保证金")
+            
+            # 调用平仓API
+            response = requests.post('http://localhost:5000/api/anchor/close-sub-account-position',
+                                   json={
+                                       'account_name': account['account_name'],
+                                       'inst_id': inst_id,
+                                       'pos_side': pos_side,
+                                       'close_size': close_size
+                                   },
+                                   timeout=60)
+            
+            result = response.json()
+            if result.get('success'):
+                log(f"   ✅ 平仓成功，订单ID: {result.get('order_id', 'N/A')}")
+                return True
+            else:
+                log(f"   ❌ 平仓失败: {result.get('message', '未知错误')}")
+                return False
+        
+        else:
+            # 保证金太少，需要补足
+            shortage = -margin_diff
+            # 计算需要开仓的张数
+            add_size = int((shortage * lever) / mark_price)
+            
+            if add_size < 1:
+                log(f"   ✓ 缺少保证金太少({shortage:.2f}U)，不需要补仓")
+                return True
+            
+            log(f"   🔧 保证金不足: {current_margin:.2f}U，目标: {target_margin}U")
+            log(f"   📈 开仓 {add_size} 张以补足 {shortage:.2f}U 保证金")
+            
+            # 调用开仓API
+            response = requests.post('http://localhost:5000/api/anchor/open-sub-account-position',
+                                   json={
+                                       'account_name': account['account_name'],
+                                       'inst_id': inst_id,
+                                       'pos_side': pos_side,
+                                       'open_size': add_size
+                                   },
+                                   timeout=60)
+            
+            result = response.json()
+            if result.get('success'):
+                log(f"   ✅ 开仓成功，订单ID: {result.get('order_id', 'N/A')}")
+                return True
+            else:
+                log(f"   ❌ 开仓失败: {result.get('message', '未知错误')}")
+                return False
+    
+    except Exception as e:
+        log(f"   ❌ 调整保证金异常: {e}")
+        log(traceback.format_exc())
+        return False
+
+def check_and_correct(account):
+    """检查并纠正一个子账户的所有持仓"""
+    try:
+        account_name = account['account_name']
+        log(f"\n🔍 检查账户: {account_name}")
+        
+        # 获取所有持仓
+        response = requests.get('http://localhost:5000/api/anchor-system/sub-account-positions', timeout=10)
+        data = response.json()
+        
+        if not data.get('success'):
+            log(f"❌ 获取持仓失败")
+            return
+        
+        positions = [pos for pos in data['positions'] if pos['account_name'] == account_name]
+        
+        if not positions:
+            log(f"   无持仓")
+            return
+        
+        log(f"   持仓数量: {len(positions)}")
+        
+        # 逐个检查持仓
+        for pos in positions:
+            inst_id = pos['inst_id']
+            pos_side = pos['pos_side']
+            current_margin = pos['margin']
+            
+            # 获取维护次数
+            maintenance_count, record = get_maintenance_record(account_name, inst_id, pos_side)
+            
+            # 确定目标保证金
+            if maintenance_count in [0, 1]:
+                target_margin = 10.0
+                margin_range = "9.5-10.5U"
+            elif maintenance_count == 2:
+                target_margin = 20.0
+                margin_range = "19-21U"
+            else:
+                log(f"   ⚠️  {inst_id} {pos_side}: 维护次数异常({maintenance_count})，跳过")
+                continue
+            
+            log(f"\n   📊 {inst_id} {pos_side}:")
+            log(f"      维护次数: {maintenance_count}")
+            log(f"      当前保证金: {current_margin:.2f}U")
+            log(f"      目标保证金: {target_margin}U (允许范围: {margin_range})")
+            
+            # 检查是否在允许范围内
+            if maintenance_count in [0, 1]:
+                in_range = 9.5 <= current_margin <= 10.5
+            elif maintenance_count == 2:
+                in_range = 19 <= current_margin <= 21
+            else:
+                in_range = False
+            
+            if in_range:
+                log(f"      ✅ 保证金在允许范围内")
+                continue
+            
+            # 需要调整
+            log(f"      ⚠️  保证金超出范围，需要调整")
+            
+            # 获取详细持仓信息
+            position_detail = get_position(account, inst_id, pos_side)
+            if not position_detail:
+                log(f"      ❌ 无法获取详细持仓信息")
+                continue
+            
+            # 调整保证金
+            success = adjust_margin(
+                account, inst_id, pos_side,
+                current_margin, target_margin,
+                position_detail['pos_size'],
+                position_detail['mark_price'],
+                position_detail['lever']
+            )
+            
+            if success:
+                log(f"      ✅ 保证金调整完成")
+            
+            # 等待一段时间再处理下一个
+            time.sleep(2)
+    
+    except Exception as e:
+        log(f"❌ 检查纠错失败: {e}")
+        log(traceback.format_exc())
+
+def main_loop():
+    """主循环"""
+    log("🚀 子账户纠错机制启动")
+    log(f"⏱️  检查间隔: {CHECK_INTERVAL}秒")
+    log(f"📋 纠错规则:")
+    log(f"   维护次数0或1: 目标10U (允许范围9.5-10.5U)")
+    log(f"   维护次数2: 目标20U (允许范围19-21U)")
+    
+    while True:
+        try:
+            # 加载配置
+            config = load_config()
+            if not config:
+                log("⚠️  配置文件加载失败，等待下次检查")
+                time.sleep(CHECK_INTERVAL)
+                continue
+            
+            # 检查所有启用的子账户
+            for account in config['sub_accounts']:
+                if account.get('enabled'):
+                    check_and_correct(account)
+            
+            log(f"\n😴 等待 {CHECK_INTERVAL} 秒后继续检查...")
+            time.sleep(CHECK_INTERVAL)
+        
+        except KeyboardInterrupt:
+            log("\n👋 程序退出")
+            break
+        except Exception as e:
+            log(f"❌ 主循环异常: {e}")
+            log(traceback.format_exc())
+            time.sleep(60)  # 发生异常后等待1分钟
+
+if __name__ == '__main__':
+    main_loop()
