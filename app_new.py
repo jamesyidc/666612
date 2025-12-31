@@ -15468,19 +15468,21 @@ def maintain_sub_account():
         keep_size_raw = (target_margin * lever) / mark_price
         keep_size = math.floor(keep_size_raw)
         
-        # 重要：如果计算出的keep_size大于0但被向下取整成0，至少保留1张
-        if keep_size_raw > 0 and keep_size == 0:
-            keep_size = 1
-            print(f"⚠️  keep_size计算为 {keep_size_raw:.2f}，向下取整为0，强制保留1张")
+        # 🔴 重要：确保保留的仓位对应的保证金不小于0.6U（OKEx最小保证金要求）
+        MIN_MARGIN = 0.6  # 最小保证金0.6U
+        min_keep_size = math.ceil((MIN_MARGIN * lever) / mark_price)
         
-        # 如果order_size == keep_size，不需要平仓
-        if order_size == keep_size:
+        if keep_size < min_keep_size:
+            old_keep_size = keep_size
+            keep_size = min_keep_size
+            print(f"⚠️  keep_size计算为 {keep_size_raw:.2f}（{old_keep_size} 张），但为满足最小保证金0.6U要求，强制保留 {keep_size} 张")
+        
+        # 如果order_size <= keep_size，不需要平仓
+        if order_size <= keep_size:
             close_size = 0
-            print(f"⚠️  order_size ({order_size}) == keep_size ({keep_size})，跳过第3步平仓")
+            print(f"⚠️  order_size ({order_size}) <= keep_size ({keep_size})，跳过第3步平仓")
         else:
             close_size = order_size - keep_size
-            if close_size < 0:
-                close_size = 0  # 如果计算出负数，不平仓
         
         # ========== 第1步：平掉旧持仓（释放保证金）==========
         old_close_order_id = None
