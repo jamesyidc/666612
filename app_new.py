@@ -15673,9 +15673,9 @@ def open_sub_account_position():
             'traceback': traceback.format_exc()
         })
 
-@app.route('/api/anchor/reset-sub-maintenance-count', methods=['POST'])
-def reset_sub_maintenance_count():
-    """清零子账户今日维护次数（新API）"""
+@app.route('/api/sub-account/reset-maintenance-count', methods=['POST'])
+def reset_sub_account_maintenance_count():
+    """清零子账户今日维护次数"""
     try:
         import json as json_lib
         from datetime import datetime
