@@ -283,12 +283,23 @@ def check_and_maintain():
             
             # 检查1：收益率是否达到维护阈值
             should_maintain = False
-            if pos_side == 'long' and auto_maintain_long and profit_rate <= loss_threshold:
-                log(f"⚠️  多单收益率达到阈值: {profit_rate:.2f}% <= {loss_threshold}%")
-                should_maintain = True
-            elif pos_side == 'short' and auto_maintain_short and profit_rate <= loss_threshold:
-                log(f"⚠️  空单收益率达到阈值: {profit_rate:.2f}% <= {loss_threshold}%")
-                should_maintain = True
+            prepare_maintain = False  # 准备维护状态
+            
+            # 判断是否需要准备维护（-8%）或立即维护（-10%）
+            if pos_side == 'long' and auto_maintain_long:
+                if profit_rate <= loss_threshold:  # <= -10%
+                    log(f"⚠️  多单收益率达到维护阈值: {profit_rate:.2f}% <= {loss_threshold}%")
+                    should_maintain = True
+                elif profit_rate <= -8:  # <= -8%
+                    log(f"📢 多单收益率达到准备维护阈值: {profit_rate:.2f}% <= -8%")
+                    prepare_maintain = True
+            elif pos_side == 'short' and auto_maintain_short:
+                if profit_rate <= loss_threshold:  # <= -10%
+                    log(f"⚠️  空单收益率达到维护阈值: {profit_rate:.2f}% <= {loss_threshold}%")
+                    should_maintain = True
+                elif profit_rate <= -8:  # <= -8%
+                    log(f"📢 空单收益率达到准备维护阈值: {profit_rate:.2f}% <= -8%")
+                    prepare_maintain = True
             
             if should_maintain:
                 # 获取今天的总维护次数（包括普通维护和超级维护）

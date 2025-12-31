@@ -545,11 +545,19 @@ def import_to_database(data, content):
                 log(f"   ❌ 数据库操作失败: {e}")
                 import traceback
                 log(f"   错误详情: {traceback.format_exc()}")
+                try:
+                    conn.close()
+                except:
+                    pass
                 return False
         except Exception as e:
             log(f"   ❌ 数据库操作失败: {e}")
             import traceback
             log(f"   错误详情: {traceback.format_exc()}")
+            try:
+                conn.close()
+            except:
+                pass
             return False
     
     # 如果所有重试都失败

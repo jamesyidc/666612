@@ -231,11 +231,21 @@ def main_loop():
                 
                 log(f"  检查 {inst_id} {pos_side}: 收益率 {profit_rate:.2f}%")
                 
-                # 检查是否触发维护条件
-                if profit_rate <= TRIGGER_RATE:
+                # 检查是否触发准备维护或立即维护
+                should_maintain = False
+                prepare_maintain = False
+                
+                if profit_rate <= TRIGGER_RATE:  # <= -10%
+                    should_maintain = True
+                    log(f"    ⚠️  收益率跌破维护阈值{TRIGGER_RATE}%")
+                elif profit_rate <= -8:  # <= -8%
+                    prepare_maintain = True
+                    log(f"    📢 收益率跌破准备维护阈值-8%")
+                
+                if should_maintain:
                     # 获取今日维护次数
                     count = get_maintenance_count(account_name, inst_id, pos_side)
-                    log(f"    ⚠️ 收益率跌破{TRIGGER_RATE}%，今日维护{count}/{MAX_MAINTENANCE_COUNT}次")
+                    log(f"    今日维护{count}/{MAX_MAINTENANCE_COUNT}次")
                     
                     # 检查是否达到上限
                     if count >= MAX_MAINTENANCE_COUNT:
