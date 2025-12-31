@@ -15454,6 +15454,128 @@ def maintain_sub_account():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor/close-sub-account-position', methods=['POST'])
+def close_sub_account_position():
+    """子账户平仓：部分或全部平仓"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        
+        data = request.json
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        close_size = float(data.get('close_size', 0))
+        reason = data.get('reason', '手动平仓')
+        
+        if not all([account_name, inst_id, pos_side, close_size]):
+            return jsonify({
+                'success': False,
+                'message': '缺少必要参数'
+            })
+        
+        # 读取子账户配置
+        with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+            config = json_lib.load(f)
+        
+        # 查找对应的子账户
+        sub_account = None
+        for acc in config.get('sub_accounts', []):
+            if acc['account_name'] == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({
+                'success': False,
+                'message': f'未找到子账户: {account_name}'
+            })
+        
+        api_key = sub_account['api_key']
+        secret_key = sub_account['secret_key']
+        passphrase = sub_account['passphrase']
+        
+        # OKEx API签名函数
+        def generate_signature(timestamp, method, request_path, body=''):
+            if body:
+                body = json_lib.dumps(body)
+            message = timestamp + method + request_path + body
+            mac = hmac.new(
+                bytes(secret_key, encoding='utf8'),
+                bytes(message, encoding='utf-8'),
+                digestmod=hashlib.sha256
+            )
+            return base64.b64encode(mac.digest()).decode()
+        
+        def get_headers(method, request_path, body=''):
+            timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            sign = generate_signature(timestamp, method, request_path, body)
+            return {
+                'OK-ACCESS-KEY': api_key,
+                'OK-ACCESS-SIGN': sign,
+                'OK-ACCESS-TIMESTAMP': timestamp,
+                'OK-ACCESS-PASSPHRASE': passphrase,
+                'Content-Type': 'application/json'
+            }
+        
+        # 执行平仓
+        OKEX_REST_URL = 'https://www.okx.com'
+        order_path = '/api/v5/trade/order'
+        
+        # 确定平仓方向
+        close_side = 'buy' if pos_side == 'short' else 'sell'
+        
+        close_order_body = {
+            'instId': inst_id,
+            'tdMode': 'isolated',
+            'side': close_side,
+            'posSide': pos_side,
+            'ordType': 'market',
+            'sz': str(int(close_size))
+        }
+        
+        print(f"🎯 子账户平仓: {account_name} {inst_id} {pos_side} {close_size}")
+        print(f"   原因: {reason}")
+        
+        headers = get_headers('POST', order_path, close_order_body)
+        close_response = requests.post(
+            OKEX_REST_URL + order_path,
+            headers=headers,
+            json=close_order_body,
+            timeout=10
+        )
+        close_data = close_response.json()
+        
+        if close_data.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f'平仓失败: {close_data.get("msg")}',
+                'error_code': close_data.get('code')
+            })
+        
+        order_id = close_data['data'][0]['ordId']
+        print(f"✅ 平仓订单提交成功: {order_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': '平仓成功',
+            'order_id': order_id,
+            'close_size': int(close_size),
+            'reason': reason
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'平仓失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/anchor/open-sub-account-position', methods=['POST'])
 def open_sub_account_position():
     """子账户开仓：按指定金额开仓"""
