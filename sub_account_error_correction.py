@@ -120,7 +120,7 @@ def get_position(account, inst_id, pos_side):
         return None
 
 def adjust_margin(account, inst_id, pos_side, current_margin, target_margin, pos_size, mark_price, lever):
-    """调整保证金到目标值"""
+    """调整保证金到目标值（逐仓模式）"""
     try:
         margin_diff = current_margin - target_margin
         
@@ -128,67 +128,78 @@ def adjust_margin(account, inst_id, pos_side, current_margin, target_margin, pos
             log(f"   ✓ 保证金在允许范围内: {current_margin:.2f}U (目标: {target_margin}U)")
             return True
         
+        # 在逐仓模式下，调整保证金需要使用 position/margin-balance API
+        path = '/api/v5/account/position/margin-balance'
+        
         if margin_diff > 0:
-            # 保证金太多，需要平掉一部分
-            excess_margin = margin_diff
-            # 计算需要平掉的张数
-            close_size = int((excess_margin * lever) / mark_price)
+            # 保证金过多，需要转出
+            # 计算安全可转出金额：需要考虑维持保证金和安全缓冲
+            notional = pos_size * mark_price  # 持仓名义价值
+            maintenance_margin = notional * 0.004  # 维持保证金率约0.4%（根据具体币种可能不同）
+            safety_buffer = 1.5  # 1.5U安全缓冲
             
-            if close_size < 1:
-                log(f"   ✓ 多余保证金太少({excess_margin:.2f}U)，不需要平仓")
-                return True
+            # 转出后必须保留：维持保证金 + 安全缓冲
+            min_required_margin = maintenance_margin + safety_buffer
+            
+            # 最大可转出 = 当前保证金 - 最小需要保证金
+            max_transferable = current_margin - min_required_margin
+            
+            log(f"   💡 当前保证金: {current_margin:.2f}U")
+            log(f"   💡 持仓名义价值: {notional:.2f}U")
+            log(f"   💡 维持保证金: {maintenance_margin:.4f}U")
+            log(f"   💡 最小需要: {min_required_margin:.2f}U")
+            log(f"   💡 最大可转出: {max_transferable:.2f}U")
+            
+            if max_transferable <= 0:
+                log(f"   ⚠️ 当前无可转出保证金，跳过调整")
+                return False
+            
+            # 选择较小的：要转出的金额 vs 最大可转出金额
+            # 但为了避免OKEx 59301错误，每次最多转出5U
+            ideal_reduce = min(margin_diff, max_transferable)
+            reduce_amount = min(ideal_reduce, 5.0)  # 每次最多5U
             
             log(f"   🔧 保证金过多: {current_margin:.2f}U，目标: {target_margin}U")
-            log(f"   📉 平仓 {close_size} 张以减少 {excess_margin:.2f}U 保证金")
+            log(f"   💡 理想转出: {ideal_reduce:.2f}U，实际转出: {reduce_amount:.2f}U (限制5U/次)")
+            log(f"   📤 转出 {reduce_amount:.2f}U 保证金")
             
-            # 调用平仓API
-            response = requests.post('http://localhost:5000/api/anchor/close-sub-account-position',
-                                   json={
-                                       'account_name': account['account_name'],
-                                       'inst_id': inst_id,
-                                       'pos_side': pos_side,
-                                       'close_size': close_size
-                                   },
-                                   timeout=60)
-            
-            result = response.json()
-            if result.get('success'):
-                log(f"   ✅ 平仓成功，订单ID: {result.get('order_id', 'N/A')}")
-                return True
-            else:
-                log(f"   ❌ 平仓失败: {result.get('message', '未知错误')}")
-                return False
-        
+            body = {
+                'instId': inst_id,
+                'posSide': pos_side,
+                'type': 'reduce',  # 减少保证金
+                'amt': str(round(reduce_amount, 4)),  # 保留4位小数
+                'ccy': 'USDT'
+            }
         else:
-            # 保证金太少，需要补足
-            shortage = -margin_diff
-            # 计算需要开仓的张数
-            add_size = int((shortage * lever) / mark_price)
-            
-            if add_size < 1:
-                log(f"   ✓ 缺少保证金太少({shortage:.2f}U)，不需要补仓")
-                return True
+            # 保证金不足，需要转入
+            add_amount = -margin_diff
             
             log(f"   🔧 保证金不足: {current_margin:.2f}U，目标: {target_margin}U")
-            log(f"   📈 开仓 {add_size} 张以补足 {shortage:.2f}U 保证金")
+            log(f"   📥 转入 {add_amount:.2f}U 保证金")
             
-            # 调用开仓API
-            response = requests.post('http://localhost:5000/api/anchor/open-sub-account-position',
-                                   json={
-                                       'account_name': account['account_name'],
-                                       'inst_id': inst_id,
-                                       'pos_side': pos_side,
-                                       'open_size': add_size
-                                   },
-                                   timeout=60)
-            
-            result = response.json()
-            if result.get('success'):
-                log(f"   ✅ 开仓成功，订单ID: {result.get('order_id', 'N/A')}")
-                return True
-            else:
-                log(f"   ❌ 开仓失败: {result.get('message', '未知错误')}")
-                return False
+            body = {
+                'instId': inst_id,
+                'posSide': pos_side,
+                'type': 'add',  # 增加保证金
+                'amt': str(round(add_amount, 2)),
+                'ccy': 'USDT'
+            }
+        
+        # 调用OKEx API
+        headers = get_headers('POST', path, body, 
+                            account['api_key'], account['secret_key'], account['passphrase'])
+        
+        response = requests.post(OKEX_REST_URL + path, headers=headers, json=body, timeout=10)
+        result = response.json()
+        
+        if result.get('code') == '0':
+            log(f"   ✅ 保证金调整成功")
+            return True
+        else:
+            log(f"   ❌ 保证金调整失败: {result.get('msg', '未知错误')}")
+            log(f"   错误码: {result.get('code')}")
+            log(f"   完整响应: {result}")
+            return False
     
     except Exception as e:
         log(f"   ❌ 调整保证金异常: {e}")
