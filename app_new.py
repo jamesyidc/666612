@@ -6398,16 +6398,23 @@ def api_support_resistance_latest():
         ''')
         
         snapshot_row = cursor.fetchone()
-        if not snapshot_row:
-            conn.close()
-            return jsonify({
-                'success': False,
-                'message': 'No snapshot data available'
-            })
         
         import json
         
-        update_time = snapshot_row['snapshot_time']
+        # 获取实时数据的最新更新时间（不依赖快照）
+        cursor.execute('''
+            SELECT MAX(record_time) as latest_time
+            FROM support_resistance_levels
+        ''')
+        latest_row = cursor.fetchone()
+        update_time = latest_row['latest_time'] if latest_row and latest_row['latest_time'] else None
+        
+        if not update_time:
+            conn.close()
+            return jsonify({
+                'success': False,
+                'message': 'No data available'
+            })
         
         # 获取所有监控的币种（27个）
         MONITORED_SYMBOLS = [
@@ -6442,54 +6449,55 @@ def api_support_resistance_latest():
         
         # 解析4种情况的币种数据，构建alert字典
         alert_dict = {}
-        for scenario_num in range(1, 5):
-            coins_json = snapshot_row[f'scenario_{scenario_num}_coins']
-            if coins_json:
-                try:
-                    coins = json.loads(coins_json)
-                    for coin in coins:
-                        symbol = coin['symbol']
-                        if symbol not in alert_dict:
-                            alert_dict[symbol] = {
-                                'support_1': 0,
-                                'support_2': 0,
-                                'resistance_1': 0,
-                                'resistance_2': 0,
-                                'position_s2_r1': None,
-                                'position_s1_r2': None,
-                                'position_s1_r2_upper': None,
-                                'position_s1_r1': None,
-                                'alert_scenario_1': False,
-                                'alert_scenario_2': False,
-                                'alert_scenario_3': False,
-                                'alert_scenario_4': False
-                            }
-                        
-                        # 从当前币种数据中更新支撑/压力线值（合并所有场景的数据）
-                        if 'support_1' in coin and coin['support_1']:
-                            alert_dict[symbol]['support_1'] = coin['support_1']
-                        if 'support_2' in coin and coin['support_2']:
-                            alert_dict[symbol]['support_2'] = coin['support_2']
-                        if 'resistance_1' in coin and coin['resistance_1']:
-                            alert_dict[symbol]['resistance_1'] = coin['resistance_1']
-                        if 'resistance_2' in coin and coin['resistance_2']:
-                            alert_dict[symbol]['resistance_2'] = coin['resistance_2']
-                        
-                        # 设置对应情况的alert和position
-                        if scenario_num == 1:
-                            alert_dict[symbol]['alert_scenario_1'] = True
-                            alert_dict[symbol]['position_s2_r1'] = coin.get('position', 0)
-                        elif scenario_num == 2:
-                            alert_dict[symbol]['alert_scenario_2'] = True
-                            alert_dict[symbol]['position_s1_r2'] = coin.get('position', 0)
-                        elif scenario_num == 3:
-                            alert_dict[symbol]['alert_scenario_3'] = True
-                            alert_dict[symbol]['position_s1_r2_upper'] = coin.get('position', 0)
-                        elif scenario_num == 4:
-                            alert_dict[symbol]['alert_scenario_4'] = True
-                            alert_dict[symbol]['position_s1_r1'] = coin.get('position', 0)
-                except:
-                    pass
+        if snapshot_row:  # 只有当快照存在时才解析
+            for scenario_num in range(1, 5):
+                coins_json = snapshot_row[f'scenario_{scenario_num}_coins']
+                if coins_json:
+                    try:
+                        coins = json.loads(coins_json)
+                        for coin in coins:
+                            symbol = coin['symbol']
+                            if symbol not in alert_dict:
+                                alert_dict[symbol] = {
+                                    'support_1': 0,
+                                    'support_2': 0,
+                                    'resistance_1': 0,
+                                    'resistance_2': 0,
+                                    'position_s2_r1': None,
+                                    'position_s1_r2': None,
+                                    'position_s1_r2_upper': None,
+                                    'position_s1_r1': None,
+                                    'alert_scenario_1': False,
+                                    'alert_scenario_2': False,
+                                    'alert_scenario_3': False,
+                                    'alert_scenario_4': False
+                                }
+                            
+                            # 从当前币种数据中更新支撑/压力线值（合并所有场景的数据）
+                            if 'support_1' in coin and coin['support_1']:
+                                alert_dict[symbol]['support_1'] = coin['support_1']
+                            if 'support_2' in coin and coin['support_2']:
+                                alert_dict[symbol]['support_2'] = coin['support_2']
+                            if 'resistance_1' in coin and coin['resistance_1']:
+                                alert_dict[symbol]['resistance_1'] = coin['resistance_1']
+                            if 'resistance_2' in coin and coin['resistance_2']:
+                                alert_dict[symbol]['resistance_2'] = coin['resistance_2']
+                            
+                            # 设置对应情况的alert和position
+                            if scenario_num == 1:
+                                alert_dict[symbol]['alert_scenario_1'] = True
+                                alert_dict[symbol]['position_s2_r1'] = coin.get('position', 0)
+                            elif scenario_num == 2:
+                                alert_dict[symbol]['alert_scenario_2'] = True
+                                alert_dict[symbol]['position_s1_r2'] = coin.get('position', 0)
+                            elif scenario_num == 3:
+                                alert_dict[symbol]['alert_scenario_3'] = True
+                                alert_dict[symbol]['position_s1_r2_upper'] = coin.get('position', 0)
+                            elif scenario_num == 4:
+                                alert_dict[symbol]['alert_scenario_4'] = True
+                                alert_dict[symbol]['position_s1_r1'] = coin.get('position', 0)
+                    except:
+                        pass
         
         # 获取所有币种的支撑/压力线数据（从support_resistance_levels表）
         # 将币种格式从 'BTC-USDT-SWAP' 转换为 'BTCUSDT'
