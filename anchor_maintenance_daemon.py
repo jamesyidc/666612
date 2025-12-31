@@ -25,6 +25,9 @@ ANCHOR_DB = '/home/user/webapp/anchor_system.db'
 # 可选值: 'paper' (模拟交易) 或 'live' (实盘交易)
 TRADE_MODE = 'paper'  # 默认使用模拟交易（模拟盘）
 
+# 最小底仓保护配置
+MIN_KEEP_MARGIN = 0.6  # 平仓时必须保留的最小保证金（USDT），防止锚点单被完全平掉
+
 class AnchorMaintenanceDaemon:
     """锚点单自动维护守护进程"""
     
@@ -39,7 +42,7 @@ class AnchorMaintenanceDaemon:
         print(f"📊 检查间隔: {self.check_interval}秒")
         print(f"🎯 触发条件: 亏损 ≥ 10%")
         print(f"💰 补仓倍数: 10倍")
-        print(f"📉 平仓策略: 保留≤2U保证金")
+        print(f"📉 平仓策略: 保留≥{MIN_KEEP_MARGIN}U保证金（底仓保护）")
         print("=" * 60)
     
     def get_anchor_positions(self) -> List[Dict]:
@@ -297,15 +300,23 @@ class AnchorMaintenanceDaemon:
             add_id = cursor.lastrowid
             print(f"  1️⃣  补仓记录 #{add_id}: {add_size:.4f} @ {current_price:.4f}")
             
-            # 2. 记录平仓（保留不超过2U）
+            # 2. 记录平仓（保留≥0.6U底仓）
             # 计算平仓数量：补仓后总量 = 原持仓 + 10倍补仓 = 11倍原持仓
-            # 保留不超过2U保证金对应的持仓量
+            # 保留至少0.6U保证金对应的持仓量，防止锚点单被完全平掉
             total_after_add = open_size * 11  # 补仓后总量
             total_margin_after_add = total_after_add * current_price / 10  # 10x杠杆，总保证金
             
-            # 计算保留量：目标2U，但不超过总保证金
-            target_remaining_margin = min(2.0, total_margin_after_add)  # 目标保留2U，但不超过总额
+            # 计算保留量：目标MIN_KEEP_MARGIN (0.6U)，但不超过总保证金
+            # 重要：必须保留至少0.6U，即使总保证金很小也要保留
+            target_remaining_margin = max(MIN_KEEP_MARGIN, min(2.0, total_margin_after_add))
             remain_size = (target_remaining_margin * 10) / current_price  # 保证金在10x杠杆下对应的持仓量
+            
+            # 安全检查：确保保留量不会超过总量
+            if remain_size >= total_after_add:
+                print(f"  ⚠️  警告: 保留量({remain_size:.4f})≥总量({total_after_add:.4f})，跳过平仓")
+                conn.rollback()
+                conn.close()
+                return True
             
             # 平仓数量 = 总量 - 保留量
             close_size = total_after_add - remain_size
@@ -327,7 +338,7 @@ class AnchorMaintenanceDaemon:
                 pos_side,
                 close_size,
                 current_price,
-                f"维护平仓保留≤2U (亏损{maintenance['profit_rate']:.2f}%触发)",
+                f"维护平仓保留≥{MIN_KEEP_MARGIN}U底仓 (亏损{maintenance['profit_rate']:.2f}%触发)",
                 maintenance['profit_rate'],
                 0.0,  # 未实现盈亏待计算
                 now
@@ -428,7 +439,7 @@ class AnchorMaintenanceDaemon:
                 remain_size,
                 remain_size * current_price / 10,
                 f"亏损{maintenance['profit_rate']:.2f}%触发维护",
-                f"平仓{close_percent:.1f}%：{total_after_add:.4f} 张中平掉 {close_size:.4f} 张，保留≤2U ≈ {remain_size:.4f} 张（实际 {remain_size * current_price / 10:.2f}U）；维护后平均价格：{average_price:.4f}（原价{open_price:.4f}）",
+                f"平仓{close_percent:.1f}%：{total_after_add:.4f} 张中平掉 {close_size:.4f} 张，保留≥{MIN_KEEP_MARGIN}U底仓 ≈ {remain_size:.4f} 张（实际 {remain_size * current_price / 10:.2f}U）；维护后平均价格：{average_price:.4f}（原价{open_price:.4f}）",
                 'executed',
                 now,
                 now

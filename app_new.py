@@ -15470,6 +15470,7 @@ def close_sub_account_position():
         import hashlib
         import json as json_lib
         from datetime import datetime, timezone
+        from position_close_guard import validate_close_request, MIN_KEEP_MARGIN
         
         data = request.json
         account_name = data.get('account_name')
@@ -15528,8 +15529,55 @@ def close_sub_account_position():
                 'Content-Type': 'application/json'
             }
         
-        # 执行平仓
+        # OKEx API URL
         OKEX_REST_URL = 'https://www.okx.com'
+        
+        # 🛡️ 底仓保护：获取当前持仓信息
+        positions_path = '/api/v5/account/positions'
+        positions_params = f'?instType=SWAP&instId={inst_id}'
+        positions_headers = get_headers('GET', positions_path + positions_params)
+        positions_response = requests.get(
+            OKEX_REST_URL + positions_path + positions_params,
+            headers=positions_headers,
+            timeout=10
+        )
+        positions_data = positions_response.json()
+        
+        if positions_data.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f'获取持仓信息失败: {positions_data.get("msg")}'
+            })
+        
+        # 查找对应的持仓
+        current_position = None
+        for pos in positions_data.get('data', []):
+            if pos['instId'] == inst_id and pos['posSide'] == pos_side:
+                current_position = pos
+                break
+        
+        if not current_position:
+            return jsonify({
+                'success': False,
+                'message': f'未找到持仓: {inst_id} {pos_side}'
+            })
+        
+        # 提取持仓信息
+        pos_size = abs(float(current_position['pos']))
+        mark_price = float(current_position['markPx'])
+        leverage = float(current_position['lever'])
+        
+        # 🛡️ 底仓保护验证
+        is_safe, adjusted_close_size, warning_msg = validate_close_request(
+            pos_size, close_size, mark_price, leverage, MIN_KEEP_MARGIN
+        )
+        
+        if not is_safe:
+            print(f"⚠️  {warning_msg}")
+            close_size = adjusted_close_size
+            reason = f"{reason} (底仓保护自动调整)"
+        
+        # 执行平仓
         order_path = '/api/v5/trade/order'
         
         # 确定平仓方向

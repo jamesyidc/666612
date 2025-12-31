@@ -12,7 +12,9 @@
       "check_add_position": true,
       "add_position_trigger": -10.0,
       "min_amount_handling": "dynamic",
-      "prevent_duplicate_minutes": 5
+      "prevent_duplicate_minutes": 5,
+      "min_keep_margin": 0.6,
+      "min_keep_margin_description": "平仓时必须保留的最小保证金（USDT），防止锚点单被完全平掉"
     },
     "target_coins": [
       "CFX",
