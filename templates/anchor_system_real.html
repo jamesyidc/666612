@@ -682,7 +682,7 @@
                 <div class="card-title">
                     <span>💼</span>
                     当前持仓情况
-                    <span id="positionStats" style="margin-left: 15px; font-size: 14px; font-weight: normal; color: #718096;">
+                    <span id="positionStats" style="margin-left: 15px; font-size: 16px; font-weight: 600; color: #4299e1;">
                         <!-- 统计信息将在这里动态显示 -->
                     </span>
                 </div>
@@ -1417,8 +1417,23 @@
                 return;
             }
 
-            // 统计做空持仓各盈利级别
+            // 统计持仓总数
+            const longPositions = data.filter(item => item.pos_side === 'long');
             const shortPositions = data.filter(item => item.pos_side === 'short');
+            const totalCount = data.length;
+            const longCount = longPositions.length;
+            const shortCount = shortPositions.length;
+            
+            // 更新持仓统计显示
+            let statsColor = totalCount < 22 ? '#f56565' : '#48bb78';  // 少于22个用红色，否则用绿色
+            let warningIcon = totalCount < 22 ? '⚠️ ' : '';
+            statsDiv.innerHTML = `
+                ${warningIcon}总计: <span style="color: ${statsColor}; font-weight: 700;">${totalCount}</span> 个
+                <span style="margin-left: 10px; color: #48bb78;">多单: ${longCount}</span>
+                <span style="margin-left: 10px; color: #f56565;">空单: ${shortCount}</span>
+            `;
+
+            // 统计做空持仓各盈利级别
             const profit70 = shortPositions.filter(item => item.profit_rate >= 70).length;
             const profit60 = shortPositions.filter(item => item.profit_rate >= 60).length;
             const profit50 = shortPositions.filter(item => item.profit_rate >= 50).length;
