@@ -13046,17 +13046,20 @@ def get_sub_account_positions():
                                 mark_px = float(pos.get('markPx') or 0)
                                 upl = float(pos.get('upl') or 0)
                                 notional_usd = float(pos.get('notionalUsd') or 0)
-                                # 优先使用 imr（初始保证金），如果为空则尝试 margin
-                                margin = float(pos.get('imr') or pos.get('margin') or 0)
+                                # 打印原始字段值
+                                print(f"🔍 原始数据 - imr: {pos.get('imr')}, margin: {pos.get('margin')}, mgnRatio: {pos.get('mgnRatio')}")
+                                # 优先使用 margin（占用保证金），而不是 imr（初始保证金）
+                                margin = float(pos.get('margin') or pos.get('imr') or 0)
+                                print(f"💰 最终使用的保证金: {margin}")
                             except Exception as e:
                                 print(f"⚠️ 数据转换失败: {e}, pos={pos}")
                                 continue
                             
                             leverage = pos.get('lever', '10')
                             
-                            # 计算盈亏率
-                            if notional_usd != 0:
-                                profit_rate = (upl / abs(notional_usd)) * 100
+                            # 计算盈亏率（相对于保证金，反映真实杠杆收益率）
+                            if margin > 0:
+                                profit_rate = (upl / margin) * 100
                             else:
                                 profit_rate = 0
                             
