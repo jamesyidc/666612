@@ -16450,13 +16450,16 @@ def get_decline_strength():
                     'upl': float(pos.get('upl', 0))
                 })
         
-        # 计算各盈利区间的空单数量
+        # 计算各盈利区间的空单数量（新增100%、90%、80%统计）
+        count_100 = len([p for p in short_profits if p['profit_rate'] >= 100])
+        count_90 = len([p for p in short_profits if p['profit_rate'] >= 90])
+        count_80 = len([p for p in short_profits if p['profit_rate'] >= 80])
         count_70 = len([p for p in short_profits if p['profit_rate'] >= 70])
         count_60 = len([p for p in short_profits if p['profit_rate'] >= 60])
         count_50 = len([p for p in short_profits if p['profit_rate'] >= 50])
         count_40 = len([p for p in short_profits if p['profit_rate'] >= 40])
         
-        # 判断下跌强度
+        # 判断下跌等级（新的5级规则）
         strength_level = 0
         strength_name = ''
         buy_suggestion = ''
@@ -16464,33 +16467,46 @@ def get_decline_strength():
         
         # 没有空单的情况
         if len(short_profits) == 0:
-            strength_name = '无空单持仓'
-            buy_suggestion = '市场上涨或震荡，暂无下跌信号'
+            strength_level = 0
+            strength_name = '市场正常'
+            buy_suggestion = '暂无明显下跌信号'
             color_class = 'strength-0'
-        # 下跌强度1级（最弱）
-        elif count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 <= 3:
-            strength_level = 1
-            strength_name = '下跌强度1级'
-            buy_suggestion = '多单买入点在50%'
-            color_class = 'strength-1'
-        # 下跌强度2级（中等）
-        elif count_70 == 0 and count_60 <= 1 and count_50 <= 4 and count_40 <= 5:
-            strength_level = 2
-            strength_name = '下跌强度2级'
-            buy_suggestion = '多单买入点在60%'
-            color_class = 'strength-2'
-        # 下跌强度3级（最强）
-        elif count_70 <= 2 and count_60 <= 5 and count_50 <= 8 and count_40 <= 11:
-            strength_level = 3
-            strength_name = '下跌强度3级'
-            buy_suggestion = '多单买入点在70-80%'
-            color_class = 'strength-3'
-        # 超出范围（极端下跌）
-        else:
+        # 下跌等级5：极端下跌
+        elif count_100 >= 1:
+            strength_level = 5
+            strength_name = '下跌等级5 - 极端下跌'
+            buy_suggestion = '交易对的空仓盈利要大于100%'
+            color_class = 'strength-5'
+        # 下跌等级4：超高强度下跌
+        elif count_100 == 0 and count_90 >= 1 and count_80 >= 1:
             strength_level = 4
-            strength_name = '极端下跌'
-            buy_suggestion = '市场极度恐慌，谨慎操作'
+            strength_name = '下跌等级4 - 超高强度下跌'
+            buy_suggestion = '交易对的空仓盈利要大于90%'
             color_class = 'strength-4'
+        # 下跌等级3：高强度下跌
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 >= 1 and count_60 >= 2:
+            strength_level = 3
+            strength_name = '下跌等级3 - 高强度下跌'
+            buy_suggestion = '交易对的空仓盈利要大于70%'
+            color_class = 'strength-3'
+        # 下跌等级2：中等强度下跌
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 >= 2:
+            strength_level = 2
+            strength_name = '下跌等级2 - 中等强度下跌'
+            buy_suggestion = '交易对的空仓盈利要大于60%'
+            color_class = 'strength-2'
+        # 下跌等级1：轻微下跌
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 >= 3:
+            strength_level = 1
+            strength_name = '下跌等级1 - 轻微下跌'
+            buy_suggestion = '交易对的空仓盈利要大于40%'
+            color_class = 'strength-1'
+        # 不满足任何条件
+        else:
+            strength_level = 0
+            strength_name = '市场正常'
+            buy_suggestion = '暂无明显下跌信号'
+            color_class = 'strength-0'
         
         return jsonify({
             'success': True,
@@ -16501,6 +16517,9 @@ def get_decline_strength():
                 'color_class': color_class,
                 'statistics': {
                     'total_shorts': len(short_profits),
+                    'profit_100': count_100,
+                    'profit_90': count_90,
+                    'profit_80': count_80,
                     'profit_70': count_70,
                     'profit_60': count_60,
                     'profit_50': count_50,
