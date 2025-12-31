@@ -757,7 +757,7 @@
                         </tr>
                     </thead>
                     <tbody id="subAccountPositionBody">
-                        <tr><td colspan="15" class="loading">加载中...</td></tr>
+                        <tr><td colspan="16" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1479,7 +1479,7 @@
                     <td style="text-align: center;">
                         ${(item.maintenance_count_today || 0) > 0 ? `
                             <button class="btn-reset-maintenance-sub" 
-                                    onclick="resetSubMaintenanceCount('${item.account_name}', '${item.inst_id}', '${item.pos_side}')"
+                                    onclick="resetSubAccountMaintenance('${item.account_name}', '${item.inst_id}', '${item.pos_side}')"
                                     title="清零今日维护次数"
                                     style="background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
                                            color: white;
@@ -2439,7 +2439,7 @@ ${closeDetails}
         }
         
         // 子账户清零函数
-        async function resetSubMaintenanceCount(accountName, instId, posSide) {
+        async function resetSubAccountMaintenance(accountName, instId, posSide) {
             try {
                 if (!confirm(`确认清零子账户今日维护次数？\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${posSide === 'short' ? '做空' : '做多'}\n\n清零后今日维护次数将重置为0`)) {
                     return;
