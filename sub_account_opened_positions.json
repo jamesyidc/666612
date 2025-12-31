@@ -67,5 +67,11 @@
     "inst_id": "DOT-USDT-SWAP",
     "pos_side": "long",
     "opened_at": "2025-12-31 16:25:11"
+  },
+  "Wu666666:STX-USDT-SWAP:long": {
+    "account_name": "Wu666666",
+    "inst_id": "STX-USDT-SWAP",
+    "pos_side": "long",
+    "opened_at": "2025-12-31 18:45:40"
   }
 }
