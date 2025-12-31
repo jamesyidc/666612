@@ -13054,13 +13054,21 @@ def get_sub_account_positions():
                                 print(f"⚠️ 数据转换失败: {e}, pos={pos}")
                                 continue
                             
-                            leverage = pos.get('lever', '10')
+                            leverage = float(pos.get('lever') or 10)  # 确保leverage是float类型
+                            pos_side = pos.get('posSide')
                             
-                            # 计算盈亏率（相对于保证金，反映真实杠杆收益率）
-                            if margin > 0:
-                                profit_rate = (upl / margin) * 100
+                            # ✅ 使用实时价格计算收益率（与前端一致）
+                            if avg_px > 0 and mark_px > 0:
+                                if pos_side == 'long':
+                                    # 多单：(当前价 - 开仓价) / 开仓价 * 杠杆 * 100
+                                    profit_rate = (mark_px - avg_px) / avg_px * leverage * 100
+                                else:  # short
+                                    # 空单：(开仓价 - 当前价) / 开仓价 * 杠杆 * 100
+                                    profit_rate = (avg_px - mark_px) / avg_px * leverage * 100
+                                print(f"📊 收益率计算: {pos['instId']} {pos_side}, 开仓价={avg_px:.4f}, 标记价={mark_px:.4f}, 杠杆={leverage}x, 收益率={profit_rate:.2f}%")
                             else:
                                 profit_rate = 0
+                                print(f"⚠️ {pos['instId']} 价格数据异常，收益率设为0")
                             
                             # 获取维护次数
                             maintenance_count = 0

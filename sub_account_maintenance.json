@@ -22,8 +22,8 @@
     "last_maintenance": "2026-01-01 00:36:36"
   },
   "Wu666666_AAVE-USDT-SWAP_long": {
-    "count": 0,
-    "last_maintenance": "2026-01-01 00:36:36"
+    "count": 1,
+    "last_maintenance": "2026-01-01 01:24:40"
   },
   "Wu666666_LDO-USDT-SWAP_long": {
     "count": 2,
@@ -40,5 +40,9 @@
   "Wu666666_CFX-USDT-SWAP_long": {
     "count": 1,
     "last_maintenance": "2026-01-01 00:51:28"
+  },
+  "Wu666666_FIL-USDT-SWAP_long": {
+    "count": 1,
+    "last_maintenance": "2026-01-01 01:25:04"
   }
 }
