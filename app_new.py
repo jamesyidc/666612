@@ -15441,6 +15441,238 @@ def maintain_sub_account():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor/open-sub-account-position', methods=['POST'])
+def open_sub_account_position():
+    """子账户开仓：按指定金额开仓"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        import pytz
+        import os
+        import math
+        import time
+        
+        data = request.json
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')  # 'long' or 'short'
+        amount = float(data.get('amount', 10))  # 默认10U
+        
+        if not all([account_name, inst_id, pos_side]):
+            return jsonify({
+                'success': False,
+                'message': '缺少必要参数'
+            })
+        
+        # 读取子账户配置
+        with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+            config = json_lib.load(f)
+        
+        # 查找对应的子账户
+        sub_account = None
+        for acc in config.get('sub_accounts', []):
+            if acc['account_name'] == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({
+                'success': False,
+                'message': f'未找到子账户: {account_name}'
+            })
+        
+        api_key = sub_account['api_key']
+        secret_key = sub_account['secret_key']
+        passphrase = sub_account['passphrase']
+        
+        print(f"\n{'='*80}")
+        print(f"🚀 子账户开仓")
+        print(f"账户: {account_name}")
+        print(f"币种: {inst_id}")
+        print(f"方向: {pos_side}")
+        print(f"金额: {amount} USDT")
+        print(f"{'='*80}\n")
+        
+        # 1. 获取当前标记价格
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        request_path = f'/api/v5/public/mark-price?instType=SWAP&instId={inst_id}'
+        message = timestamp + 'GET' + request_path
+        mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        mark_price_url = f'https://www.okx.com{request_path}'
+        mark_response = requests.get(mark_price_url, headers=headers, timeout=10)
+        mark_result = mark_response.json()
+        
+        if mark_result['code'] != '0' or not mark_result['data']:
+            return jsonify({
+                'success': False,
+                'message': f'获取标记价格失败: {mark_result.get("msg")}'
+            })
+        
+        mark_price = float(mark_result['data'][0]['markPx'])
+        print(f"📊 当前标记价格: {mark_price}")
+        
+        # 2. 获取合约信息（张数和面值）
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        request_path = f'/api/v5/public/instruments?instType=SWAP&instId={inst_id}'
+        message = timestamp + 'GET' + request_path
+        mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers['OK-ACCESS-SIGN'] = signature
+        headers['OK-ACCESS-TIMESTAMP'] = timestamp
+        
+        instruments_url = f'https://www.okx.com{request_path}'
+        instruments_response = requests.get(instruments_url, headers=headers, timeout=10)
+        instruments_result = instruments_response.json()
+        
+        if instruments_result['code'] != '0' or not instruments_result['data']:
+            return jsonify({
+                'success': False,
+                'message': f'获取合约信息失败: {instruments_result.get("msg")}'
+            })
+        
+        ct_val = float(instruments_result['data'][0]['ctVal'])
+        lot_sz = float(instruments_result['data'][0]['lotSz'])
+        print(f"📊 合约面值: {ct_val}, 最小张数: {lot_sz}")
+        
+        # 3. 计算开仓张数（10倍杠杆）
+        leverage = 10
+        # amount USDT * 杠杆 / 标记价格 = 可开张数
+        raw_size = (amount * leverage) / (mark_price * ct_val)
+        # 向下取整到最小张数的倍数
+        open_size = math.floor(raw_size / lot_sz) * lot_sz
+        
+        if open_size < lot_sz:
+            return jsonify({
+                'success': False,
+                'message': f'开仓金额太小，无法开仓（最少需要 {lot_sz} 张）'
+            })
+        
+        print(f"📊 计算开仓张数: {open_size}")
+        
+        # 4. 设置杠杆
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        request_path = '/api/v5/account/set-leverage'
+        body = json_lib.dumps({
+            'instId': inst_id,
+            'lever': str(leverage),
+            'mgnMode': 'isolated',
+            'posSide': pos_side if pos_side in ['long', 'short'] else 'net'
+        })
+        message = timestamp + 'POST' + request_path + body
+        mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers['OK-ACCESS-SIGN'] = signature
+        headers['OK-ACCESS-TIMESTAMP'] = timestamp
+        
+        leverage_url = f'https://www.okx.com{request_path}'
+        leverage_response = requests.post(leverage_url, headers=headers, data=body, timeout=10)
+        leverage_result = leverage_response.json()
+        print(f"📊 设置杠杆结果: {leverage_result}")
+        
+        # 5. 提交开仓订单
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        request_path = '/api/v5/trade/order'
+        
+        # 判断订单方向
+        if pos_side == 'long':
+            side = 'buy'
+        elif pos_side == 'short':
+            side = 'sell'
+        else:
+            side = 'buy'  # 默认买入
+        
+        body = json_lib.dumps({
+            'instId': inst_id,
+            'tdMode': 'isolated',
+            'side': side,
+            'ordType': 'market',
+            'sz': str(int(open_size)),
+            'posSide': pos_side if pos_side in ['long', 'short'] else 'net'
+        })
+        
+        message = timestamp + 'POST' + request_path + body
+        mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers['OK-ACCESS-SIGN'] = signature
+        headers['OK-ACCESS-TIMESTAMP'] = timestamp
+        
+        order_url = f'https://www.okx.com{request_path}'
+        order_response = requests.post(order_url, headers=headers, data=body, timeout=10)
+        order_result = order_response.json()
+        
+        print(f"📊 开仓订单结果: {order_result}")
+        
+        if order_result['code'] != '0':
+            return jsonify({
+                'success': False,
+                'message': f'开仓失败: {order_result.get("msg", "未知错误")}'
+            })
+        
+        order_id = order_result['data'][0]['ordId']
+        print(f"✅ 开仓订单ID: {order_id}")
+        
+        # 6. 保存开仓记录
+        opened_positions = {}
+        try:
+            if os.path.exists('sub_account_opened_positions.json'):
+                with open('sub_account_opened_positions.json', 'r', encoding='utf-8') as f:
+                    opened_positions = json_lib.load(f)
+        except:
+            pass
+        
+        position_key = f"{account_name}_{inst_id}_{pos_side}"
+        opened_positions[position_key] = {
+            'account_name': account_name,
+            'inst_id': inst_id,
+            'pos_side': pos_side,
+            'order_id': order_id,
+            'open_size': open_size,
+            'open_price': mark_price,
+            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        with open('sub_account_opened_positions.json', 'w', encoding='utf-8') as f:
+            json_lib.dump(opened_positions, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({
+            'success': True,
+            'message': '开仓成功',
+            'data': {
+                'account_name': account_name,
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'order_id': order_id,
+                'open_size': open_size,
+                'open_price': mark_price,
+                'amount': amount
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'开仓失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 
