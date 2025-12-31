@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Dict, List
 
 # 数据库配置
-DB_PATH = os.path.join(os.path.dirname(__file__), 'crypto_data.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'support_resistance.db')
 
 # 日志文件
 LOG_FILE = os.path.join(os.path.dirname(__file__), 'support_resistance_snapshot.log')
