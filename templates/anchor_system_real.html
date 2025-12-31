@@ -1308,6 +1308,10 @@
         function calculateDeclineStrength(stats) {
             const { profit100, profit90, profit80, profit70, profit60, profit50, profit40 } = stats;
             
+            console.log('🔍 calculateDeclineStrength called with:', {
+                profit100, profit90, profit80, profit70, profit60, profit50, profit40
+            });
+            
             let level = 0;
             let title = '';
             let suggestion = '';
@@ -1362,6 +1366,8 @@
                 bgColor = 'linear-gradient(135deg, #10b981 0%, #34d399 100%)';
                 icon = '✅';
             }
+            
+            console.log('📊 下跌强度判断结果:', { level, title, suggestion });
             
             // 更新显示
             const levelElement = document.getElementById('strengthLevel');
