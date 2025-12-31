@@ -1,5 +1,56 @@
 [
   {
+    "id": 11,
+    "account_name": "JAMESYI",
+    "inst_id": "FIL-USDT-SWAP",
+    "pos_side": "long",
+    "original_size": 75.0,
+    "old_close_order_id": "3177367124714708992",
+    "open_order_id": "3177367233531731968",
+    "open_size": 750.0,
+    "open_fills": [
+      {
+        "trade_id": "428394927",
+        "qty": 750.0,
+        "price": 1.312,
+        "value": 984.0,
+        "fee": 0.0492,
+        "fee_currency": "USDT",
+        "profit": -0.6900000000000772,
+        "net_profit": -0.7844295000000773
+      }
+    ],
+    "open_total_qty": 750.0,
+    "open_avg_price": 1.312,
+    "open_total_fee": 0.0492,
+    "close_order_id": "3177367359897722880",
+    "close_size": 690.0,
+    "close_fills": [
+      {
+        "trade_id": "428394954",
+        "qty": 690.0,
+        "price": 1.311,
+        "value": 904.5899999999999,
+        "fee": 0.0452295,
+        "fee_currency": "USDT",
+        "profit": -0.6900000000000772,
+        "net_profit": -0.7844295000000773
+      }
+    ],
+    "close_total_qty": 690.0,
+    "close_avg_price": 1.311,
+    "close_total_fee": 0.0452295,
+    "remaining_size": 60.0,
+    "total_fee": 0.0944295,
+    "total_cost": 0.7844295000000772,
+    "fee_rate": 0.07971844512195905,
+    "total_profit": -0.6900000000000772,
+    "net_profit": -0.7844295000000773,
+    "created_at": "2025-12-31 15:35:30",
+    "status": "success",
+    "flow_type": "optimized"
+  },
+  {
     "id": 10,
     "account_name": "JAMESYI",
     "inst_id": "XLM-USDT-SWAP",

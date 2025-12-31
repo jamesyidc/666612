@@ -15459,51 +15459,94 @@ def maintain_sub_account():
         if close_size < 0:
             close_size = 0  # 如果计算出负数，不平仓
         
-        # 第零步：向逐仓仓位增加保证金（逐仓必须）
-        # 计算所需保证金：维护金额 / 杠杆 + 手续费缓冲（3%）
-        required_margin = maintenance_amount / lever * 1.03  # 加3%手续费和滑点缓冲
+        # ========== 第1步：平掉旧持仓（释放保证金）==========
+        print(f"📊 第1步：平掉旧持仓 {pos_size} 张（释放保证金）")
+        old_close_side = 'buy' if pos_side == 'short' else 'sell'
         
-        margin_path = '/api/v5/account/position/margin-balance'
-        margin_body = {
+        order_path = '/api/v5/trade/order'
+        old_close_body = {
             'instId': inst_id,
+            'tdMode': 'isolated',
+            'side': old_close_side,
             'posSide': pos_side,
-            'type': 'add',  # 增加保证金
-            'amt': str(round(required_margin, 2)),
-            'ccy': 'USDT'
+            'ordType': 'market',
+            'sz': str(pos_size)  # 全部平掉（支持小数持仓）
         }
         
-        print(f"💰 增加逐仓保证金: {required_margin:.2f} USDT 到 {inst_id} {pos_side}")
-        headers = get_headers('POST', margin_path, margin_body)
-        margin_response = requests.post(
-            OKEX_REST_URL + margin_path,
+        headers = get_headers('POST', order_path, old_close_body)
+        old_close_response = requests.post(
+            OKEX_REST_URL + order_path,
             headers=headers,
-            json=margin_body,
+            json=old_close_body,
             timeout=10
         )
         
-        margin_result = margin_response.json()
-        print(f"📥 保证金增加响应: code={margin_result.get('code')}, msg={margin_result.get('msg')}")
+        old_close_result = old_close_response.json()
+        print(f"📤 平仓请求: {old_close_body}")
+        print(f"📥 OKEx响应: code={old_close_result.get('code')}, msg={old_close_result.get('msg')}")
         
-        # 如果保证金增加失败，继续尝试（可能已经有足够保证金或是新仓位）
-        if margin_result.get('code') != '0':
-            print(f"⚠️  保证金增加失败（可能是新仓位或已有足够保证金）: {margin_result.get('msg')}")
-        else:
-            print(f"✅ 保证金增加成功")
-            # 等待保证金生效
-            time.sleep(1)
+        if old_close_result.get('code') != '0':
+            print(f"❌ 平掉旧持仓失败: {old_close_result}")
+            return jsonify({
+                'success': False,
+                'message': f"平掉旧持仓失败: {old_close_result.get('msg', '未知错误')}",
+                'error_code': old_close_result.get('code'),
+                'full_response': str(old_close_result)
+            })
         
-        # 第一步：开仓
+        old_close_order_id = old_close_result['data'][0]['ordId']
+        print(f"✅ 旧持仓平仓订单ID: {old_close_order_id}")
+        
+        # 等待平仓完成
+        time.sleep(2)
+        
+        # 第零步：向逐仓仓位增加保证金（逐仓必须）- 现在改为注释，因为已经平掉旧持仓释放了保证金
+        # 计算所需保证金：维护金额 / 杠杆 + 手续费缓冲（3%）
+        # 注释原因：第1步已经平掉旧持仓，释放了保证金到账户余额，开新仓时会自动使用
+        # required_margin = maintenance_amount / lever * 1.03  # 加3%手续费和滑点缓冲
+        
+        # margin_path = '/api/v5/account/position/margin-balance'
+        # margin_body = {
+        #     'instId': inst_id,
+        #     'posSide': pos_side,
+        #     'type': 'add',  # 增加保证金
+        #     'amt': str(round(required_margin, 2)),
+        #     'ccy': 'USDT'
+        # }
+        
+        # print(f"💰 增加逐仓保证金: {required_margin:.2f} USDT 到 {inst_id} {pos_side}")
+        # headers = get_headers('POST', margin_path, margin_body)
+        # margin_response = requests.post(
+        #     OKEX_REST_URL + margin_path,
+        #     headers=headers,
+        #     json=margin_body,
+        #     timeout=10
+        # )
+        
+        # margin_result = margin_response.json()
+        # print(f"📥 保证金增加响应: code={margin_result.get('code')}, msg={margin_result.get('msg')}")
+        
+        # # 如果保证金增加失败，继续尝试（可能已经有足够保证金或是新仓位）
+        # if margin_result.get('code') != '0':
+        #     print(f"⚠️  保证金增加失败（可能是新仓位或已有足够保证金）: {margin_result.get('msg')}")
+        # else:
+        #     print(f"✅ 保证金增加成功")
+        #     # 等待保证金生效
+        #     time.sleep(1)
+        
+        # ========== 第2步：开仓新持仓 ==========
+        print(f"📊 第2步：开仓新持仓 {order_size} 张")
         order_path = '/api/v5/trade/order'
         side = 'sell' if pos_side == 'short' else 'buy'
         
         open_order_body = {
             'instId': inst_id,
-            'tdMode': 'cross',  # 改用全仓模式，避免逐仓保证金不足问题
+            'tdMode': 'isolated',  # 逐仓模式：每个持仓独立保证金
             'side': side,
             'posSide': pos_side,
             'ordType': 'market',
-            'sz': str(order_size)
-            # 全仓模式不需要指定杠杆，使用账户级别杠杆
+            'sz': str(order_size),
+            'lever': str(lever)  # 逐仓模式需要指定杠杆
         }
         
         headers = get_headers('POST', order_path, open_order_body)
@@ -15536,13 +15579,14 @@ def maintain_sub_account():
         import time
         time.sleep(2)
         
-        # 第二步：平掉多余仓位，保留target_margin对应的数量
+        # ========== 第3步：平掉多余仓位，保留target_margin对应的数量 ==========
+        print(f"📊 第3步：平到目标保证金，平掉 {close_size} 张")
         # close_size已经在前面计算好了
         close_side = 'buy' if pos_side == 'short' else 'sell'
         
         close_order_body = {
             'instId': inst_id,
-            'tdMode': 'cross',  # 全仓模式
+            'tdMode': 'isolated',  # 逐仓模式
             'side': close_side,
             'posSide': pos_side,
             'ordType': 'market',
