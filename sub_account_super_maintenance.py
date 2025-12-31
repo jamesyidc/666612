@@ -129,9 +129,9 @@ def execute_super_maintenance(account_config, inst_id, pos_side, pos_size, profi
             maintenance_amount = 100
             target_margin = 10
         elif current_count == 1:
-            # 第2次维护：买入100U，留10U（不是20U！）
+            # 第2次维护：买入100U，留20U（✅ 已修改从10U改为20U）
             maintenance_amount = 100
-            target_margin = 10
+            target_margin = 20
         elif current_count == 2:
             # 第3次维护：买入200U，留20U，设置-20%止损
             maintenance_amount = 200
