@@ -47,7 +47,7 @@ def load_sub_account_config():
         return None
 
 def get_maintenance_count(account_name, inst_id, pos_side):
-    """获取今日维护次数"""
+    """获取维护次数（不再按日期重置）"""
     try:
         with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -55,9 +55,7 @@ def get_maintenance_count(account_name, inst_id, pos_side):
         key = f"{account_name}_{inst_id}_{pos_side}"
         if key in data:
             record = data[key]
-            today = get_china_today()
-            if record.get('date') == today:
-                return record.get('count', 0)
+            return record.get('count', 0)
         return 0
     except FileNotFoundError:
         return 0
@@ -66,7 +64,7 @@ def get_maintenance_count(account_name, inst_id, pos_side):
         return 0
 
 def update_maintenance_count(account_name, inst_id, pos_side):
-    """更新维护次数+1"""
+    """更新维护次数+1（不再按日期重置）"""
     try:
         try:
             with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
@@ -75,22 +73,16 @@ def update_maintenance_count(account_name, inst_id, pos_side):
             data = {}
         
         key = f"{account_name}_{inst_id}_{pos_side}"
-        today = get_china_today()
         now = get_china_time().strftime('%Y-%m-%d %H:%M:%S')
         
         if key not in data:
             data[key] = {
                 'count': 1,
-                'date': today,
                 'last_maintenance': now
             }
         else:
             record = data[key]
-            if record.get('date') == today:
-                record['count'] = record.get('count', 0) + 1
-            else:
-                record['count'] = 1
-                record['date'] = today
+            record['count'] = record.get('count', 0) + 1
             record['last_maintenance'] = now
         
         with open('sub_account_maintenance.json', 'w', encoding='utf-8') as f:

@@ -13903,39 +13903,40 @@ def maintain_anchor_order():
         # 计算10倍数量
         order_size = pos_size * 10
         
-        # 检查今日维护次数
-        import json as json_lib_check
-        import os
-        from collections import defaultdict
+        # 检查维护次数（不再限制每日次数）
+        # 注释掉原有的今日维护次数限制逻辑
+        # import json as json_lib_check
+        # import os
+        # from collections import defaultdict
         
-        maintenance_file = 'maintenance_orders.json'
-        today = get_china_today()
+        # maintenance_file = 'maintenance_orders.json'
+        # today = get_china_today()
         
-        # 统计今天的维护次数
-        today_count = 0
-        if os.path.exists(maintenance_file):
-            try:
-                with open(maintenance_file, 'r', encoding='utf-8') as f:
-                    records = json_lib_check.load(f)
-                
-                for record in records:
-                    created_at = record.get('created_at', '')
-                    if created_at.startswith(today):
-                        if record.get('inst_id') == inst_id and record.get('pos_side') == pos_side:
-                            today_count += 1
-            except Exception as e:
-                print(f"读取维护记录失败: {e}")
+        # # 统计今天的维护次数
+        # today_count = 0
+        # if os.path.exists(maintenance_file):
+        #     try:
+        #         with open(maintenance_file, 'r', encoding='utf-8') as f:
+        #             records = json_lib_check.load(f)
+        #         
+        #         for record in records:
+        #             created_at = record.get('created_at', '')
+        #             if created_at.startswith(today):
+        #                 if record.get('inst_id') == inst_id and record.get('pos_side') == pos_side:
+        #                     today_count += 1
+        #     except Exception as e:
+        #         print(f"读取维护记录失败: {e}")
         
-        print(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/3")
+        # print(f"📊 {inst_id} {pos_side} 今日已维护次数: {today_count}/3")
         
-        # 检查是否超过每日上限
-        if today_count >= 3:
-            return jsonify({
-                'success': False,
-                'message': f'今日维护次数已达上限(3次)，请明天再试',
-                'today_count': today_count,
-                'max_count': 3
-            })
+        # # 检查是否超过每日上限
+        # if today_count >= 3:
+        #     return jsonify({
+        #         'success': False,
+        #         'message': f'今日维护次数已达上限(3次)，请明天再试',
+        #         'today_count': today_count,
+        #         'max_count': 3
+        #     })
         
         # 🔄 优化后的流程：先平仓再开仓（避免保证金不足）
         # 第一步：平掉旧持仓（释放保证金）
@@ -15352,17 +15353,15 @@ def maintain_sub_account():
         record_key = f"{account_name}_{inst_id}_{pos_side}"
         record = maintenance_data.get(record_key, {})
         
-        # 检查今日维护次数
-        today_count = 0
-        if record.get('date') == today_date:
-            today_count = record.get('count', 0)
+        # 获取当前维护次数（不再按日期重置）
+        current_count = record.get('count', 0)
         
         max_count = sub_account.get('max_maintenance_count', 3)
-        if today_count >= max_count:
+        if current_count >= max_count:
             return jsonify({
                 'success': False,
-                'message': f'今日维护次数已达上限({max_count}次)，请明天再试或手动清零',
-                'today_count': today_count,
+                'message': f'维护次数已达上限({max_count}次)，请手动清零',
+                'current_count': current_count,
                 'max_count': max_count
             })
         
@@ -15611,16 +15610,15 @@ def maintain_sub_account():
             print(f"📊 第3步：跳过（close_size={close_size}，无需平仓）")
             close_order_id = "SKIPPED"
         
-        # 维护成功，更新维护次数
-        if record.get('date') != today_date:
-            # 新的一天，重置次数
+        # 维护成功，更新维护次数（不再按日期重置）
+        if not record:
+            # 第一次维护，创建记录
             record = {
                 'count': 1,
-                'date': today_date,
                 'last_maintenance': now_beijing.strftime('%Y-%m-%d %H:%M:%S')
             }
         else:
-            # 同一天，增加次数
+            # 增加次数（不再检查日期）
             record['count'] = record.get('count', 0) + 1
             record['last_maintenance'] = now_beijing.strftime('%Y-%m-%d %H:%M:%S')
         
@@ -15632,7 +15630,7 @@ def maintain_sub_account():
         
         return jsonify({
             'success': True,
-            'message': f'维护成功！今日第{record["count"]}次维护',
+            'message': f'维护成功！第{record["count"]}次维护',
             'data': {
                 'account_name': account_name,
                 'inst_id': inst_id,
@@ -15641,7 +15639,7 @@ def maintain_sub_account():
                 'close_order_id': close_order_id,
                 'order_size': new_order_size,  # 新开仓的数量
                 'close_size': close_size,  # 平仓的数量
-                'today_count': record['count'],
+                'total_count': record['count'],
                 'max_count': max_count
             }
         })
