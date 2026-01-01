@@ -13054,6 +13054,8 @@ def get_sub_account_positions():
                                     print(f"🔍 逐仓模式 - margin: {pos.get('margin')}")
                                 
                                 print(f"💰 最终使用的保证金: {margin} USDT (模式: {mgn_mode})")
+                                print(f"📊 notional_usd（持仓价值/权益金）: {notional_usd} USDT")
+                                print(f"⚠️ 注意：保证金({margin}) 应该约等于 notional_usd({notional_usd}) / 杠杆({leverage}) = {notional_usd/leverage if leverage > 0 else 0:.4f}")
                             except Exception as e:
                                 print(f"⚠️ 数据转换失败: {e}, pos={pos}")
                                 continue
