@@ -78,9 +78,15 @@ def insert_to_history_records(inst_id, pos_side, record_type, profit_rate, pos_s
         
         now = get_beijing_time()
         
-        # 插入或更新记录（如果已存在则替换）
+        # 先删除旧记录
         cursor.execute('''
-            INSERT OR REPLACE INTO anchor_real_profit_records 
+            DELETE FROM anchor_real_profit_records 
+            WHERE inst_id = ? AND pos_side = ? AND record_type = ?
+        ''', (inst_id, pos_side, record_type))
+        
+        # 插入新记录
+        cursor.execute('''
+            INSERT INTO anchor_real_profit_records 
             (inst_id, pos_side, record_type, profit_rate, timestamp, pos_size, avg_price, mark_price)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (inst_id, pos_side, record_type, profit_rate, now, pos_size, avg_price, mark_price))
