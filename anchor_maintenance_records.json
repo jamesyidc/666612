@@ -23,5 +23,13 @@
     "last_maintenance": "2026-01-01 23:32:11",
     "date": "2026-01-01",
     "last_reset": "2026-01-01 15:28:56"
+  },
+  "BCH-USDT-SWAP_long": {
+    "inst_id": "BCH-USDT-SWAP",
+    "pos_side": "long",
+    "today_count": 1,
+    "total_count": 1,
+    "last_maintenance": "2026-01-01 23:33:51",
+    "date": "2026-01-01"
   }
 }

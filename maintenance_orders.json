@@ -791,5 +791,15 @@
     "date": "2026-01-01",
     "type": "auto_maintenance",
     "success": true
+  },
+  {
+    "id": 19,
+    "account_name": "AUTO_DAEMON",
+    "inst_id": "BCH-USDT-SWAP",
+    "pos_side": "long",
+    "timestamp": "2026-01-01 23:33:51",
+    "date": "2026-01-01",
+    "type": "auto_maintenance",
+    "success": true
   }
 ]

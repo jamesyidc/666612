@@ -159,6 +159,23 @@ class AnchorMaintenanceManager:
         remaining_size = total_size_after_buy - close_size
         remaining_margin = total_margin_after_buy - close_margin
         
+        # ✅ 关键修复：确保剩余数量满足最小持仓要求
+        MIN_POSITION_SIZE = 0.01  # OKEx最小持仓数量
+        
+        if 0 < remaining_size < MIN_POSITION_SIZE:
+            # 剩余数量太小，调整平仓数量
+            # 确保至少保留 MIN_POSITION_SIZE
+            close_size = total_size_after_buy - MIN_POSITION_SIZE
+            remaining_size = MIN_POSITION_SIZE
+            
+            # 重新计算保证金
+            close_margin = (close_size / total_size_after_buy) * total_margin_after_buy if total_size_after_buy > 0 else 0
+            remaining_margin = total_margin_after_buy - close_margin
+            close_percent = (close_margin / total_margin_after_buy) * 100 if total_margin_after_buy > 0 else 0
+            
+            print(f"⚠️ 调整平仓数量：剩余数量过小，确保至少保留 {MIN_POSITION_SIZE} 张")
+            print(f"   调整后：平仓 {close_size:.4f} 张，保留 {remaining_size:.4f} 张 ({remaining_margin:.2f} USDT)")
+        
         return {
             'step1_buy': {
                 'action': 'buy',
