@@ -16513,11 +16513,11 @@ def reset_main_account_maintenance_count():
                 'message': '缺少必要参数'
             })
         
-        # 读取维护记录文件
-        maintenance_file = 'main_account_maintenance.json'
+        # 读取维护记录文件（使用守护进程同样的文件）
+        maintenance_file = 'anchor_maintenance_records.json'
         try:
             with open(maintenance_file, 'r', encoding='utf-8') as f:
-                maintenance_data = json.load(f)
+                maintenance_data = json_lib.load(f)
         except FileNotFoundError:
             maintenance_data = {}
         
@@ -16536,17 +16536,17 @@ def reset_main_account_maintenance_count():
         
         record = maintenance_data[record_key]
         
-        # 清零今日维护次数
-        old_count = record.get('count', 0)
+        # 清零今日维护次数（使用守护进程的字段名）
+        old_count = record.get('today_count', 0)
         
         # 重置记录
-        record['count'] = 0
+        record['today_count'] = 0
         record['date'] = today_date
         record['last_reset'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         # 保存更新后的数据
         with open(maintenance_file, 'w', encoding='utf-8') as f:
-            json.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
         return jsonify({
             'success': True,

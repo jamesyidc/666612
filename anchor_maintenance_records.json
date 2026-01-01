@@ -14,5 +14,13 @@
     "total_count": 1,
     "last_maintenance": "2026-01-01 13:10:06",
     "date": "2026-01-01"
+  },
+  "FIL-USDT-SWAP_short": {
+    "inst_id": "FIL-USDT-SWAP",
+    "pos_side": "short",
+    "today_count": 5,
+    "total_count": 5,
+    "last_maintenance": "2026-01-01 23:10:03",
+    "date": "2026-01-01"
   }
 }
