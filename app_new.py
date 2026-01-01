@@ -1487,7 +1487,7 @@ def panic_page():
 def api_panic_latest():
     """恐慌清洗指数最新数据API"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 使用新的 panic_wash_index 表
@@ -1550,7 +1550,7 @@ def api_panic_latest():
 def api_stats():
     """统计数据API - 包含本轮急涨急跌和恐慌清洗指数"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 总记录数
@@ -1673,7 +1673,7 @@ def api_homepage_summary():
             'timestamp': datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 1. 统计栏数据（本轮急涨急跌和恐慌指数）
@@ -1899,7 +1899,7 @@ def api_query():
         return jsonify({'error': '请提供查询时间'})
     
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -1983,7 +1983,7 @@ def api_query():
 def api_latest():
     """获取最新数据API"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -2072,7 +2072,7 @@ def api_chart():
         page = request.args.get('page', '0')  # 默认第0页（最新）
         page = int(page)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取所有历史数据点，按时间升序排列
@@ -2174,7 +2174,7 @@ def api_chart():
 def api_timeline():
     """获取所有历史数据点API - 返回完整的统计数据"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 查询所有字段 - 倒序排列（时间晚的在上，时间早的在下）
@@ -2254,7 +2254,7 @@ def popup_demo():
 def api_signals_stats():
     """获取信号统计数据"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新记录
@@ -2317,7 +2317,7 @@ def api_signals_chart():
         points_per_page = minutes // 3  # 每3分钟一个数据点
         offset = page * points_per_page
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取总记录数
@@ -2366,7 +2366,7 @@ def api_signals_history():
     try:
         limit = int(request.args.get('limit', 50))
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -2404,7 +2404,7 @@ def api_signals_history():
 def api_liquidation_30days():
     """30日爆仓数据API"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -2446,7 +2446,7 @@ def api_panic_history():
         limit = int(request.args.get('limit', 50))
         query_time = request.args.get('time', None)  # 可选的时间查询参数
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         if query_time:
@@ -2532,7 +2532,7 @@ def api_panic_history():
 def api_modules_stats():
     """获取所有模块的统计信息"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 1. 历史数据查询模块统计
@@ -2619,7 +2619,7 @@ def price_comparison_page():
 def api_price_comparison_list():
     """获取比价系统所有币种数据 - 按用户指定顺序，使用北京时间"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -2697,7 +2697,7 @@ def api_price_comparison_update():
                 'error': '缺少必要参数: coin_name 或 price'
             })
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取当前币种的最高价和最低价
@@ -2816,7 +2816,7 @@ def api_breakthrough_stats():
         from datetime import datetime, timedelta
         import pytz
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         beijing_tz = pytz.timezone('Asia/Shanghai')
@@ -2963,7 +2963,7 @@ def api_breakthrough_logs():
         coin_filter = request.args.get('coin', None)
         type_filter = request.args.get('type', None)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 构建查询
@@ -3043,7 +3043,7 @@ def api_update_price_ratios():
     - 最低价占比 = (当前价 / 最低价) × 100%
     """
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新快照时间
@@ -3133,7 +3133,7 @@ def api_monitor_data_collection():
         from datetime import datetime, timedelta
         import pytz
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         beijing_tz = pytz.timezone('Asia/Shanghai')
@@ -3232,7 +3232,7 @@ def api_star_system_data():
         from datetime import datetime, timedelta
         import pytz
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         beijing_tz = pytz.timezone('Asia/Shanghai')
         
@@ -3594,7 +3594,7 @@ def api_star_system_history():
         date = request.args.get('date')  # 格式: YYYY-MM-DD
         limit = int(request.args.get('limit', 100))
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         if date:
@@ -3977,7 +3977,7 @@ def api_index_start():
 def api_index_current():
     """获取当前指数值 - 基于27币种加权指数"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新的K线数据
@@ -4008,7 +4008,7 @@ def api_index_current():
         change_percent = (change / base_value) * 100
         
         # 获取BTC的4个周期平均位置数据
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         cursor.execute('''
             SELECT position_4h, position_12h, position_24h, position_48h
@@ -4058,7 +4058,7 @@ def api_index_current():
 def api_index_components():
     """获取成分详情 - 27币种权重明细"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取所有币种的基准价格和权重
@@ -4154,7 +4154,7 @@ def api_index_history():
         records_per_hour = 60  # 每小时60条（1分钟K线）
         page_size = hours_per_page * records_per_hour  # 每页720条
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取总记录数
@@ -4227,7 +4227,7 @@ def api_index_klines():
     try:
         limit = int(request.args.get('limit', 100))
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最近的K线数据
@@ -4285,7 +4285,7 @@ def position_system():
 def api_position_latest():
     """获取最新位置数据"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新的记录时间
@@ -4388,7 +4388,7 @@ def api_position_latest():
 def api_position_summary():
     """获取位置统计摘要"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新的记录时间
@@ -4476,7 +4476,7 @@ def api_position_summary():
 def api_position_history(symbol):
     """获取指定币种的历史位置数据"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最近24小时的数据
@@ -4521,7 +4521,7 @@ def api_position_history(symbol):
 def api_position_stats_latest():
     """获取最新的位置统计数据（低于1%的币种数量）"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新的统计数据
@@ -4568,7 +4568,7 @@ def api_position_stats_history():
         start_time = request.args.get('start_time', default=None, type=str)
         end_time = request.args.get('end_time', default=None, type=str)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 构建查询条件
@@ -5580,7 +5580,7 @@ def track_trading_signal(symbol, buy_point_type, suggested_position):
     signal_key = f"{symbol}_{buy_point_type}"
     
     # 使用独立的数据库连接
-    conn_track = sqlite3.connect('crypto_data.db')
+    conn_track = sqlite3.connect('databases/crypto_data.db')
     conn_track.row_factory = sqlite3.Row
     cursor_track = conn_track.cursor()
     
@@ -5629,7 +5629,7 @@ def check_no_new_low_5min(symbol):
     import sqlite3
     from datetime import datetime, timedelta
     
-    conn = sqlite3.connect('crypto_data.db')
+    conn = sqlite3.connect('databases/crypto_data.db')
     cursor = conn.cursor()
     
     try:
@@ -5683,7 +5683,7 @@ def get_1h_rsi(symbol):
     """获取1小时RSI"""
     import sqlite3
     
-    conn = sqlite3.connect('crypto_data.db')
+    conn = sqlite3.connect('databases/crypto_data.db')
     cursor = conn.cursor()
     
     try:
@@ -5707,7 +5707,7 @@ def check_consecutive_oscillation_5min(symbol):
     """检查5分钟周期连续3个震荡≤0.5% 且涨跌在0%到+0.25%之间（不包括负涨跌）"""
     import sqlite3
     
-    conn = sqlite3.connect('crypto_data.db')
+    conn = sqlite3.connect('databases/crypto_data.db')
     cursor = conn.cursor()
     
     try:
@@ -5758,7 +5758,7 @@ def deactivate_missing_signals(active_signal_keys):
     beijing_tz = pytz.timezone('Asia/Shanghai')
     now = datetime.now(beijing_tz)
     
-    conn = sqlite3.connect('crypto_data.db')
+    conn = sqlite3.connect('databases/crypto_data.db')
     cursor = conn.cursor()
     
     try:
@@ -5790,7 +5790,7 @@ def api_trading_signals_analyze():
         import pytz
         from opening_logic import get_opening_suggestion
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -6314,7 +6314,7 @@ def api_trading_signals_history():
         from datetime import datetime, timedelta
         import pytz
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -7021,7 +7021,7 @@ def api_escape_top_signals_history(symbol):
     try:
         hours = request.args.get('hours', 24, type=int)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -7257,7 +7257,7 @@ def api_kline_indicators_latest():
         symbol = request.args.get('symbol')
         timeframe = request.args.get('timeframe')
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -7540,7 +7540,7 @@ def api_kline_indicators_tv_latest():
         symbol = request.args.get('symbol')
         timeframe = request.args.get('timeframe')
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -7631,7 +7631,7 @@ def api_kline_indicators_tv_latest():
 def api_kline_indicators_tv_status():
     """获取TradingView指标采集器运行状态"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -7703,7 +7703,7 @@ def api_symbol_kline(symbol):
         # 转换timeframe格式: 5m -> 5m, 1h -> 1H (数据库中使用大写H)
         db_timeframe = timeframe.upper() if timeframe == '1h' else timeframe
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 根据时间周期设置limit
@@ -7856,7 +7856,7 @@ def api_symbol_indicators(symbol):
         # 转换timeframe格式: 5m -> 5m, 1h -> 1H
         db_timeframe = timeframe.upper() if timeframe == '1h' else timeframe
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 设置limit
@@ -7923,7 +7923,7 @@ def api_signals_recent():
         from datetime import datetime, timedelta
         import json
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 计算2小时前的时间
@@ -8020,7 +8020,7 @@ def api_symbol_extremes(symbol):
         # 转换timeframe格式
         db_timeframe = timeframe.upper() if timeframe == '1h' else timeframe
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 计算时间范围（毫秒时间戳）
@@ -8293,7 +8293,7 @@ def api_gdrive_monitor_status():
         db_records = 0
         try:
             import sqlite3
-            conn = sqlite3.connect('crypto_data.db')
+            conn = sqlite3.connect('databases/crypto_data.db')
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM crypto_snapshots WHERE snapshot_date = ?", (now.strftime('%Y-%m-%d'),))
             db_records = cursor.fetchone()[0]
@@ -8943,7 +8943,7 @@ def api_sell_point_1_save():
                     'error': f'缺少必需字段: {field}'
                 }), 400
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 检查是否已存在相同的信号（避免重复插入）
@@ -9012,7 +9012,7 @@ def api_sell_point_1_latest():
         symbol = request.args.get('symbol')
         hours = int(request.args.get('hours', 24))
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -9313,7 +9313,7 @@ def api_telegram_stop():
 def api_query_latest():
     """获取最新查询数据API（用于计次预警）"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -9850,7 +9850,7 @@ def api_sar_slope_latest():
         symbol_filter = request.args.get('symbol', '').upper()
         position_filter = request.args.get('position', '')  # bullish/bearish
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取每个币种的最新记录
@@ -9953,7 +9953,7 @@ def api_sar_slope_history(symbol):
         # 计算起始时间戳
         start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -10016,7 +10016,7 @@ def api_sar_slope_position_changes(symbol):
         days = int(request.args.get('days', 7))
         start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
         
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 查找位置变化点
@@ -10081,7 +10081,7 @@ def api_sar_slope_position_changes(symbol):
 def api_sar_slope_collector_status():
     """获取SAR斜率采集器状态"""
     try:
-        conn = sqlite3.connect('crypto_data.db')
+        conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
         # 获取最新数据时间
