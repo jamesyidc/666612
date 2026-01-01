@@ -15675,7 +15675,7 @@ def close_all_sub_account_positions():
         # OKEx API签名和请求头函数
         def generate_signature(timestamp, method, request_path, body='', secret_key=''):
             if body:
-                body = json.dumps(body)
+                body = json_lib.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
             return base64.b64encode(mac.digest()).decode()
