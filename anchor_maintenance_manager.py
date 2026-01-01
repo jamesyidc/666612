@@ -61,7 +61,7 @@ class AnchorMaintenanceManager:
     
     def check_maintenance_needed(self, position: Dict) -> Dict:
         """
-        检查锚点单是否需要维护
+        检查持仓是否需要维护
         
         Args:
             position: 持仓信息
@@ -72,17 +72,12 @@ class AnchorMaintenanceManager:
                 - mark_price: 当前价格
                 - profit_rate: 收益率
                 - margin: 保证金
-                - is_anchor: 是否锚点单
         
         Returns:
             dict: 决策结果
         """
-        # 只处理锚点单
-        if not position.get('is_anchor'):
-            return {
-                'need_maintenance': False,
-                'reason': '不是锚点单'
-            }
+        # 🔥 去掉锚点单判断，只要亏损>=10%就触发维护
+        # 由用户通过开关控制是否启用维护功能
         
         profit_rate = position.get('profit_rate', 0)
         
@@ -98,12 +93,12 @@ class AnchorMaintenanceManager:
                 'original_price': position['avg_price'],
                 'original_margin': position['margin'],
                 'current_price': position['mark_price'],
-                'reason': f'⚠️  锚点单亏损达到 {profit_rate:.2f}%，触发维护条件'
+                'reason': f'⚠️  持仓亏损达到 {profit_rate:.2f}%，触发维护条件'
             }
         
         return {
             'need_maintenance': False,
-            'reason': f'锚点单盈亏 {profit_rate:.2f}%，未达到维护阈值(-10%)'
+            'reason': f'持仓盈亏 {profit_rate:.2f}%，未达到维护阈值(-10%)'
         }
     
     def calculate_maintenance_plan(self, position: Dict) -> Dict:
