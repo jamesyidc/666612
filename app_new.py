@@ -15710,6 +15710,7 @@ def close_all_sub_account_positions():
                         if pos_size != 0:
                             inst_id = pos_data.get('instId', '')
                             pos_side = pos_data.get('posSide', '')
+                            mgn_mode = pos_data.get('mgnMode', 'isolated')  # 获取持仓模式
                             margin_str = pos_data.get('margin', '0')
                             mark_px_str = pos_data.get('markPx', '0')
                             
@@ -15723,10 +15724,11 @@ def close_all_sub_account_positions():
                                 'pos_side': pos_side,
                                 'pos_size': pos_size,
                                 'margin': margin,
-                                'mark_price': mark_price
+                                'mark_price': mark_price,
+                                'mgn_mode': mgn_mode  # 保存持仓模式
                             })
                             pos_count += 1
-                            print(f"    ✅ {inst_id} {pos_side}: {pos_size}张")
+                            print(f"    ✅ {inst_id} {pos_side}: {pos_size}张 (模式: {mgn_mode})")
                     print(f"  📈 {account_name} 共找到 {pos_count} 个持仓")
                 else:
                     error_msg = result.get('msg', 'Unknown error')
@@ -15777,9 +15779,12 @@ def close_all_sub_account_positions():
             inst_id = pos.get('inst_id')
             pos_side = pos.get('pos_side')
             pos_size = abs(float(pos.get('pos_size', 0)))
+            mgn_mode = pos.get('mgn_mode', 'isolated')  # 获取持仓模式，默认逐仓
             
             if pos_size == 0:
                 continue
+            
+            print(f"\n🔧 开始平仓: {account_name} {inst_id} {pos_side} ({pos_size}张, 模式:{mgn_mode})")
             
             try:
                 # 查找对应的子账户
@@ -15817,7 +15822,7 @@ def close_all_sub_account_positions():
                     
                     close_body = {
                         'instId': inst_id,
-                        'mgnMode': 'isolated',
+                        'mgnMode': mgn_mode,  # 使用实际的持仓模式
                         'posSide': pos_side,
                         'ccy': 'USDT'
                     }
@@ -15855,7 +15860,7 @@ def close_all_sub_account_positions():
                         
                         order_body = {
                             'instId': inst_id,
-                            'tdMode': 'isolated',
+                            'tdMode': mgn_mode,  # 使用实际的持仓模式
                             'side': close_side,
                             'posSide': pos_side,
                             'ordType': 'market',
@@ -15896,7 +15901,7 @@ def close_all_sub_account_positions():
                         
                         order_body = {
                             'instId': inst_id,
-                            'tdMode': 'isolated',
+                            'tdMode': mgn_mode,  # 使用实际的持仓模式
                             'side': close_side,
                             'posSide': pos_side,
                             'ordType': 'market',
