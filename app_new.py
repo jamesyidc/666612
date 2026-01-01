@@ -12851,9 +12851,9 @@ def get_current_positions():
                 status = '接近止损'
                 status_class = 'loss'
             
-            # 获取24小时最高最低价作为极值
-            extreme_high = None
-            extreme_low = None
+            # 获取24小时最高最低价作为市场极值
+            market_high_24h = None
+            market_low_24h = None
             try:
                 # 从OKEx API获取24小时最高最低价
                 ticker_response = requests.get(
@@ -12864,10 +12864,36 @@ def get_current_positions():
                     ticker_data = ticker_response.json()
                     if ticker_data.get('code') == '0' and ticker_data.get('data'):
                         ticker = ticker_data['data'][0]
-                        extreme_high = safe_float(ticker.get('high24h'))
-                        extreme_low = safe_float(ticker.get('low24h'))
+                        market_high_24h = safe_float(ticker.get('high24h'))
+                        market_low_24h = safe_float(ticker.get('low24h'))
             except Exception as e:
-                print(f"获取{inst_id}极值失败: {e}")
+                print(f"获取{inst_id}市场极值失败: {e}")
+            
+            # 获取持仓的盈利极值（最高盈利率和最大亏损率）
+            max_profit_rate = None
+            max_profit_time = None
+            max_loss_rate = None
+            max_loss_time = None
+            
+            # 从数据库获取开仓时间
+            if db_record:
+                open_time = db_record.get('created_at') or db_record.get('updated_at')
+                if open_time:
+                    try:
+                        # 查询盈利极值记录
+                        cursor.execute('''
+                            SELECT max_profit_rate, max_profit_time, max_loss_rate, max_loss_time
+                            FROM position_profit_extremes
+                            WHERE inst_id = ? AND pos_side = ? AND open_time = ?
+                        ''', (inst_id, pos_side, open_time))
+                        extreme_row = cursor.fetchone()
+                        if extreme_row:
+                            max_profit_rate = extreme_row['max_profit_rate']
+                            max_profit_time = extreme_row['max_profit_time']
+                            max_loss_rate = extreme_row['max_loss_rate']
+                            max_loss_time = extreme_row['max_loss_time']
+                    except Exception as e:
+                        print(f"获取{inst_id}盈利极值失败: {e}")
             
             position_list.append({
                 'inst_id': inst_id,
@@ -12884,8 +12910,12 @@ def get_current_positions():
                 'is_anchor': is_anchor,
                 'maintenance_count_today': today_maintenance_counts.get((inst_id, pos_side), 0),  # 今日维护次数
                 'total_maintenance_count': total_maintenance_counts.get((inst_id, pos_side), 0),  # 总维护次数
-                'extreme_high': extreme_high,  # 24小时最高价
-                'extreme_low': extreme_low  # 24小时最低价
+                'market_high_24h': market_high_24h,  # 24小时市场最高价
+                'market_low_24h': market_low_24h,  # 24小时市场最低价
+                'max_profit_rate': max_profit_rate,  # 本次持仓的最高盈利率 ✨
+                'max_profit_time': max_profit_time,  # 达到最高盈利率的时间
+                'max_loss_rate': max_loss_rate,      # 本次持仓的最大亏损率 ✨
+                'max_loss_time': max_loss_time        # 达到最大亏损率的时间
             })
         
         return jsonify({
