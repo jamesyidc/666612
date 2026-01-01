@@ -48,55 +48,16 @@ def get_okx_config():
         return None
 
 def get_current_positions():
-    """获取当前所有持仓（直接通过OKX API）"""
+    """从Flask API获取当前所有持仓"""
     try:
-        config = get_okx_config()
-        if not config:
-            return []
-        
-        import hmac
-        import base64
-        from datetime import datetime, timezone
-        
-        # OKX API 参数
-        api_key = config['api_key']
-        secret_key = config['secret_key']
-        passphrase = config['passphrase']
-        base_url = 'https://www.okx.com'
-        
-        # 构建请求
-        timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-        method = 'GET'
-        request_path = '/api/v5/account/positions?instType=SWAP'
-        
-        # 签名
-        prehash_string = timestamp + method + request_path
-        signature = base64.b64encode(
-            hmac.new(secret_key.encode(), prehash_string.encode(), digestmod='sha256').digest()
-        ).decode()
-        
-        # 请求头
-        headers = {
-            'OK-ACCESS-KEY': api_key,
-            'OK-ACCESS-SIGN': signature,
-            'OK-ACCESS-TIMESTAMP': timestamp,
-            'OK-ACCESS-PASSPHRASE': passphrase,
-            'Content-Type': 'application/json'
-        }
-        
-        # 发送请求
-        response = requests.get(base_url + request_path, headers=headers, timeout=10)
+        response = requests.get('http://localhost:5000/api/anchor-system/current-positions?trade_mode=real', timeout=10)
         if response.status_code == 200:
             data = response.json()
-            if data.get('code') == '0':
-                return data.get('data', [])
-        
-        print(f"⚠️  API返回错误: {response.text[:200]}")
+            if data.get('success'):
+                return data.get('positions', [])
         return []
-        
     except Exception as e:
         print(f"❌ 获取持仓失败: {e}")
-        traceback.print_exc()
         return []
 
 def get_position_open_time(inst_id, pos_side):
@@ -213,7 +174,7 @@ def track_all_positions():
     print(f"🔍 开始扫描持仓盈利极值 - {get_beijing_time()}")
     print(f"{'='*60}")
     
-    # 获取当前持仓
+    # 获取当前持仓（从Flask API）
     positions = get_current_positions()
     
     if not positions or len(positions) == 0:
@@ -225,26 +186,22 @@ def track_all_positions():
     tracked_count = 0
     
     for pos in positions:
-        inst_id = pos.get('instId')
-        pos_side = pos.get('posSide')
-        pos_value = float(pos.get('pos', 0))
+        # Flask API返回的格式
+        inst_id = pos.get('inst_id')
+        pos_side = pos.get('pos_side')
+        pos_size = float(pos.get('pos_size', 0))
         
         # 跳过空仓
-        if pos_value == 0:
+        if pos_size == 0:
             continue
         
-        # 计算当前盈亏率
-        try:
-            upl_ratio = float(pos.get('uplRatio', 0))
-            current_profit_rate = upl_ratio * 100  # 转换为百分比
-        except:
-            print(f"⚠️  {inst_id} {pos_side} 无法获取盈亏率")
-            continue
+        # 获取当前盈亏率（Flask API已经计算好了）
+        current_profit_rate = float(pos.get('profit_rate', 0))
         
         # 获取开仓时间
         open_time = get_position_open_time(inst_id, pos_side)
         if not open_time:
-            print(f"⚠️  {inst_id} {pos_side} 无法获取开仓时间")
+            print(f"⚠️  {inst_id} {pos_side} 无法获取开仓时间，跳过")
             continue
         
         # 更新极值
