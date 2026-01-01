@@ -7,16 +7,22 @@
 
 import time
 import requests
+import json
 from datetime import datetime
 import pytz
 from anchor_maintenance_manager import AnchorMaintenanceManager
+from maintenance_trade_executor import MaintenanceTradeExecutor
 
 # 北京时区
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 # Flask API 配置
 FLASK_API_URL = 'http://localhost:5000/api/anchor-system/current-positions'
+AUTO_MAINTENANCE_CONFIG_PATH = '/home/user/webapp/auto_maintenance_config.json'
 CHECK_INTERVAL = 60  # 60秒检查一次
+
+# 自动执行配置
+AUTO_EXECUTE_ENABLED = True  # 是否自动执行交易（True=实盘自动执行，False=仅检测记录）
 
 def get_current_positions():
     """从Flask API获取当前实盘持仓"""
@@ -35,15 +41,29 @@ def get_current_positions():
         print(f"❌ 获取持仓失败: {e}")
         return []
 
+def load_config():
+    """加载自动维护配置"""
+    try:
+        with open(AUTO_MAINTENANCE_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            return config
+    except:
+        return {
+            'auto_maintain_long_enabled': False,
+            'auto_maintain_short_enabled': False
+        }
+
 def main():
     """主循环"""
     print("🚀 锚点单实时维护守护进程启动 (基于Flask API)")
     print(f"📊 检查间隔: {CHECK_INTERVAL}秒")
     print(f"🎯 触发条件: 亏损 ≥ 10%")
     print(f"💰 余额控制: 0.6U - 1.1U")
+    print(f"⚡ 自动执行: {'开启 (实盘交易)' if AUTO_EXECUTE_ENABLED else '关闭 (仅检测记录)'}")
     print("=" * 60)
     
     manager = AnchorMaintenanceManager()
+    executor = MaintenanceTradeExecutor(dry_run=not AUTO_EXECUTE_ENABLED)
     
     while True:
         try:
@@ -66,13 +86,68 @@ def main():
                 print("✅ 扫描完成，无需维护")
             else:
                 print(f"\n🚨 发现 {len(maintenance_list)} 个需要维护的持仓:")
+                
+                # 加载配置
+                config = load_config()
+                
                 for m in maintenance_list:
-                    print(f"   {m['inst_id']} {m['pos_side']}: 亏损{m['profit_rate']:.2f}%")
+                    print(f"\n{'=' * 60}")
+                    print(f"📍 {m['inst_id']} {m['pos_side']}: 亏损{m['profit_rate']:.2f}%")
                     print(f"   触发原因: {m['trigger_reason']}")
                     
-                    # 注意: 这里只是记录和显示，实际执行需要调用交易API
-                    # 目前AnchorMaintenanceManager已经保存了维护日志
-                    print(f"   ⚠️  维护方案已记录，需要手动或通过交易系统执行")
+                    # 检查该方向是否开启自动维护
+                    pos_side = m['pos_side']
+                    auto_enabled = False
+                    
+                    if pos_side == 'long' and config.get('auto_maintain_long_enabled'):
+                        auto_enabled = True
+                    elif pos_side == 'short' and config.get('auto_maintain_short_enabled'):
+                        auto_enabled = True
+                    
+                    if not auto_enabled:
+                        print(f"   ⚠️  {pos_side} 方向自动维护未开启，跳过执行")
+                        continue
+                    
+                    if not AUTO_EXECUTE_ENABLED:
+                        print(f"   ⚠️  自动执行功能未开启，仅记录维护计划")
+                        continue
+                    
+                    # 自动执行维护
+                    print(f"   🤖 自动执行维护...")
+                    
+                    try:
+                        # 找到对应的持仓对象
+                        position = None
+                        for p in positions:
+                            if (p.get('inst_id') == m['inst_id'] and 
+                                p.get('pos_side') == m['pos_side']):
+                                position = p
+                                break
+                        
+                        if not position:
+                            print(f"   ❌ 未找到对应持仓，跳过")
+                            continue
+                        
+                        # 执行维护计划
+                        maintenance_plan = m.get('maintenance_plan', {})
+                        result = executor.execute_maintenance_plan(position, maintenance_plan)
+                        
+                        if result['success']:
+                            print(f"   ✅ 维护执行成功!")
+                            print(f"      补仓订单: {result['step1_result'].get('order_id', 'N/A')}")
+                            print(f"      平仓订单: {result['step2_result'].get('order_id', 'N/A')}")
+                        else:
+                            print(f"   ❌ 维护执行失败: {result.get('error')}")
+                        
+                        # 等待5秒再处理下一个
+                        if len(maintenance_list) > 1:
+                            print(f"   ⏳ 等待5秒后处理下一个持仓...")
+                            time.sleep(5)
+                            
+                    except Exception as e:
+                        print(f"   ❌ 维护执行异常: {e}")
+                        import traceback
+                        traceback.print_exc()
             
             # 3. 等待下一次检查
             print(f"\n⏳ 等待{CHECK_INTERVAL}秒后继续...\n")
