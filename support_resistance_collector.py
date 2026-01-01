@@ -346,18 +346,21 @@ def calculate_support_resistance(symbol: str) -> Optional[Dict]:
         log(f"❌ {symbol} 计算支撑压力线失败: {e}")
         return None
 
-def save_to_database(data: Dict) -> bool:
+def save_to_database(data: Dict, record_time: str = None) -> bool:
     """保存到数据库"""
     try:
         conn = sqlite3.connect(DB_PATH, timeout=DB_TIMEOUT)
         conn.execute("PRAGMA busy_timeout = 60000")
         cursor = conn.cursor()
         
-        # 使用北京时间
-        from datetime import datetime as dt_class
-        import pytz
-        china_tz = pytz.timezone('Asia/Shanghai')
-        beijing_now = dt_class.now(china_tz).strftime('%Y-%m-%d %H:%M:%S')
+        # 使用传入的时间戳，如果没有则使用北京时间
+        if record_time is None:
+            from datetime import datetime as dt_class
+            import pytz
+            china_tz = pytz.timezone('Asia/Shanghai')
+            beijing_now = dt_class.now(china_tz).strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            beijing_now = record_time
         
         cursor.execute('''
             INSERT INTO support_resistance_levels (
@@ -404,6 +407,13 @@ def collect_all_symbols():
     log("=" * 60)
     log("🚀 开始采集支撑压力线数据")
     
+    # 生成统一的采集时间戳（北京时间）
+    from datetime import datetime as dt_class
+    import pytz
+    china_tz = pytz.timezone('Asia/Shanghai')
+    collection_time = dt_class.now(china_tz).strftime('%Y-%m-%d %H:%M:%S')
+    log(f"📅 采集时间: {collection_time}")
+    
     success_count = 0
     failed_count = 0
     
@@ -413,7 +423,7 @@ def collect_all_symbols():
         data = calculate_support_resistance(symbol)
         
         if data:
-            if save_to_database(data):
+            if save_to_database(data, collection_time):
                 log(f"✅ {symbol} 采集成功 | 当前价: ${data['current_price']:.2f} | "
                     f"支撑1: ${data['support_line_1']:.2f} ({data['distance_to_support_1']:.2f}%) | "
                     f"压力1: ${data['resistance_line_1']:.2f} ({data['distance_to_resistance_1']:.2f}%)")
