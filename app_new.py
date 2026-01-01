@@ -16767,5 +16767,10 @@ def sub_account_trades_page():
     """子账户交易详情页面"""
     return render_template('sub_account_trades.html')
 
+@app.route('/test-reset-api')
+def test_reset_api_page():
+    """测试清零API页面"""
+    return render_template('test_reset_api.html')
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
