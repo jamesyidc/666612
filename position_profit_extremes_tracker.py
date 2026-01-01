@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 持仓盈利极值跟踪守护进程
-记录每个持仓的最高盈利率和最大亏损率
+只监控你的持仓盈亏率，记录最高盈利率和最大亏损率
+不从OKX获取市场极值
 """
 
 import time
@@ -13,6 +14,8 @@ import traceback
 from datetime import datetime
 import pytz
 import requests
+import hmac
+import base64
 
 # 北京时区
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
@@ -21,17 +24,63 @@ def get_beijing_time():
     """获取北京时间字符串"""
     return datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
-def get_current_positions():
-    """从Flask API获取当前所有持仓"""
+def get_okx_config():
+    """读取OKX配置"""
     try:
-        response = requests.get('http://localhost:5000/api/anchor-system/current-positions?trade_mode=real', timeout=10)
+        with open('/home/user/webapp/okx_config.json', 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"❌ 读取配置失败: {e}")
+        return None
+
+def get_current_positions():
+    """获取当前所有持仓（直接通过OKX API）"""
+    try:
+        config = get_okx_config()
+        if not config:
+            return []
+        
+        from datetime import timezone
+        
+        # OKX API 参数
+        api_key = config['api_key']
+        secret_key = config['secret_key']
+        passphrase = config['passphrase']
+        base_url = 'https://www.okx.com'
+        
+        # 构建请求
+        timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        method = 'GET'
+        request_path = '/api/v5/account/positions?instType=SWAP'
+        
+        # 签名
+        prehash_string = timestamp + method + request_path
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash_string.encode(), digestmod='sha256').digest()
+        ).decode()
+        
+        # 请求头
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        # 发送请求
+        response = requests.get(base_url + request_path, headers=headers, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            if data.get('success'):
-                return data.get('positions', [])
+            if data.get('code') == '0':
+                return data.get('data', [])
+        
+        print(f"⚠️  API返回错误: {response.text[:200]}")
         return []
+        
     except Exception as e:
         print(f"❌ 获取持仓失败: {e}")
+        traceback.print_exc()
         return []
 
 def get_position_open_time(inst_id, pos_side):
@@ -83,6 +132,8 @@ def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
             max_profit_rate = row['max_profit_rate']
             max_loss_rate = row['max_loss_rate']
             
+            updated = False
+            
             # 检查是否需要更新最高盈利率
             if current_profit_rate > max_profit_rate:
                 cursor.execute('''
@@ -95,9 +146,10 @@ def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
                 ''', (current_profit_rate, now, current_profit_rate, now, 
                       inst_id, pos_side, open_time))
                 print(f"📈 {inst_id} {pos_side} 新高盈利: {current_profit_rate:.2f}% (之前: {max_profit_rate:.2f}%)")
+                updated = True
             
             # 检查是否需要更新最大亏损率
-            elif current_profit_rate < max_loss_rate:
+            if current_profit_rate < max_loss_rate:
                 cursor.execute('''
                     UPDATE position_profit_extremes 
                     SET max_loss_rate = ?,
@@ -108,9 +160,10 @@ def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
                 ''', (current_profit_rate, now, current_profit_rate, now,
                       inst_id, pos_side, open_time))
                 print(f"📉 {inst_id} {pos_side} 新低亏损: {current_profit_rate:.2f}% (之前: {max_loss_rate:.2f}%)")
+                updated = True
             
-            else:
-                # 只更新当前盈亏率
+            # 如果没有更新极值，只更新当前盈亏率
+            if not updated:
                 cursor.execute('''
                     UPDATE position_profit_extremes 
                     SET current_profit_rate = ?,
@@ -131,7 +184,7 @@ def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
                   current_profit_rate if current_profit_rate < 0 else 0,
                   now if current_profit_rate < 0 else None,
                   current_profit_rate, now))
-            print(f"✨ {inst_id} {pos_side} 创建极值记录: {current_profit_rate:.2f}%")
+            print(f"✨ {inst_id} {pos_side} 创建极值记录: 当前盈亏率 {current_profit_rate:.2f}%")
         
         conn.commit()
         conn.close()
@@ -148,7 +201,7 @@ def track_all_positions():
     print(f"🔍 开始扫描持仓盈利极值 - {get_beijing_time()}")
     print(f"{'='*60}")
     
-    # 获取当前持仓（从Flask API）
+    # 获取当前持仓
     positions = get_current_positions()
     
     if not positions or len(positions) == 0:
@@ -160,27 +213,32 @@ def track_all_positions():
     tracked_count = 0
     
     for pos in positions:
-        # Flask API返回的格式
-        inst_id = pos.get('inst_id')
-        pos_side = pos.get('pos_side')
-        pos_size = float(pos.get('pos_size', 0))
+        inst_id = pos.get('instId')
+        pos_side = pos.get('posSide')
+        pos_value = float(pos.get('pos', 0))
         
         # 跳过空仓
-        if pos_size == 0:
+        if pos_value == 0:
             continue
         
-        # 获取当前盈亏率（Flask API已经计算好了）
-        current_profit_rate = float(pos.get('profit_rate', 0))
+        # 计算当前盈亏率（从OKX返回的uplRatio）
+        try:
+            upl_ratio = float(pos.get('uplRatio', 0))
+            current_profit_rate = upl_ratio * 100  # 转换为百分比
+        except:
+            print(f"⚠️  {inst_id} {pos_side} 无法获取盈亏率")
+            continue
         
         # 获取开仓时间
         open_time = get_position_open_time(inst_id, pos_side)
         if not open_time:
-            print(f"⚠️  {inst_id} {pos_side} 无法获取开仓时间，跳过")
-            continue
+            print(f"⚠️  {inst_id} {pos_side} 无法获取开仓时间，使用当前时间")
+            open_time = get_beijing_time()
         
         # 更新极值
         if update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
             tracked_count += 1
+            print(f"   ✓ {inst_id} {pos_side}: 当前 {current_profit_rate:+.2f}%")
     
     print(f"\n✅ 成功跟踪 {tracked_count} 个持仓的盈利极值")
 
@@ -191,7 +249,10 @@ def main():
     print("="*60)
     print(f"📍 工作目录: {os.getcwd()}")
     print(f"🕐 扫描间隔: 60秒")
-    print(f"📊 功能: 跟踪每个持仓的最高盈利率和最大亏损率")
+    print(f"📊 功能: 监控每个持仓的盈亏率")
+    print(f"📈 记录: 最高盈利率（正值）")
+    print(f"📉 记录: 最大亏损率（负值）")
+    print(f"❌ 不获取: OKX市场极值")
     print("="*60)
     
     while True:
