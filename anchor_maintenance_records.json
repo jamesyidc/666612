@@ -1,0 +1,10 @@
+{
+  "TEST-USDT-SWAP_long": {
+    "inst_id": "TEST-USDT-SWAP",
+    "pos_side": "long",
+    "today_count": 1,
+    "total_count": 1,
+    "last_maintenance": "2026-01-01 13:07:56",
+    "date": "2026-01-01"
+  }
+}

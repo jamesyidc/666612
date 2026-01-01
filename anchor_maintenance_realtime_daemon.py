@@ -98,20 +98,23 @@ def update_maintenance_count(inst_id, pos_side):
             json.dump(records, f, ensure_ascii=False, indent=2)
         
         # 同时更新Flask使用的maintenance_orders.json文件
+        # 注意：这个文件是一个数组格式，每次维护都追加一条记录
         try:
-            flask_records = {}
+            flask_records = []
             try:
                 with open(flask_maintenance_file, 'r', encoding='utf-8') as f:
                     flask_records = json.load(f)
+                    if not isinstance(flask_records, list):
+                        flask_records = []
             except (FileNotFoundError, json.JSONDecodeError):
-                flask_records = {}
+                flask_records = []
             
             # 添加新的维护记录（Flask用来统计次数）
-            flask_record_key = f"{inst_id}_{pos_side}"
-            if flask_record_key not in flask_records:
-                flask_records[flask_record_key] = []
-            
-            flask_records[flask_record_key].append({
+            flask_records.append({
+                'id': len(flask_records) + 1,
+                'account_name': 'AUTO_DAEMON',
+                'inst_id': inst_id,
+                'pos_side': pos_side,
                 'timestamp': now_beijing.strftime('%Y-%m-%d %H:%M:%S'),
                 'date': today_date,
                 'type': 'auto_maintenance',
