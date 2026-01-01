@@ -12858,30 +12858,23 @@ def get_current_positions():
             max_loss_rate = None
             max_loss_time = None
             
-            # 从数据库获取开仓时间
-            open_time = None
-            if db_record:
-                try:
-                    open_time = db_record['created_at'] or db_record['updated_time'] or db_record['timestamp']
-                except (KeyError, IndexError):
-                    pass
-                
-                if open_time:
-                    try:
-                        # 查询盈利极值记录
-                        cursor.execute('''
-                            SELECT max_profit_rate, max_profit_time, max_loss_rate, max_loss_time
-                            FROM position_profit_extremes
-                            WHERE inst_id = ? AND pos_side = ? AND open_time = ?
-                        ''', (inst_id, pos_side, open_time))
-                        extreme_row = cursor.fetchone()
-                        if extreme_row:
-                            max_profit_rate = extreme_row['max_profit_rate']
-                            max_profit_time = extreme_row['max_profit_time']
-                            max_loss_rate = extreme_row['max_loss_rate']
-                            max_loss_time = extreme_row['max_loss_time']
-                    except Exception as e:
-                        print(f"获取{inst_id}盈利极值失败: {e}")
+            try:
+                # 查询最新的盈利极值记录（不依赖开仓时间，直接用inst_id和pos_side查询最新记录）
+                cursor.execute('''
+                    SELECT max_profit_rate, max_profit_time, max_loss_rate, max_loss_time
+                    FROM position_profit_extremes
+                    WHERE inst_id = ? AND pos_side = ?
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                ''', (inst_id, pos_side))
+                extreme_row = cursor.fetchone()
+                if extreme_row:
+                    max_profit_rate = extreme_row['max_profit_rate']
+                    max_profit_time = extreme_row['max_profit_time']
+                    max_loss_rate = extreme_row['max_loss_rate']
+                    max_loss_time = extreme_row['max_loss_time']
+            except Exception as e:
+                print(f"获取{inst_id}盈利极值失败: {e}")
             
             position_list.append({
                 'inst_id': inst_id,
