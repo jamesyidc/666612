@@ -125,8 +125,9 @@ class AnchorMaintenanceManager:
         
         # 步骤1：投入10倍保证金买入
         buy_margin = original_margin * 10  # 投入10倍保证金
-        buy_value = buy_margin * leverage  # 10倍杠杆下的实际价值
-        buy_size = buy_value / current_price  # 买入张数
+        # 注意：在10倍杠杆下，投入保证金就能开对应价值的仓位
+        # 不需要再乘以leverage，因为合约张数已经体现了杠杆效应
+        buy_size = buy_margin / current_price  # 买入张数（每张合约面值已包含杠杆）
         
         # 买入后的总仓位
         total_size_after_buy = original_size + buy_size
@@ -163,9 +164,8 @@ class AnchorMaintenanceManager:
                 'action': 'buy',
                 'size': buy_size,
                 'margin': buy_margin,
-                'value': buy_value,
                 'leverage': leverage,
-                'description': f'投入10倍保证金: {buy_margin:.2f} USDT ({leverage}x杠杆 = {buy_value:.2f} USDT价值, {buy_size:.4f} 张)'
+                'description': f'投入10倍保证金: {buy_margin:.2f} USDT (开仓{buy_size:.4f}张)'
             },
             'after_buy': {
                 'total_size': total_size_after_buy,

@@ -28,6 +28,155 @@ class MaintenanceTradeExecutor:
         self.dry_run = dry_run
         self.safety_gate = SafetyGate()
     
+    def get_available_balance(self):
+        """获取账户可用USDT余额"""
+        try:
+            import requests
+            method = 'GET'
+            request_path = '/api/v5/account/balance'
+            headers = self.trader.get_headers(method, request_path)
+            
+            response = requests.get(
+                self.trader.base_url + request_path,
+                headers=headers,
+                timeout=10
+            )
+            
+            data = response.json()
+            if data.get('code') == '0':
+                for detail in data.get('data', [])[0].get('details', []):
+                    if detail.get('ccy') == 'USDT':
+                        avail = float(detail.get('availBal', 0))
+                        return avail
+            return 0
+        except Exception as e:
+            print(f"⚠️  获取账户余额失败: {e}")
+            return 0
+    
+    def adjust_maintenance_plan(self, position, maintenance_plan):
+        """
+        根据可用余额智能调整维护计划
+        
+        Args:
+            position: 持仓信息
+            maintenance_plan: 原始维护计划
+        
+        Returns:
+            dict: 调整后的维护计划 {'success': bool, 'plan': dict, 'message': str}
+        """
+        # 获取可用余额
+        available_balance = self.get_available_balance()
+        print(f"\n💰 账户可用余额: {available_balance:.2f} USDT")
+        
+        # 获取原始计划的补仓金额
+        original_buy_margin = maintenance_plan['step1_buy']['margin']
+        print(f"📊 原计划需要: {original_buy_margin:.2f} USDT")
+        
+        # 如果余额充足，直接返回原计划
+        if available_balance >= original_buy_margin:
+            print(f"✅ 余额充足，使用原计划")
+            return {
+                'success': True,
+                'plan': maintenance_plan,
+                'message': '余额充足'
+            }
+        
+        # 余额不足，智能调整
+        print(f"⚠️  余额不足，开始智能调整...")
+        
+        # 保留10 USDT作为安全余额
+        SAFETY_BUFFER = 10.0
+        usable_balance = max(0, available_balance - SAFETY_BUFFER)
+        
+        if usable_balance < 1:
+            return {
+                'success': False,
+                'plan': None,
+                'message': f'可用余额不足1 USDT（当前{available_balance:.2f}，保留{SAFETY_BUFFER} USDT安全余额）'
+            }
+        
+        # 计算调整后的维护倍数
+        original_margin = position['margin']
+        max_multiplier = usable_balance / original_margin
+        adjusted_multiplier = min(max_multiplier, 10)  # 最多10倍
+        
+        print(f"🔧 调整维护倍数: 10x → {adjusted_multiplier:.1f}x")
+        print(f"   原保证金: {original_margin:.4f} USDT")
+        print(f"   可用余额: {usable_balance:.2f} USDT")
+        print(f"   调整后投入: {original_margin * adjusted_multiplier:.2f} USDT")
+        
+        # 重新计算维护计划
+        current_price = position['mark_price']
+        leverage = position.get('lever', 10)
+        original_size = position['pos_size']
+        
+        # 步骤1：调整后的补仓
+        adjusted_buy_margin = original_margin * adjusted_multiplier
+        # 注意：不需要乘以leverage，保证金直接除以价格得到张数
+        adjusted_buy_size = adjusted_buy_margin / current_price
+        
+        # 买入后的总仓位
+        total_size_after_buy = original_size + adjusted_buy_size
+        total_margin_after_buy = original_margin + adjusted_buy_margin
+        
+        # 步骤2：余额控制（0.6-1.1U）
+        MIN_MARGIN = 0.6
+        MAX_MARGIN = 1.1
+        
+        if total_margin_after_buy > MAX_MARGIN:
+            target_remaining_margin = MAX_MARGIN
+            close_margin = total_margin_after_buy - target_remaining_margin
+        else:
+            target_remaining_margin = total_margin_after_buy
+            close_margin = 0
+        
+        close_percent = (close_margin / total_margin_after_buy) * 100 if total_margin_after_buy > 0 else 0
+        close_size = (close_margin / total_margin_after_buy) * total_size_after_buy if total_margin_after_buy > 0 else 0
+        
+        # 步骤3：剩余持仓
+        remaining_size = total_size_after_buy - close_size
+        remaining_margin = total_margin_after_buy - close_margin
+        
+        adjusted_plan = {
+            'step1_buy': {
+                'action': 'buy',
+                'size': adjusted_buy_size,
+                'margin': adjusted_buy_margin,
+                'leverage': leverage,
+                'multiplier': adjusted_multiplier,
+                'description': f'投入{adjusted_multiplier:.1f}倍保证金: {adjusted_buy_margin:.2f} USDT (开仓{adjusted_buy_size:.4f}张)'
+            },
+            'after_buy': {
+                'total_size': total_size_after_buy,
+                'total_margin': total_margin_after_buy,
+                'description': f'买入后总仓位: {total_size_after_buy:.4f} 张 ({total_margin_after_buy:.2f} USDT)'
+            },
+            'step2_close': {
+                'action': 'close',
+                'size': close_size,
+                'margin': close_margin,
+                'percent': close_percent,
+                'description': f'平掉{close_percent:.1f}%: {close_size:.4f} 张 ({close_margin:.2f} USDT)'
+            },
+            'step3_remaining': {
+                'size': remaining_size,
+                'margin': remaining_margin,
+                'target_margin': target_remaining_margin,
+                'description': f'保留余额{MIN_MARGIN}-{MAX_MARGIN}U: {remaining_size:.4f} 张 ({remaining_margin:.2f} USDT)'
+            },
+            'original': {
+                'size': original_size,
+                'margin': original_margin
+            },
+            'adjusted': True
+        }
+        
+        return {
+            'success': True,
+            'plan': adjusted_plan,
+            'message': f'智能调整维护倍数: {adjusted_multiplier:.1f}x（余额限制）'
+        }
+    
     def execute_maintenance_plan(self, position, maintenance_plan):
         """
         执行维护计划
@@ -64,9 +213,21 @@ class MaintenanceTradeExecutor:
                 result['error'] = '安全检查未通过'
                 return result
             
+            # 智能调整维护计划（根据可用余额）
+            adjusted_result = self.adjust_maintenance_plan(position, maintenance_plan)
+            if not adjusted_result['success']:
+                result['error'] = adjusted_result['message']
+                print(f"\n❌ {adjusted_result['message']}")
+                return result
+            
+            # 使用调整后的计划
+            adjusted_plan = adjusted_result['plan']
+            if adjusted_result.get('message') != '余额充足':
+                print(f"✅ {adjusted_result['message']}")
+            
             # Step 1: 补仓（对冲）
             print("\n【步骤1】执行补仓操作...")
-            step1_result = self._execute_add_position(position, maintenance_plan)
+            step1_result = self._execute_add_position(position, adjusted_plan)
             result['step1_result'] = step1_result
             
             if not step1_result['success']:
@@ -79,7 +240,7 @@ class MaintenanceTradeExecutor:
             
             # Step 2: 平仓（保留底仓）
             print("\n【步骤2】执行平仓操作...")
-            step2_result = self._execute_close_position(position, maintenance_plan)
+            step2_result = self._execute_close_position(position, adjusted_plan)
             result['step2_result'] = step2_result
             
             if not step2_result['success']:
