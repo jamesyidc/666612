@@ -107,8 +107,8 @@ class AnchorMaintenanceManager:
         
         维护流程：
         1. 买入10倍原持仓（投入10倍保证金）
-        2. 平掉到剩余1U保证金
-        3. 保留1U的仓位
+        2. 平掉到余额控制在0.6-1.1U之间
+        3. 如果超过1.1U，补平多余部分
         
         注意：10倍杠杆下，投入10倍保证金 = 10倍实际价值
         
@@ -132,15 +132,29 @@ class AnchorMaintenanceManager:
         total_size_after_buy = original_size + buy_size
         total_margin_after_buy = original_margin + buy_margin
         
-        # 步骤2：计算要保留≤2U，需要平掉多少
-        target_remaining_margin = min(2.0, total_margin_after_buy)  # 目标保留2U，但不超过总额
-        close_margin = total_margin_after_buy - target_remaining_margin
-        close_percent = (close_margin / total_margin_after_buy) * 100
+        # 步骤2：余额控制逻辑（0.6U - 1.1U）
+        # 如果余额>1.1U，平掉超出部分
+        # 如果余额在0.6-1.1之间，保持不变
+        # 如果余额<0.6，这种情况不应该发生（买入10倍应该总是>0.6）
+        
+        MIN_MARGIN = 0.6  # 最小余额
+        MAX_MARGIN = 1.1  # 最大余额
+        
+        if total_margin_after_buy > MAX_MARGIN:
+            # 超过上限，平掉多余部分
+            target_remaining_margin = MAX_MARGIN
+            close_margin = total_margin_after_buy - target_remaining_margin
+        else:
+            # 在范围内或低于下限，保持不变
+            target_remaining_margin = total_margin_after_buy
+            close_margin = 0
+        
+        close_percent = (close_margin / total_margin_after_buy) * 100 if total_margin_after_buy > 0 else 0
         
         # 按比例计算平仓数量
-        close_size = (close_margin / total_margin_after_buy) * total_size_after_buy
+        close_size = (close_margin / total_margin_after_buy) * total_size_after_buy if total_margin_after_buy > 0 else 0
         
-        # 步骤3：剩余持仓（≤2U）
+        # 步骤3：剩余持仓
         remaining_size = total_size_after_buy - close_size
         remaining_margin = total_margin_after_buy - close_margin
         
@@ -169,7 +183,7 @@ class AnchorMaintenanceManager:
                 'size': remaining_size,
                 'margin': remaining_margin,
                 'target_margin': target_remaining_margin,
-                'description': f'保留1U: {remaining_size:.4f} 张 ({remaining_margin:.2f} USDT)'
+                'description': f'保留余额{MIN_MARGIN}-{MAX_MARGIN}U: {remaining_size:.4f} 张 ({remaining_margin:.2f} USDT)'
             },
             'original': {
                 'size': original_size,
