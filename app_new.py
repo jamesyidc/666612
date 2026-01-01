@@ -15832,6 +15832,8 @@ def close_all_sub_account_positions():
                 
                 result = response.json()
                 
+                print(f"  📡 OKEx响应: {result}")
+                
                 if result.get('code') == '0' and result.get('data'):
                     order_id = result['data'][0].get('ordId', '--')
                     print(f"  ✅ {account_name} {inst_id} {pos_side}: 平仓成功 (订单ID: {order_id})")
@@ -15845,8 +15847,11 @@ def close_all_sub_account_positions():
                         'size': pos_size
                     })
                 else:
+                    error_code = result.get('code', 'unknown')
                     error_msg = result.get('msg', '未知错误')
-                    print(f"  ❌ {account_name} {inst_id} {pos_side}: 平仓失败 - {error_msg}")
+                    print(f"  ❌ {account_name} {inst_id} {pos_side}: 平仓失败")
+                    print(f"     错误码: {error_code}, 错误信息: {error_msg}")
+                    print(f"     订单参数: {order_body}")
                     fail_count += 1
                     results.append({
                         'account_name': account_name,
