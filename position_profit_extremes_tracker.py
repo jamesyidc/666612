@@ -24,7 +24,7 @@ def get_beijing_time():
 def get_okx_config():
     """读取OKX配置（主账号）"""
     try:
-        # 尝试读取主账号配置
+        # 读取配置文件
         config_file = '/home/user/webapp/sub_account_config.json'
         if not os.path.exists(config_file):
             print(f"⚠️  配置文件不存在: {config_file}")
@@ -33,13 +33,13 @@ def get_okx_config():
         with open(config_file, 'r') as f:
             data = json.load(f)
         
-        # 使用第一个子账号（主账号）的配置
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]
-        elif isinstance(data, dict):
-            return data
+        # 获取主账号配置
+        if 'main_account' in data:
+            return data['main_account']
+        elif 'sub_accounts' in data and len(data['sub_accounts']) > 0:
+            return data['sub_accounts'][0]
         
-        print("⚠️  配置文件格式不正确")
+        print("⚠️  配置文件中没有找到账号信息")
         return None
         
     except Exception as e:
