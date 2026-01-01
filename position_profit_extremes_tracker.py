@@ -52,10 +52,10 @@ def get_position_open_time(inst_id, pos_side):
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT created_at, updated_at 
+            SELECT created_at, updated_time, timestamp
             FROM position_opens 
             WHERE inst_id = ? AND pos_side = ? AND open_size != 0
-            ORDER BY updated_at DESC
+            ORDER BY created_at DESC
             LIMIT 1
         ''', (inst_id, pos_side))
         
@@ -63,8 +63,8 @@ def get_position_open_time(inst_id, pos_side):
         conn.close()
         
         if row:
-            # 优先使用 created_at，如果没有则使用 updated_at
-            return row['created_at'] or row['updated_at']
+            # 优先使用 created_at，如果没有则使用 updated_time或timestamp
+            return row['created_at'] or row['updated_time'] or row['timestamp']
         return None
     except Exception as e:
         print(f"❌ 获取开仓时间失败 {inst_id} {pos_side}: {e}")
