@@ -12859,15 +12859,23 @@ def get_current_positions():
             max_loss_time = None
             
             try:
+                # 为极值查询创建独立的数据库连接（避免cursor已关闭的问题）
+                extreme_conn = sqlite3.connect('trading_decision.db')
+                extreme_conn.row_factory = sqlite3.Row
+                extreme_cursor = extreme_conn.cursor()
+                
                 # 查询最新的盈利极值记录（不依赖开仓时间，直接用inst_id和pos_side查询最新记录）
-                cursor.execute('''
+                extreme_cursor.execute('''
                     SELECT max_profit_rate, max_profit_time, max_loss_rate, max_loss_time
                     FROM position_profit_extremes
                     WHERE inst_id = ? AND pos_side = ?
                     ORDER BY updated_at DESC
                     LIMIT 1
                 ''', (inst_id, pos_side))
-                extreme_row = cursor.fetchone()
+                extreme_row = extreme_cursor.fetchone()
+                
+                extreme_conn.close()
+                
                 if extreme_row:
                     max_profit_rate = extreme_row['max_profit_rate']
                     max_profit_time = extreme_row['max_profit_time']
