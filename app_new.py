@@ -12811,7 +12811,9 @@ def get_current_positions():
             mark_price = safe_float(pos.get('markPx', 0))
             lever = safe_int(pos.get('lever', 10))
             upl = safe_float(pos.get('upl', 0))
-            margin = safe_float(pos.get('margin', 0))
+            # OKEx的margin字段是持仓价值，需要除以杠杆得到真实保证金
+            okex_margin = safe_float(pos.get('margin', 0))
+            margin = okex_margin / lever if lever > 0 else okex_margin
             
             # 如果数据库中有记录，使用数据库的开仓价格（可能是维护后的）
             if db_record:
