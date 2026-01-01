@@ -15641,17 +15641,75 @@ def close_all_sub_account_positions():
         
         print("🚨 开始执行一键全部平仓...")
         
-        # 获取所有子账户持仓
-        positions_response = get_sub_account_positions()
-        positions_data = positions_response.get_json()
+        # 直接读取子账户配置并获取持仓
+        all_positions = []
         
-        if not positions_data.get('success'):
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config_data = json_lib.load(f)
+        except FileNotFoundError:
             return jsonify({
                 'success': False,
-                'message': '获取持仓列表失败'
+                'message': '子账户配置文件不存在'
             })
         
-        positions = positions_data.get('positions', [])
+        # 遍历所有子账号获取持仓
+        for sub_account in config_data.get('sub_accounts', []):
+            if not sub_account.get('enabled'):
+                continue
+            
+            account_name = sub_account['account_name']
+            api_key = sub_account['api_key']
+            secret_key = sub_account['secret_key']
+            passphrase = sub_account['passphrase']
+            
+            try:
+                # 生成OKEx签名
+                request_path = '/api/v5/account/positions'
+                query_string = 'instType=SWAP'
+                timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                message = timestamp + 'GET' + request_path + '?' + query_string
+                mac = hmac.new(
+                    secret_key.encode('utf-8'),
+                    message.encode('utf-8'),
+                    hashlib.sha256
+                )
+                signature = base64.b64encode(mac.digest()).decode('utf-8')
+                
+                headers = {
+                    'OK-ACCESS-KEY': api_key,
+                    'OK-ACCESS-SIGN': signature,
+                    'OK-ACCESS-TIMESTAMP': timestamp,
+                    'OK-ACCESS-PASSPHRASE': passphrase,
+                    'Content-Type': 'application/json'
+                }
+                
+                # 获取持仓
+                response = requests.get(
+                    f'{OKEX_REST_URL}{request_path}?{query_string}',
+                    headers=headers,
+                    timeout=10
+                )
+                
+                result = response.json()
+                
+                if result.get('code') == '0' and result.get('data'):
+                    for pos_data in result['data']:
+                        pos_size = float(pos_data.get('pos', 0))
+                        if pos_size != 0:
+                            all_positions.append({
+                                'account_name': account_name,
+                                'inst_id': pos_data.get('instId'),
+                                'pos_side': pos_data.get('posSide'),
+                                'pos_size': pos_size,
+                                'margin': float(pos_data.get('margin', 0)),
+                                'mark_price': float(pos_data.get('markPx', 0))
+                            })
+            except Exception as e:
+                print(f"⚠️ 获取 {account_name} 持仓失败: {str(e)}")
+                continue
+        
+        positions = all_positions
         
         if not positions:
             return jsonify({
@@ -15667,10 +15725,6 @@ def close_all_sub_account_positions():
         success_count = 0
         fail_count = 0
         results = []
-        
-        # 读取子账户配置
-        with open('sub_account_config.json', 'r', encoding='utf-8') as f:
-            config = json_lib.load(f)
         
         # OKEx API签名和请求头函数
         def generate_signature(timestamp, method, request_path, body='', secret_key=''):
@@ -15702,7 +15756,7 @@ def close_all_sub_account_positions():
             try:
                 # 查找对应的子账户
                 sub_account = None
-                for acc in config.get('sub_accounts', []):
+                for acc in config_data.get('sub_accounts', []):
                     if acc['account_name'] == account_name:
                         sub_account = acc
                         break
