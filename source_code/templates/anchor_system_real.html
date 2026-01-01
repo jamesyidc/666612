@@ -687,8 +687,13 @@
                 const recordsRes = await fetch('/api/anchor-system/profit-records?trade_mode=real');
                 const recordsData = await recordsRes.json();
                 
+                console.log('📊 历史极值记录数据:', recordsData);
+                console.log('📊 记录数量:', recordsData.records ? recordsData.records.length : 0);
+                
                 if (recordsData.success) {
                     renderRecordsTable(recordsData.records);
+                } else {
+                    console.error('❌ 历史极值记录加载失败:', recordsData);
                 }
 
                 // 加载当前持仓情况（实盘模式）
