@@ -588,6 +588,7 @@
                             <th>未实现盈亏</th>
                             <th>保证金</th>
                             <th>收益率</th>
+                            <th>极值</th>
                             <th>状态</th>
                         </tr>
                     </thead>
@@ -912,7 +913,7 @@
             const statsDiv = document.getElementById('positionStats');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="empty">当前无持仓</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
                 // 清空盈利统计显示
                 document.getElementById('profit70Plus').textContent = '0';
@@ -1055,6 +1056,17 @@
             
             tbody.innerHTML = data.map(item => {
                 const coinNumber = coinNumbers[item.inst_id] || '--';
+                // 格式化极值显示
+                let extremeHtml = '--';
+                if (item.max_profit_rate !== null && item.max_profit_rate !== undefined) {
+                    const maxProfit = item.max_profit_rate.toFixed(2);
+                    const maxLoss = (item.max_loss_rate || 0).toFixed(2);
+                    extremeHtml = `<div style="font-size: 12px;">
+                        <div style="color: #48bb78;">🏆 ${maxProfit}%</div>
+                        <div style="color: #f56565;">📉 ${maxLoss}%</div>
+                    </div>`;
+                }
+                
                 return `
                 <tr>
                     <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
@@ -1075,6 +1087,7 @@
                     <td style="color: ${item.profit_rate >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
                         ${item.profit_rate >= 0 ? '+' : ''}${item.profit_rate.toFixed(2)}%
                     </td>
+                    <td>${extremeHtml}</td>
                     <td>
                         <span class="badge ${
                             item.status_class === 'profit' ? 'badge-profit' : 
