@@ -15654,14 +15654,19 @@ def close_all_sub_account_positions():
             })
         
         # 遍历所有子账号获取持仓
+        print(f"📋 配置中的子账号数量: {len(config_data.get('sub_accounts', []))}")
+        
         for sub_account in config_data.get('sub_accounts', []):
-            if not sub_account.get('enabled'):
+            account_name = sub_account.get('account_name', 'Unknown')
+            enabled = sub_account.get('enabled', False)
+            print(f"  - {account_name}: enabled={enabled}")
+            
+            if not enabled:
                 continue
             
-            account_name = sub_account['account_name']
-            api_key = sub_account['api_key']
-            secret_key = sub_account['secret_key']
-            passphrase = sub_account['passphrase']
+            api_key = sub_account.get('api_key', '')
+            secret_key = sub_account.get('secret_key', '')
+            passphrase = sub_account.get('passphrase', '')
             
             try:
                 # 生成OKEx签名
@@ -15685,6 +15690,7 @@ def close_all_sub_account_positions():
                 }
                 
                 # 获取持仓
+                print(f"  🔍 正在获取 {account_name} 的持仓...")
                 response = requests.get(
                     f'{OKEX_REST_URL}{request_path}?{query_string}',
                     headers=headers,
@@ -15692,21 +15698,33 @@ def close_all_sub_account_positions():
                 )
                 
                 result = response.json()
+                print(f"  📊 API响应: code={result.get('code')}, data_count={len(result.get('data', []))}")
                 
                 if result.get('code') == '0' and result.get('data'):
+                    pos_count = 0
                     for pos_data in result['data']:
                         pos_size = float(pos_data.get('pos', 0))
                         if pos_size != 0:
+                            inst_id = pos_data.get('instId')
+                            pos_side = pos_data.get('posSide')
                             all_positions.append({
                                 'account_name': account_name,
-                                'inst_id': pos_data.get('instId'),
-                                'pos_side': pos_data.get('posSide'),
+                                'inst_id': inst_id,
+                                'pos_side': pos_side,
                                 'pos_size': pos_size,
                                 'margin': float(pos_data.get('margin', 0)),
                                 'mark_price': float(pos_data.get('markPx', 0))
                             })
+                            pos_count += 1
+                            print(f"    ✅ {inst_id} {pos_side}: {pos_size}张")
+                    print(f"  📈 {account_name} 共找到 {pos_count} 个持仓")
+                else:
+                    error_msg = result.get('msg', 'Unknown error')
+                    print(f"  ❌ API错误: {error_msg}")
             except Exception as e:
-                print(f"⚠️ 获取 {account_name} 持仓失败: {str(e)}")
+                print(f"  ⚠️ 获取 {account_name} 持仓失败: {str(e)}")
+                import traceback
+                print(f"  Stack trace: {traceback.format_exc()}")
                 continue
         
         positions = all_positions
