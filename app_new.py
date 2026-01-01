@@ -12811,10 +12811,8 @@ def get_current_positions():
             mark_price = safe_float(pos.get('markPx', 0))
             lever = safe_int(pos.get('lever', 10))
             upl = safe_float(pos.get('upl', 0))
-            # 不使用OKEx的margin字段（不可靠），自己计算真实保证金
-            # 真实保证金 = 持仓价值 / 杠杆 = (持仓数量 × 标记价格) / 杠杆
-            pos_value_abs = abs(pos_value)  # 持仓数量（绝对值）
-            margin = (pos_value_abs * mark_price) / lever if lever > 0 and mark_price > 0 else 0.01
+            # 直接使用OKEx的margin字段（保证金）
+            margin = safe_float(pos.get('margin', 0))
             
             # 直接使用OKEx的收益率（uplRatio），转换为百分比
             okex_profit_ratio = safe_float(pos.get('uplRatio', 0))
