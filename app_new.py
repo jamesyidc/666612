@@ -12851,33 +12851,21 @@ def get_current_positions():
                 status = '接近止损'
                 status_class = 'loss'
             
-            # 获取24小时最高最低价作为市场极值
-            market_high_24h = None
-            market_low_24h = None
-            try:
-                # 从OKEx API获取24小时最高最低价
-                ticker_response = requests.get(
-                    f'https://www.okx.com/api/v5/market/ticker?instId={inst_id}',
-                    timeout=3
-                )
-                if ticker_response.status_code == 200:
-                    ticker_data = ticker_response.json()
-                    if ticker_data.get('code') == '0' and ticker_data.get('data'):
-                        ticker = ticker_data['data'][0]
-                        market_high_24h = safe_float(ticker.get('high24h'))
-                        market_low_24h = safe_float(ticker.get('low24h'))
-            except Exception as e:
-                print(f"获取{inst_id}市场极值失败: {e}")
-            
             # 获取持仓的盈利极值（最高盈利率和最大亏损率）
+            # 注意：这是监控你的持仓盈亏率的极值，不是市场价格极值
             max_profit_rate = None
             max_profit_time = None
             max_loss_rate = None
             max_loss_time = None
             
             # 从数据库获取开仓时间
+            open_time = None
             if db_record:
-                open_time = db_record['created_at'] if db_record['created_at'] else db_record['updated_at']
+                try:
+                    open_time = db_record['created_at'] or db_record['updated_time'] or db_record['timestamp']
+                except (KeyError, IndexError):
+                    pass
+                
                 if open_time:
                     try:
                         # 查询盈利极值记录
