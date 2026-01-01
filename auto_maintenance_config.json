@@ -1,8 +1,8 @@
 {
   "auto_maintain_long_enabled": true,
   "auto_maintain_short_enabled": true,
-  "super_maintain_long_enabled": true,
-  "super_maintain_short_enabled": true,
+  "super_maintain_long_enabled": false,
+  "super_maintain_short_enabled": false,
   "loss_threshold": -10,
   "margin_min": 0.6,
   "margin_max": 1.0,
