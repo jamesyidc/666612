@@ -12811,16 +12811,18 @@ def get_current_positions():
             mark_price = safe_float(pos.get('markPx', 0))
             lever = safe_int(pos.get('lever', 10))
             upl = safe_float(pos.get('upl', 0))
-            # OKEx的margin字段是持仓价值，需要除以杠杆得到真实保证金
-            okex_margin = safe_float(pos.get('margin', 0))
-            margin = okex_margin / lever if lever > 0 else okex_margin
+            # 不使用OKEx的margin字段（不可靠），自己计算真实保证金
+            # 真实保证金 = 持仓价值 / 杠杆 = (持仓数量 × 标记价格) / 杠杆
+            pos_value_abs = abs(pos_value)  # 持仓数量（绝对值）
+            margin = (pos_value_abs * mark_price) / lever if lever > 0 and mark_price > 0 else 0.01
             
             # 如果数据库中有记录，使用数据库的开仓价格（可能是维护后的）
             if db_record:
                 avg_price = float(db_record['open_price'])
                 is_anchor = int(db_record['is_anchor']) if db_record['is_anchor'] else 0
-                # 计算相对保证金的收益率（考虑杠杆）
-                # 方法：未实现盈亏 / 保证金 * 100
+                # 计算相对保证金的收益率
+                # 注意：这里应该使用真实保证金(margin)而不是持仓价值(okex_margin)
+                # 因为收益率 = 盈亏 / 投入的保证金 * 100
                 if margin > 0:
                     profit_rate = (upl / margin) * 100
                 else:
