@@ -12877,7 +12877,7 @@ def get_current_positions():
             
             # 从数据库获取开仓时间
             if db_record:
-                open_time = db_record.get('created_at') or db_record.get('updated_at')
+                open_time = db_record['created_at'] if db_record['created_at'] else db_record['updated_at']
                 if open_time:
                     try:
                         # 查询盈利极值记录
