@@ -190,6 +190,7 @@ class MaintenanceTradeExecutor:
                 'success': bool,
                 'step1_result': dict,  # 补仓结果
                 'step2_result': dict,  # 平仓结果
+                'step3_result': dict,  # 保证金验证结果
                 'error': str
             }
         """
@@ -204,6 +205,7 @@ class MaintenanceTradeExecutor:
             'success': False,
             'step1_result': None,
             'step2_result': None,
+            'step3_result': None,
             'error': None
         }
         
@@ -246,6 +248,20 @@ class MaintenanceTradeExecutor:
             if not step2_result['success']:
                 result['error'] = f"平仓失败: {step2_result.get('error')}"
                 return result
+            
+            # 等待平仓成交
+            print("⏳ 等待3秒确保平仓成交...")
+            time.sleep(3)
+            
+            # Step 3: 验证并调整剩余保证金到0.6-1.1U范围
+            print("\n【步骤3】验证剩余保证金...")
+            step3_result = self._verify_and_adjust_margin(position)
+            result['step3_result'] = step3_result
+            
+            if not step3_result['success']:
+                result['error'] = f"保证金调整失败: {step3_result.get('error')}"
+                # 即使保证金调整失败，维护仍算成功（因为主要步骤已完成）
+                print(f"⚠️ 警告: {result['error']}")
             
             # 所有步骤成功
             result['success'] = True
@@ -410,6 +426,160 @@ class MaintenanceTradeExecutor:
                 'success': False,
                 'error': data.get('msg', '平仓失败')
             }
+    
+    def _verify_and_adjust_margin(self, position):
+        """
+        验证并调整剩余保证金到0.6-1.1U范围
+        
+        Args:
+            position: 持仓信息
+        
+        Returns:
+            dict: {'success': bool, 'adjusted': bool, 'final_margin': float, 'error': str}
+        """
+        inst_id = position['inst_id']
+        pos_side = position['pos_side']
+        
+        MIN_MARGIN = 0.6
+        MAX_MARGIN = 1.1
+        
+        try:
+            # 获取当前持仓状态
+            current_position = self._get_current_position(inst_id, pos_side)
+            
+            if not current_position:
+                return {
+                    'success': False,
+                    'error': '无法获取当前持仓信息'
+                }
+            
+            current_margin = current_position.get('margin', 0)
+            current_size = current_position.get('pos_size', 0)
+            current_price = current_position.get('mark_price', 0)
+            
+            print(f"📊 当前持仓状态:")
+            print(f"   保证金: {current_margin:.4f} USDT")
+            print(f"   数量: {current_size} 张")
+            print(f"   目标范围: {MIN_MARGIN}-{MAX_MARGIN} USDT")
+            
+            # 检查保证金是否在范围内
+            if MIN_MARGIN <= current_margin <= MAX_MARGIN:
+                print(f"✅ 保证金在目标范围内")
+                return {
+                    'success': True,
+                    'adjusted': False,
+                    'final_margin': current_margin
+                }
+            
+            # 保证金超出范围，需要继续平仓
+            if current_margin > MAX_MARGIN:
+                excess_margin = current_margin - MAX_MARGIN
+                # 计算需要平仓的数量
+                close_size = int((excess_margin / current_margin) * current_size)
+                
+                if close_size <= 0:
+                    print(f"⚠️ 保证金 {current_margin:.4f} 超出范围，但计算的平仓数量为0")
+                    return {
+                        'success': True,
+                        'adjusted': False,
+                        'final_margin': current_margin,
+                        'warning': f'保证金{current_margin:.4f}超出{MAX_MARGIN}，但数量不足以继续平仓'
+                    }
+                
+                print(f"⚠️ 保证金 {current_margin:.4f} 超出 {MAX_MARGIN}，需要继续平仓")
+                print(f"📉 继续平仓: {close_size} 张")
+                
+                # 执行额外平仓
+                side = 'sell' if pos_side == 'long' else 'buy'
+                order_data = {
+                    'instId': inst_id,
+                    'tdMode': 'isolated',
+                    'side': side,
+                    'posSide': pos_side,
+                    'ordType': 'market',
+                    'sz': str(close_size)
+                }
+                
+                if self.dry_run:
+                    print("🎭 [模拟模式] 额外平仓操作")
+                    return {
+                        'success': True,
+                        'adjusted': True,
+                        'final_margin': MAX_MARGIN,
+                        'mode': 'dry_run'
+                    }
+                
+                success, data = self.trader.place_order(order_data)
+                
+                if success:
+                    print(f"✅ 额外平仓成功")
+                    # 等待成交
+                    time.sleep(2)
+                    # 再次检查保证金
+                    updated_position = self._get_current_position(inst_id, pos_side)
+                    final_margin = updated_position.get('margin', 0) if updated_position else current_margin
+                    print(f"📊 最终保证金: {final_margin:.4f} USDT")
+                    return {
+                        'success': True,
+                        'adjusted': True,
+                        'final_margin': final_margin,
+                        'order_id': data.get('data', [{}])[0].get('ordId', '')
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': f"额外平仓失败: {data.get('msg', '未知错误')}"
+                    }
+            
+            # 保证金低于最小值（不太可能发生，但仍需处理）
+            elif current_margin < MIN_MARGIN:
+                print(f"⚠️ 保证金 {current_margin:.4f} 低于 {MIN_MARGIN}（可能已爆仓或接近强平）")
+                return {
+                    'success': True,
+                    'adjusted': False,
+                    'final_margin': current_margin,
+                    'warning': f'保证金{current_margin:.4f}低于最小值{MIN_MARGIN}'
+                }
+                
+        except Exception as e:
+            print(f"❌ 保证金验证失败: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _get_current_position(self, inst_id, pos_side):
+        """
+        获取当前持仓信息
+        
+        Args:
+            inst_id: 币种ID
+            pos_side: 持仓方向
+        
+        Returns:
+            dict: 持仓信息或None
+        """
+        try:
+            positions = self.trader.get_positions()
+            for pos in positions:
+                if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                    # 计算保证金
+                    pos_size = float(pos.get('pos', 0))
+                    mark_price = float(pos.get('markPx', 0))
+                    leverage = float(pos.get('lever', 10))
+                    
+                    if pos_size > 0 and mark_price > 0:
+                        margin = (pos_size * mark_price) / leverage
+                        return {
+                            'pos_size': pos_size,
+                            'margin': margin,
+                            'mark_price': mark_price,
+                            'leverage': leverage
+                        }
+            return None
+        except Exception as e:
+            print(f"⚠️  获取持仓信息失败: {e}")
+            return None
     
     def get_execution_summary(self, position, maintenance_plan, result):
         """

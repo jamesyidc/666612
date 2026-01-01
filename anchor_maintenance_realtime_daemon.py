@@ -57,6 +57,7 @@ def update_maintenance_count(inst_id, pos_side):
     """更新维护计数"""
     try:
         maintenance_file = '/home/user/webapp/anchor_maintenance_records.json'
+        flask_maintenance_file = '/home/user/webapp/maintenance_orders.json'
         now_beijing = datetime.now(BEIJING_TZ)
         today_date = now_beijing.strftime('%Y-%m-%d')
         
@@ -95,6 +96,33 @@ def update_maintenance_count(inst_id, pos_side):
         # 保存更新后的记录
         with open(maintenance_file, 'w', encoding='utf-8') as f:
             json.dump(records, f, ensure_ascii=False, indent=2)
+        
+        # 同时更新Flask使用的maintenance_orders.json文件
+        try:
+            flask_records = {}
+            try:
+                with open(flask_maintenance_file, 'r', encoding='utf-8') as f:
+                    flask_records = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                flask_records = {}
+            
+            # 添加新的维护记录（Flask用来统计次数）
+            flask_record_key = f"{inst_id}_{pos_side}"
+            if flask_record_key not in flask_records:
+                flask_records[flask_record_key] = []
+            
+            flask_records[flask_record_key].append({
+                'timestamp': now_beijing.strftime('%Y-%m-%d %H:%M:%S'),
+                'date': today_date,
+                'type': 'auto_maintenance',
+                'success': True
+            })
+            
+            # 保存Flask记录文件
+            with open(flask_maintenance_file, 'w', encoding='utf-8') as f:
+                json.dump(flask_records, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"   ⚠️  更新Flask维护记录失败: {e}")
         
         print(f"   📊 维护计数已更新: 今日{records[record_key]['today_count']}次，总计{records[record_key]['total_count']}次")
         
