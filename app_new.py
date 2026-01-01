@@ -12753,26 +12753,37 @@ def get_current_positions():
         # 将数据库记录转换为字典
         db_positions_dict = {(row['inst_id'], row['pos_side']): row for row in db_positions}
         
-        # 获取维护次数统计（不再限制今日，统计所有维护次数）
+        # 获取维护次数统计（从anchor_maintenance_records.json读取今日次数）
         import json as json_lib
         from datetime import datetime
         from collections import defaultdict
         
-        maintenance_file = 'maintenance_orders.json'
-        maintenance_counts = defaultdict(int)
+        # 读取实时维护记录文件（守护进程使用的文件）
+        maintenance_file = 'anchor_maintenance_records.json'
+        today_maintenance_counts = defaultdict(int)  # 今日维护次数
+        total_maintenance_counts = defaultdict(int)  # 总维护次数
         
         if os.path.exists(maintenance_file):
             try:
                 with open(maintenance_file, 'r', encoding='utf-8') as f:
                     maintenance_records = json_lib.load(f)
                 
-                # 不再按日期过滤，统计所有维护次数
-                for record in maintenance_records:
-                    inst_id = record.get('inst_id', '')
-                    pos_side = record.get('pos_side', '')
-                    # 使用 (inst_id, pos_side) 作为key，区分多单和空单
-                    key = (inst_id, pos_side)
-                    maintenance_counts[key] += 1
+                # 从维护记录中获取今日次数和总次数
+                for key, record in maintenance_records.items():
+                    # key格式: "FIL-USDT-SWAP_short"
+                    parts = key.rsplit('_', 1)
+                    if len(parts) == 2:
+                        inst_id = parts[0]
+                        pos_side = parts[1]
+                        record_key = (inst_id, pos_side)
+                        
+                        # 今日维护次数
+                        today_count = record.get('today_count', 0)
+                        today_maintenance_counts[record_key] = today_count
+                        
+                        # 总维护次数
+                        total_count = record.get('total_count', 0)
+                        total_maintenance_counts[record_key] = total_count
             except Exception as e:
                 print(f"读取维护记录失败: {e}")
         
@@ -12852,8 +12863,8 @@ def get_current_positions():
                 'status': status,
                 'status_class': status_class,
                 'is_anchor': is_anchor,
-                'maintenance_count_today': maintenance_counts.get((inst_id, pos_side), 0),  # 总维护次数（不再限制今日）
-                'total_maintenance_count': maintenance_counts.get((inst_id, pos_side), 0)  # 新增字段，明确是总次数
+                'maintenance_count_today': today_maintenance_counts.get((inst_id, pos_side), 0),  # 今日维护次数
+                'total_maintenance_count': total_maintenance_counts.get((inst_id, pos_side), 0)  # 总维护次数
             })
         
         return jsonify({
