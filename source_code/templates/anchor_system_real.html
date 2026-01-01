@@ -869,10 +869,18 @@
             currentRecordsData = data; // 保存数据供持续时间更新使用
             const tbody = document.getElementById('recordsBody');
             
-            if (data.length === 0) {
+            console.log('🔍 renderRecordsTable 被调用');
+            console.log('  数据类型:', typeof data);
+            console.log('  数据长度:', data ? data.length : 'null');
+            console.log('  前2条数据:', data ? data.slice(0, 2) : 'null');
+            
+            if (!data || data.length === 0) {
+                console.log('⚠️ 历史记录数据为空');
                 tbody.innerHTML = '<tr><td colspan="10" class="empty">暂无历史记录</td></tr>';
                 return;
             }
+            
+            console.log('✅ 开始渲染历史记录...');
             
             // 币种编号映射
             const coinNumbers = {
@@ -884,37 +892,44 @@
                 'LDO-USDT-SWAP': 'NO.6'
             };
             
-            tbody.innerHTML = data.map(item => {
-                // 计算持续时间
-                const durationHtml = calculateDuration(item.timestamp);
-                // 获取编号
-                const coinNumber = coinNumbers[item.inst_id] || '--';
+            try {
+                tbody.innerHTML = data.map(item => {
+                    // 计算持续时间
+                    const durationHtml = calculateDuration(item.timestamp);
+                    // 获取编号
+                    const coinNumber = coinNumbers[item.inst_id] || '--';
+                    
+                    return `
+                    <tr>
+                        <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
+                        <td>${item.inst_id || '--'}</td>
+                        <td>
+                            <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                                ${item.pos_side === 'short' ? '做空' : '做多'}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge ${item.record_type === 'max_profit' ? 'badge-profit' : 'badge-loss'}">
+                                ${item.record_type === 'max_profit' ? '🏆 最高盈利' : '📉 最大亏损'}
+                            </span>
+                        </td>
+                        <td style="color: ${(item.profit_rate || 0) >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
+                            ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
+                        </td>
+                        <td>${Math.abs(item.pos_size || 0).toFixed(4)}</td>
+                        <td>$${(item.avg_price || 0).toFixed(4)}</td>
+                        <td>$${(item.mark_price || 0).toFixed(4)}</td>
+                        <td>${item.timestamp}</td>
+                        <td>${durationHtml}</td>
+                    </tr>
+                `;
+                }).join('');
                 
-                return `
-                <tr>
-                    <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
-                    <td>${item.inst_id || '--'}</td>
-                    <td>
-                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
-                            ${item.pos_side === 'short' ? '做空' : '做多'}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="badge ${item.record_type === 'max_profit' ? 'badge-profit' : 'badge-loss'}">
-                            ${item.record_type === 'max_profit' ? '🏆 最高盈利' : '📉 最大亏损'}
-                        </span>
-                    </td>
-                    <td style="color: ${(item.profit_rate || 0) >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
-                        ${(item.profit_rate || 0) >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
-                    </td>
-                    <td>${Math.abs(item.pos_size || 0).toFixed(4)}</td>
-                    <td>$${(item.avg_price || 0).toFixed(4)}</td>
-                    <td>$${(item.mark_price || 0).toFixed(4)}</td>
-                    <td>${item.timestamp}</td>
-                    <td>${durationHtml}</td>
-                </tr>
-            `;
-            }).join('');
+                console.log('✅ 历史记录渲染完成，共', data.length, '条');
+            } catch (error) {
+                console.error('❌ 渲染历史记录失败:', error);
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">渲染失败，请查看Console</td></tr>';
+            }
         }
 
         // 渲染当前持仓情况
