@@ -13041,11 +13041,19 @@ def get_sub_account_positions():
                                 mark_px = float(pos.get('markPx') or 0)
                                 upl = float(pos.get('upl') or 0)
                                 notional_usd = float(pos.get('notionalUsd') or 0)
-                                # 打印原始字段值
-                                print(f"🔍 原始数据 - imr: {pos.get('imr')}, margin: {pos.get('margin')}, mgnRatio: {pos.get('mgnRatio')}")
-                                # 优先使用 margin（占用保证金），而不是 imr（初始保证金）
-                                margin = float(pos.get('margin') or pos.get('imr') or 0)
-                                print(f"💰 最终使用的保证金: {margin}")
+                                mgn_mode = pos.get('mgnMode', 'isolated')
+                                
+                                # 根据持仓模式选择正确的保证金字段
+                                if mgn_mode == 'cross':
+                                    # 全仓模式：使用 imr（初始保证金）
+                                    margin = float(pos.get('imr') or 0)
+                                    print(f"🔍 全仓模式 - imr: {pos.get('imr')}")
+                                else:
+                                    # 逐仓模式：使用 margin（占用保证金）
+                                    margin = float(pos.get('margin') or 0)
+                                    print(f"🔍 逐仓模式 - margin: {pos.get('margin')}")
+                                
+                                print(f"💰 最终使用的保证金: {margin} USDT (模式: {mgn_mode})")
                             except Exception as e:
                                 print(f"⚠️ 数据转换失败: {e}, pos={pos}")
                                 continue
