@@ -312,15 +312,23 @@ class MaintenanceTradeExecutor:
         if add_size <= 0:
             return {'success': False, 'error': '补仓数量无效'}
         
-        # 对数量取整（OKEx要求整数张数）
-        add_size = int(add_size)
-        if add_size <= 0:
-            return {'success': False, 'error': '补仓数量取整后为0'}
+        # 根据数量大小判断精度处理
+        # 如果数量 >= 1，取整到整数
+        # 如果数量 < 1，保留2位小数
+        if add_size >= 1:
+            add_size = int(add_size)
+            if add_size <= 0:
+                return {'success': False, 'error': '补仓数量取整后为0'}
+        else:
+            # 小数数量，保留2位小数
+            add_size = round(add_size, 2)
+            if add_size < 0.01:  # OKEx最小数量通常是0.01
+                add_size = 0.01
         
         print(f"📈 补仓参数:")
         print(f"   币种: {inst_id}")
         print(f"   方向: {pos_side}")
-        print(f"   数量: {add_size} (已取整)")
+        print(f"   数量: {add_size}")
         print(f"   类型: 市价单")
         
         if self.dry_run:
@@ -380,15 +388,23 @@ class MaintenanceTradeExecutor:
         if close_size <= 0:
             return {'success': True, 'message': '无需平仓'}
         
-        # 对数量取整（OKEx要求整数张数）
-        close_size = int(close_size)
-        if close_size <= 0:
-            return {'success': True, 'message': '平仓数量取整后为0'}
+        # 根据数量大小判断精度处理
+        # 如果数量 >= 1，取整到整数
+        # 如果数量 < 1，保留2位小数
+        if close_size >= 1:
+            close_size = int(close_size)
+            if close_size <= 0:
+                return {'success': True, 'message': '平仓数量取整后为0'}
+        else:
+            # 小数数量，保留2位小数
+            close_size = round(close_size, 2)
+            if close_size < 0.01:  # OKEx最小数量通常是0.01
+                close_size = 0.01
         
         print(f"📉 平仓参数:")
         print(f"   币种: {inst_id}")
         print(f"   方向: {pos_side}")
-        print(f"   数量: {close_size} (已取整)")
+        print(f"   数量: {close_size}")
         print(f"   类型: 市价单")
         
         if self.dry_run:
