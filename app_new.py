@@ -16497,6 +16497,7 @@ def reset_sub_account_maintenance_count():
         })
 
 @app.route('/api/main-account/reset-maintenance-count', methods=['POST'])
+@app.route('/api/anchor/reset-sub-maintenance-count', methods=['POST'])  # 前端使用的别名
 def reset_main_account_maintenance_count():
     """清零主账户今日超级维护次数"""
     try:
