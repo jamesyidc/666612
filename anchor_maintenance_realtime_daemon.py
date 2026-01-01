@@ -8,7 +8,7 @@
 import time
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from anchor_maintenance_manager import AnchorMaintenanceManager
 from maintenance_trade_executor import MaintenanceTradeExecutor
@@ -52,6 +52,97 @@ def load_config():
             'auto_maintain_long_enabled': False,
             'auto_maintain_short_enabled': False
         }
+
+def update_maintenance_count(inst_id, pos_side):
+    """更新维护计数"""
+    try:
+        maintenance_file = '/home/user/webapp/anchor_maintenance_records.json'
+        now_beijing = datetime.now(BEIJING_TZ)
+        today_date = now_beijing.strftime('%Y-%m-%d')
+        
+        # 读取现有记录
+        try:
+            with open(maintenance_file, 'r', encoding='utf-8') as f:
+                records = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            records = {}
+        
+        # 构建记录键
+        record_key = f"{inst_id}_{pos_side}"
+        
+        if record_key not in records:
+            records[record_key] = {
+                'inst_id': inst_id,
+                'pos_side': pos_side,
+                'today_count': 1,
+                'total_count': 1,
+                'last_maintenance': now_beijing.strftime('%Y-%m-%d %H:%M:%S'),
+                'date': today_date
+            }
+        else:
+            record = records[record_key]
+            # 检查是否是同一天
+            if record.get('date') == today_date:
+                record['today_count'] = record.get('today_count', 0) + 1
+            else:
+                # 新的一天，重置today_count
+                record['today_count'] = 1
+                record['date'] = today_date
+            
+            record['total_count'] = record.get('total_count', 0) + 1
+            record['last_maintenance'] = now_beijing.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 保存更新后的记录
+        with open(maintenance_file, 'w', encoding='utf-8') as f:
+            json.dump(records, f, ensure_ascii=False, indent=2)
+        
+        print(f"   📊 维护计数已更新: 今日{records[record_key]['today_count']}次，总计{records[record_key]['total_count']}次")
+        
+    except Exception as e:
+        print(f"   ⚠️  更新维护计数失败: {e}")
+
+def check_maintenance_interval(inst_id, pos_side):
+    """检查15分钟维护间隔"""
+    try:
+        maintenance_file = '/home/user/webapp/anchor_maintenance_records.json'
+        now_beijing = datetime.now(BEIJING_TZ)
+        
+        # 读取现有记录
+        try:
+            with open(maintenance_file, 'r', encoding='utf-8') as f:
+                records = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # 没有记录，允许执行
+            return True
+        
+        record_key = f"{inst_id}_{pos_side}"
+        if record_key not in records:
+            # 没有该币种的记录，允许执行
+            return True
+        
+        last_maintenance_str = records[record_key].get('last_maintenance', '')
+        if not last_maintenance_str:
+            return True
+        
+        try:
+            last_time = datetime.strptime(last_maintenance_str, '%Y-%m-%d %H:%M:%S')
+            last_time = BEIJING_TZ.localize(last_time)
+            time_diff = (now_beijing - last_time).total_seconds() / 60
+            
+            if time_diff < 15:
+                print(f"   ⚠️  距离上次维护仅{time_diff:.1f}分钟，需要至少15分钟间隔")
+                next_time = (last_time + timedelta(minutes=15)).strftime('%H:%M:%S')
+                print(f"   ⏰ 下次可维护时间: {next_time}")
+                return False
+        except Exception as e:
+            print(f"   ⚠️  解析上次维护时间失败: {e}")
+            return True
+        
+        return True
+        
+    except Exception as e:
+        print(f"   ⚠️  检查维护间隔失败: {e}")
+        return True  # 出错时允许执行
 
 def main():
     """主循环"""
@@ -116,6 +207,10 @@ def main():
                     print(f"   🤖 自动执行维护...")
                     
                     try:
+                        # 检查15分钟维护间隔
+                        if not check_maintenance_interval(m['inst_id'], m['pos_side']):
+                            continue
+                        
                         # 找到对应的持仓对象
                         position = None
                         for p in positions:
@@ -136,6 +231,9 @@ def main():
                             print(f"   ✅ 维护执行成功!")
                             print(f"      补仓订单: {result['step1_result'].get('order_id', 'N/A')}")
                             print(f"      平仓订单: {result['step2_result'].get('order_id', 'N/A')}")
+                            
+                            # 更新维护计数
+                            update_maintenance_count(m['inst_id'], m['pos_side'])
                         else:
                             print(f"   ❌ 维护执行失败: {result.get('error')}")
                         

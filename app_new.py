@@ -13074,7 +13074,7 @@ def get_sub_account_positions():
                             maintenance_count = 0
                             try:
                                 with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
-                                    maintenance_data = json_lib.load(f)
+                                    maintenance_data = json.load(f)
                                 today = get_china_today()
                                 # Key格式: Wu666666_CRV-USDT-SWAP_long
                                 key = f"{account_name}_{pos['instId']}_{pos['posSide']}"
@@ -13623,7 +13623,7 @@ def super_maintain_anchor_order():
         # 生成签名函数
         def generate_signature(timestamp, method, request_path, body=''):
             if body:
-                body = json_lib.dumps(body)
+                body = json.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(
                 bytes(OKEX_SECRET_KEY, encoding='utf8'),
@@ -13911,7 +13911,7 @@ def maintain_anchor_order():
         # 生成签名
         def generate_signature(timestamp, method, request_path, body=''):
             if body:
-                body = json_lib.dumps(body)
+                body = json.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(
                 bytes(OKEX_SECRET_KEY, encoding='utf8'),
@@ -14528,7 +14528,7 @@ def test_api_permission():
         # 生成签名
         def generate_signature(timestamp, method, request_path, body=''):
             if body:
-                body = json_lib.dumps(body)
+                body = json.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(
                 bytes(OKEX_SECRET_KEY, encoding='utf8'),
@@ -15160,7 +15160,6 @@ def get_trading_positions_opens():
 def reset_maintenance_count():
     """清零子账户今日维护次数"""
     try:
-        import json as json_lib
         from datetime import datetime
         import pytz
         
@@ -15179,7 +15178,7 @@ def reset_maintenance_count():
         maintenance_file = 'sub_account_maintenance.json'
         try:
             with open(maintenance_file, 'r', encoding='utf-8') as f:
-                maintenance_data = json_lib.load(f)
+                maintenance_data = json.load(f)
         except FileNotFoundError:
             maintenance_data = {}
         
@@ -15211,7 +15210,7 @@ def reset_maintenance_count():
         
         # 保存更新后的数据
         with open(maintenance_file, 'w', encoding='utf-8') as f:
-            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+            json.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
         return jsonify({
             'success': True,
@@ -15297,12 +15296,30 @@ def maintain_sub_account():
         # 读取维护记录
         if os.path.exists(maintenance_file):
             with open(maintenance_file, 'r', encoding='utf-8') as f:
-                maintenance_data = json_lib.load(f)
+                maintenance_data = json.load(f)
         else:
             maintenance_data = {}
         
         record_key = f"{account_name}_{inst_id}_{pos_side}"
         record = maintenance_data.get(record_key, {})
+        
+        # 检查15分钟维护间隔
+        last_maintenance_str = record.get('last_maintenance', '')
+        if last_maintenance_str:
+            try:
+                last_time = datetime.strptime(last_maintenance_str, '%Y-%m-%d %H:%M:%S')
+                last_time = beijing_tz.localize(last_time)
+                time_diff = (now_beijing - last_time).total_seconds() / 60
+                
+                if time_diff < 15:
+                    return jsonify({
+                        'success': False,
+                        'message': f'距离上次维护仅{time_diff:.1f}分钟，需要至少15分钟间隔',
+                        'last_maintenance': last_maintenance_str,
+                        'next_available': (last_time + timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
+                    })
+            except Exception as e:
+                print(f"解析上次维护时间失败: {e}")
         
         # 获取当前维护次数（不再按日期重置）
         current_count = record.get('count', 0)
@@ -15319,7 +15336,7 @@ def maintain_sub_account():
         # OKEx API签名函数
         def generate_signature(timestamp, method, request_path, body=''):
             if body:
-                body = json_lib.dumps(body)
+                body = json.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(
                 bytes(secret_key, encoding='utf8'),
@@ -15443,11 +15460,11 @@ def maintain_sub_account():
         print(f"   需要平仓: {close_size} 张")
         
         # ========== 第1步：设置逐仓杠杆 ==========
-        print(f"📊 第1步：设置逐仓杠杆 {leverage}x")
+        print(f"📊 第1步：设置逐仓杠杆 {lever}x")
         leverage_path = '/api/v5/account/set-leverage'
         leverage_body = {
             'instId': inst_id,
-            'lever': str(leverage),
+            'lever': str(lever),
             'mgnMode': 'isolated',  # 逐仓模式
             'posSide': pos_side
         }
@@ -15568,7 +15585,7 @@ def maintain_sub_account():
         
         # 保存更新后的数据
         with open(maintenance_file, 'w', encoding='utf-8') as f:
-            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+            json.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
         # 🔍 维护后自动验证和纠错
         print(f"\n{'='*60}")
@@ -15662,7 +15679,7 @@ def close_all_sub_account_positions():
         # OKEx API签名和请求头函数
         def generate_signature(timestamp, method, request_path, body='', secret_key=''):
             if body:
-                body = json_lib.dumps(body)
+                body = json.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
             return base64.b64encode(mac.digest()).decode()
@@ -15842,7 +15859,7 @@ def close_sub_account_position():
         # OKEx API签名函数
         def generate_signature(timestamp, method, request_path, body=''):
             if body:
-                body = json_lib.dumps(body)
+                body = json.dumps(body)
             message = timestamp + method + request_path + body
             mac = hmac.new(
                 bytes(secret_key, encoding='utf8'),
@@ -16241,7 +16258,7 @@ def reset_sub_account_maintenance_count():
         maintenance_file = 'sub_account_maintenance.json'
         try:
             with open(maintenance_file, 'r', encoding='utf-8') as f:
-                maintenance_data = json_lib.load(f)
+                maintenance_data = json.load(f)
         except FileNotFoundError:
             maintenance_data = {}
         
@@ -16272,7 +16289,7 @@ def reset_sub_account_maintenance_count():
         
         # 保存更新后的数据
         with open(maintenance_file, 'w', encoding='utf-8') as f:
-            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+            json.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
         return jsonify({
             'success': True,
@@ -16314,7 +16331,7 @@ def reset_main_account_maintenance_count():
         maintenance_file = 'main_account_maintenance.json'
         try:
             with open(maintenance_file, 'r', encoding='utf-8') as f:
-                maintenance_data = json_lib.load(f)
+                maintenance_data = json.load(f)
         except FileNotFoundError:
             maintenance_data = {}
         
@@ -16343,7 +16360,7 @@ def reset_main_account_maintenance_count():
         
         # 保存更新后的数据
         with open(maintenance_file, 'w', encoding='utf-8') as f:
-            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+            json.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
         return jsonify({
             'success': True,
