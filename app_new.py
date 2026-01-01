@@ -12898,8 +12898,6 @@ def get_current_positions():
                 'is_anchor': is_anchor,
                 'maintenance_count_today': today_maintenance_counts.get((inst_id, pos_side), 0),  # 今日维护次数
                 'total_maintenance_count': total_maintenance_counts.get((inst_id, pos_side), 0),  # 总维护次数
-                'market_high_24h': market_high_24h,  # 24小时市场最高价
-                'market_low_24h': market_low_24h,  # 24小时市场最低价
                 'max_profit_rate': max_profit_rate,  # 本次持仓的最高盈利率 ✨
                 'max_profit_time': max_profit_time,  # 达到最高盈利率的时间
                 'max_loss_rate': max_loss_rate,      # 本次持仓的最大亏损率 ✨
