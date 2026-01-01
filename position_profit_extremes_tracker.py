@@ -70,7 +70,31 @@ def get_position_open_time(inst_id, pos_side):
         print(f"❌ 获取开仓时间失败 {inst_id} {pos_side}: {e}")
         return None
 
-def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
+def insert_to_history_records(inst_id, pos_side, record_type, profit_rate, pos_size, avg_price, mark_price):
+    """插入历史极值记录到anchor_system.db"""
+    try:
+        conn = sqlite3.connect('/home/user/webapp/anchor_system.db')
+        cursor = conn.cursor()
+        
+        now = get_beijing_time()
+        
+        # 插入或更新记录（如果已存在则替换）
+        cursor.execute('''
+            INSERT OR REPLACE INTO anchor_real_profit_records 
+            (inst_id, pos_side, record_type, profit_rate, timestamp, pos_size, avg_price, mark_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (inst_id, pos_side, record_type, profit_rate, now, pos_size, avg_price, mark_price))
+        
+        conn.commit()
+        conn.close()
+        print(f"📝 历史记录已更新: {inst_id} {pos_side} {record_type} {profit_rate:.2f}%")
+        return True
+    except Exception as e:
+        print(f"❌ 插入历史记录失败 {inst_id} {pos_side}: {e}")
+        traceback.print_exc()
+        return False
+
+def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate, pos_info=None):
     """更新盈利极值记录"""
     try:
         conn = sqlite3.connect('/home/user/webapp/trading_decision.db')
@@ -107,6 +131,16 @@ def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
                 ''', (current_profit_rate, now, current_profit_rate, now, 
                       inst_id, pos_side, open_time))
                 print(f"📈 {inst_id} {pos_side} 新高盈利: {current_profit_rate:.2f}% (之前: {max_profit_rate:.2f}%)")
+                
+                # 插入历史极值记录
+                if pos_info:
+                    insert_to_history_records(
+                        inst_id, pos_side, 'max_profit', current_profit_rate,
+                        pos_info.get('pos_size', 0),
+                        pos_info.get('avg_price', 0),
+                        pos_info.get('mark_price', 0)
+                    )
+                
                 updated = True
             
             # 检查是否需要更新最大亏损率
@@ -121,6 +155,16 @@ def update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
                 ''', (current_profit_rate, now, current_profit_rate, now,
                       inst_id, pos_side, open_time))
                 print(f"📉 {inst_id} {pos_side} 新低亏损: {current_profit_rate:.2f}% (之前: {max_loss_rate:.2f}%)")
+                
+                # 插入历史极值记录
+                if pos_info:
+                    insert_to_history_records(
+                        inst_id, pos_side, 'max_loss', current_profit_rate,
+                        pos_info.get('pos_size', 0),
+                        pos_info.get('avg_price', 0),
+                        pos_info.get('mark_price', 0)
+                    )
+                
                 updated = True
             
             # 如果没有更新极值，只更新当前盈亏率
@@ -196,7 +240,7 @@ def track_all_positions():
             open_time = get_beijing_time()
         
         # 更新极值
-        if update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate):
+        if update_profit_extremes(inst_id, pos_side, open_time, current_profit_rate, pos):
             tracked_count += 1
             print(f"   ✓ {inst_id} {pos_side}: 当前 {current_profit_rate:+.2f}%")
     
