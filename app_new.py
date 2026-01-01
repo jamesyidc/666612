@@ -15706,17 +15706,24 @@ def close_all_sub_account_positions():
                 if result.get('code') == '0' and result.get('data'):
                     pos_count = 0
                     for pos_data in result['data']:
-                        pos_size = float(pos_data.get('pos', 0))
+                        pos_size = float(pos_data.get('pos', 0) or 0)
                         if pos_size != 0:
-                            inst_id = pos_data.get('instId')
-                            pos_side = pos_data.get('posSide')
+                            inst_id = pos_data.get('instId', '')
+                            pos_side = pos_data.get('posSide', '')
+                            margin_str = pos_data.get('margin', '0')
+                            mark_px_str = pos_data.get('markPx', '0')
+                            
+                            # 处理空字符串
+                            margin = float(margin_str or 0)
+                            mark_price = float(mark_px_str or 0)
+                            
                             all_positions.append({
                                 'account_name': account_name,
                                 'inst_id': inst_id,
                                 'pos_side': pos_side,
                                 'pos_size': pos_size,
-                                'margin': float(pos_data.get('margin', 0)),
-                                'mark_price': float(pos_data.get('markPx', 0))
+                                'margin': margin,
+                                'mark_price': mark_price
                             })
                             pos_count += 1
                             print(f"    ✅ {inst_id} {pos_side}: {pos_size}张")
