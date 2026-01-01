@@ -27,7 +27,7 @@ FIXED_FILE_ID = "1eyYiU6lU8n7SwWUvFtm_kUIvaZI0SO4U"  # 固定的数据文件ID
 CHECK_INTERVAL = 30  # 检测间隔（秒）
 TIMEOUT_THRESHOLD = 11 * 60  # 超时阈值（秒）= 11分钟
 LOG_FILE = "/home/user/webapp/gdrive_final_detector.log"
-DB_PATH = "/home/user/webapp/crypto_data.db"
+DB_PATH = "/home/user/webapp/databases/crypto_data.db"
 CONFIG_FILE = "/home/user/webapp/daily_folder_config.json"  # 每日文件夹ID配置文件
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
