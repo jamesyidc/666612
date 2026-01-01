@@ -12850,6 +12850,24 @@ def get_current_positions():
                 status = '接近止损'
                 status_class = 'loss'
             
+            # 获取24小时最高最低价作为极值
+            extreme_high = None
+            extreme_low = None
+            try:
+                # 从OKEx API获取24小时最高最低价
+                ticker_response = requests.get(
+                    f'https://www.okx.com/api/v5/market/ticker?instId={inst_id}',
+                    timeout=3
+                )
+                if ticker_response.status_code == 200:
+                    ticker_data = ticker_response.json()
+                    if ticker_data.get('code') == '0' and ticker_data.get('data'):
+                        ticker = ticker_data['data'][0]
+                        extreme_high = safe_float(ticker.get('high24h'))
+                        extreme_low = safe_float(ticker.get('low24h'))
+            except Exception as e:
+                print(f"获取{inst_id}极值失败: {e}")
+            
             position_list.append({
                 'inst_id': inst_id,
                 'pos_side': pos_side,
@@ -12864,7 +12882,9 @@ def get_current_positions():
                 'status_class': status_class,
                 'is_anchor': is_anchor,
                 'maintenance_count_today': today_maintenance_counts.get((inst_id, pos_side), 0),  # 今日维护次数
-                'total_maintenance_count': total_maintenance_counts.get((inst_id, pos_side), 0)  # 总维护次数
+                'total_maintenance_count': total_maintenance_counts.get((inst_id, pos_side), 0),  # 总维护次数
+                'extreme_high': extreme_high,  # 24小时最高价
+                'extreme_low': extreme_low  # 24小时最低价
             })
         
         return jsonify({
