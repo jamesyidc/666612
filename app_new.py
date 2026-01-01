@@ -15804,38 +15804,129 @@ def close_all_sub_account_positions():
                 secret_key = sub_account['secret_key']
                 passphrase = sub_account['passphrase']
                 
-                # 构建平仓请求
-                timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-                request_path = '/api/v5/trade/order'
+                # 多策略平仓：尝试3种方法确保成功
+                close_success = False
+                order_id = None
+                error_details = []
                 
-                # 确定平仓方向
-                close_side = 'sell' if pos_side == 'long' else 'buy'
+                # 策略1: 使用快捷平仓接口（最可靠）
+                print(f"  🎯 策略1: 快捷平仓接口 - {inst_id} {pos_side}")
+                try:
+                    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                    request_path = '/api/v5/trade/close-position'
+                    
+                    close_body = {
+                        'instId': inst_id,
+                        'mgnMode': 'isolated',
+                        'posSide': pos_side,
+                        'ccy': 'USDT'
+                    }
+                    
+                    headers = get_headers(api_key, secret_key, passphrase, timestamp, 'POST', request_path, close_body)
+                    
+                    response = requests.post(
+                        f'{OKEX_REST_URL}{request_path}',
+                        headers=headers,
+                        json=close_body,
+                        timeout=10
+                    )
+                    
+                    result = response.json()
+                    print(f"     响应: code={result.get('code')}, msg={result.get('msg', 'N/A')}")
+                    
+                    if result.get('code') == '0' and result.get('data'):
+                        order_id = result['data'][0].get('ordId', '--')
+                        close_success = True
+                        print(f"     ✅ 策略1成功")
+                    else:
+                        error_details.append(f"策略1失败: {result.get('msg', '未知错误')}")
+                except Exception as e:
+                    error_details.append(f"策略1异常: {str(e)}")
+                    print(f"     ❌ 策略1异常: {str(e)}")
                 
-                order_body = {
-                    'instId': inst_id,
-                    'tdMode': 'isolated',
-                    'side': close_side,
-                    'posSide': pos_side,
-                    'ordType': 'market',
-                    'sz': str(int(pos_size))
-                }
+                # 策略2: 标准下单接口 + reduceOnly（如果策略1失败）
+                if not close_success:
+                    print(f"  🎯 策略2: 标准下单接口 + reduceOnly")
+                    try:
+                        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                        request_path = '/api/v5/trade/order'
+                        
+                        close_side = 'sell' if pos_side == 'long' else 'buy'
+                        
+                        order_body = {
+                            'instId': inst_id,
+                            'tdMode': 'isolated',
+                            'side': close_side,
+                            'posSide': pos_side,
+                            'ordType': 'market',
+                            'sz': str(int(pos_size)),
+                            'reduceOnly': True  # 关键参数
+                        }
+                        
+                        headers = get_headers(api_key, secret_key, passphrase, timestamp, 'POST', request_path, order_body)
+                        
+                        response = requests.post(
+                            f'{OKEX_REST_URL}{request_path}',
+                            headers=headers,
+                            json=order_body,
+                            timeout=10
+                        )
+                        
+                        result = response.json()
+                        print(f"     响应: code={result.get('code')}, msg={result.get('msg', 'N/A')}")
+                        
+                        if result.get('code') == '0' and result.get('data'):
+                            order_id = result['data'][0].get('ordId', '--')
+                            close_success = True
+                            print(f"     ✅ 策略2成功")
+                        else:
+                            error_details.append(f"策略2失败: {result.get('msg', '未知错误')}")
+                    except Exception as e:
+                        error_details.append(f"策略2异常: {str(e)}")
+                        print(f"     ❌ 策略2异常: {str(e)}")
                 
-                headers = get_headers(api_key, secret_key, passphrase, timestamp, 'POST', request_path, order_body)
+                # 策略3: 不带reduceOnly的标准下单（最后的尝试）
+                if not close_success:
+                    print(f"  🎯 策略3: 标准下单接口（无reduceOnly）")
+                    try:
+                        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                        request_path = '/api/v5/trade/order'
+                        
+                        close_side = 'sell' if pos_side == 'long' else 'buy'
+                        
+                        order_body = {
+                            'instId': inst_id,
+                            'tdMode': 'isolated',
+                            'side': close_side,
+                            'posSide': pos_side,
+                            'ordType': 'market',
+                            'sz': str(int(pos_size))
+                        }
+                        
+                        headers = get_headers(api_key, secret_key, passphrase, timestamp, 'POST', request_path, order_body)
+                        
+                        response = requests.post(
+                            f'{OKEX_REST_URL}{request_path}',
+                            headers=headers,
+                            json=order_body,
+                            timeout=10
+                        )
+                        
+                        result = response.json()
+                        print(f"     响应: code={result.get('code')}, msg={result.get('msg', 'N/A')}")
+                        
+                        if result.get('code') == '0' and result.get('data'):
+                            order_id = result['data'][0].get('ordId', '--')
+                            close_success = True
+                            print(f"     ✅ 策略3成功")
+                        else:
+                            error_details.append(f"策略3失败: {result.get('msg', '未知错误')}")
+                    except Exception as e:
+                        error_details.append(f"策略3异常: {str(e)}")
+                        print(f"     ❌ 策略3异常: {str(e)}")
                 
-                # 发送平仓请求
-                response = requests.post(
-                    f'{OKEX_REST_URL}{request_path}',
-                    headers=headers,
-                    json=order_body,
-                    timeout=10
-                )
-                
-                result = response.json()
-                
-                print(f"  📡 OKEx响应: {result}")
-                
-                if result.get('code') == '0' and result.get('data'):
-                    order_id = result['data'][0].get('ordId', '--')
+                # 汇总结果
+                if close_success:
                     print(f"  ✅ {account_name} {inst_id} {pos_side}: 平仓成功 (订单ID: {order_id})")
                     success_count += 1
                     results.append({
@@ -15847,18 +15938,15 @@ def close_all_sub_account_positions():
                         'size': pos_size
                     })
                 else:
-                    error_code = result.get('code', 'unknown')
-                    error_msg = result.get('msg', '未知错误')
-                    print(f"  ❌ {account_name} {inst_id} {pos_side}: 平仓失败")
-                    print(f"     错误码: {error_code}, 错误信息: {error_msg}")
-                    print(f"     订单参数: {order_body}")
+                    print(f"  ❌ {account_name} {inst_id} {pos_side}: 所有策略均失败")
+                    print(f"     失败详情: {'; '.join(error_details)}")
                     fail_count += 1
                     results.append({
                         'account_name': account_name,
                         'inst_id': inst_id,
                         'pos_side': pos_side,
                         'success': False,
-                        'message': error_msg
+                        'message': '; '.join(error_details) if error_details else '所有策略均失败'
                     })
                 
             except Exception as e:
