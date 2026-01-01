@@ -22,12 +22,29 @@ def get_beijing_time():
     return datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
 def get_okx_config():
-    """读取OKX配置"""
+    """读取OKX配置（主账号）"""
     try:
-        with open('/home/user/webapp/okx_config.json', 'r') as f:
-            return json.load(f)
+        # 尝试读取主账号配置
+        config_file = '/home/user/webapp/sub_account_config.json'
+        if not os.path.exists(config_file):
+            print(f"⚠️  配置文件不存在: {config_file}")
+            return None
+            
+        with open(config_file, 'r') as f:
+            data = json.load(f)
+        
+        # 使用第一个子账号（主账号）的配置
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        elif isinstance(data, dict):
+            return data
+        
+        print("⚠️  配置文件格式不正确")
+        return None
+        
     except Exception as e:
         print(f"❌ 读取配置失败: {e}")
+        traceback.print_exc()
         return None
 
 def get_current_positions():
