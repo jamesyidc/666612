@@ -12816,26 +12816,18 @@ def get_current_positions():
             pos_value_abs = abs(pos_value)  # 持仓数量（绝对值）
             margin = (pos_value_abs * mark_price) / lever if lever > 0 and mark_price > 0 else 0.01
             
-            # 如果数据库中有记录，使用数据库的开仓价格（可能是维护后的）
+            # 直接使用OKEx的收益率（uplRatio），转换为百分比
+            okex_profit_ratio = safe_float(pos.get('uplRatio', 0))
+            profit_rate = okex_profit_ratio * 100  # 转换为百分比
+            
+            # 如果数据库中有记录，使用数据库的开仓价格
             if db_record:
                 avg_price = float(db_record['open_price'])
                 is_anchor = int(db_record['is_anchor']) if db_record['is_anchor'] else 0
-                # 计算相对保证金的收益率
-                # 注意：这里应该使用真实保证金(margin)而不是持仓价值(okex_margin)
-                # 因为收益率 = 盈亏 / 投入的保证金 * 100
-                if margin > 0:
-                    profit_rate = (upl / margin) * 100
-                else:
-                    # 备用计算：价格变动率 * 杠杆
-                    if pos_side == 'short':
-                        profit_rate = ((avg_price - mark_price) / avg_price) * lever * 100
-                    else:  # long
-                        profit_rate = ((mark_price - avg_price) / avg_price) * lever * 100
             else:
                 # 如果数据库中没有，使用 OKEx 的价格，标记为非锚点单
                 avg_price = okex_avg_price
                 is_anchor = 0
-                profit_rate = calculate_profit_rate(pos)
             
             # 判断状态
             status = '监控中'
