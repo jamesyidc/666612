@@ -15641,6 +15641,9 @@ def close_all_sub_account_positions():
         
         print("🚨 开始执行一键全部平仓...")
         
+        # OKEx API配置
+        OKEX_REST_URL = 'https://www.okx.com'
+        
         # 直接读取子账户配置并获取持仓
         all_positions = []
         
