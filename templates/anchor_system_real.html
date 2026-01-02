@@ -480,6 +480,18 @@
 
         <!-- 空单低盈利/亏损统计 -->
         <div class="stats-grid" style="margin-top: 20px;">
+            <div class="stat-card" style="border: 2px solid #a78bfa; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+                <div class="stat-icon">📊</div>
+                <div class="stat-label" style="color: #6b21a8;">空单盈利≤40%</div>
+                <div class="stat-value" id="profitBelow40" style="color: #a78bfa; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #6b21a8;" id="profitBelow40Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #9333ea; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+                <div class="stat-icon">📉</div>
+                <div class="stat-label" style="color: #6b21a8;">空单盈利≤30%</div>
+                <div class="stat-value" id="profitBelow30" style="color: #9333ea; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #6b21a8;" id="profitBelow30Increase">1小时内: --</div>
+            </div>
             <div class="stat-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);">
                 <div class="stat-icon">📉</div>
                 <div class="stat-label" style="color: #5b21b6;">空单盈利≤20%</div>
@@ -1056,6 +1068,8 @@
             profit60: [],
             profit50: [],
             profit40: [],
+            profitBelow40: [],
+            profitBelow30: [],
             profitBelow20: [],
             profitBelow10: [],
             lossCount: [],
@@ -1265,6 +1279,8 @@
                 document.getElementById('profit60Plus').textContent = '0';
                 document.getElementById('profit50Plus').textContent = '0';
                 document.getElementById('profit40Plus').textContent = '0';
+                document.getElementById('profitBelow40').textContent = '0';
+                document.getElementById('profitBelow30').textContent = '0';
                 document.getElementById('profitBelow20').textContent = '0';
                 document.getElementById('profitBelow10').textContent = '0';
                 document.getElementById('lossCount').textContent = '0';
@@ -1277,6 +1293,8 @@
                 document.getElementById('profit60Increase').textContent = '1小时内: --';
                 document.getElementById('profit50Increase').textContent = '1小时内: --';
                 document.getElementById('profit40Increase').textContent = '1小时内: --';
+                document.getElementById('profitBelow40Increase').textContent = '1小时内: --';
+                document.getElementById('profitBelow30Increase').textContent = '1小时内: --';
                 document.getElementById('profitBelow20Increase').textContent = '1小时内: --';
                 document.getElementById('profitBelow10Increase').textContent = '1小时内: --';
                 document.getElementById('lossCountIncrease').textContent = '1小时内: --';
@@ -1294,6 +1312,8 @@
             const profit60 = shortPositions.filter(item => item.profit_rate >= 60).length;
             const profit50 = shortPositions.filter(item => item.profit_rate >= 50).length;
             const profit40 = shortPositions.filter(item => item.profit_rate >= 40).length;
+            const profitBelow40 = shortPositions.filter(item => item.profit_rate > 0 && item.profit_rate <= 40).length;
+            const profitBelow30 = shortPositions.filter(item => item.profit_rate > 0 && item.profit_rate <= 30).length;
             const profitBelow20 = shortPositions.filter(item => item.profit_rate > 0 && item.profit_rate <= 20).length;
             const profitBelow10 = shortPositions.filter(item => item.profit_rate > 0 && item.profit_rate <= 10).length;
             const lossCount = shortPositions.filter(item => item.profit_rate < 0).length;
@@ -1309,6 +1329,8 @@
             document.getElementById('profit60Plus').textContent = profit60;
             document.getElementById('profit50Plus').textContent = profit50;
             document.getElementById('profit40Plus').textContent = profit40;
+            document.getElementById('profitBelow40').textContent = profitBelow40;
+            document.getElementById('profitBelow30').textContent = profitBelow30;
             document.getElementById('profitBelow20').textContent = profitBelow20;
             document.getElementById('profitBelow10').textContent = profitBelow10;
             document.getElementById('lossCount').textContent = lossCount;
@@ -1332,6 +1354,8 @@
                 profitHistoryData.profit60.push({ time: now, count: profit60 });
                 profitHistoryData.profit50.push({ time: now, count: profit50 });
                 profitHistoryData.profit40.push({ time: now, count: profit40 });
+                profitHistoryData.profitBelow40.push({ time: now, count: profitBelow40 });
+                profitHistoryData.profitBelow30.push({ time: now, count: profitBelow30 });
                 profitHistoryData.profitBelow20.push({ time: now, count: profitBelow20 });
                 profitHistoryData.profitBelow10.push({ time: now, count: profitBelow10 });
                 profitHistoryData.lossCount.push({ time: now, count: lossCount });
@@ -1347,6 +1371,8 @@
                 profitHistoryData.profit60 = profitHistoryData.profit60.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit50 = profitHistoryData.profit50.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit40 = profitHistoryData.profit40.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profitBelow40 = profitHistoryData.profitBelow40.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profitBelow30 = profitHistoryData.profitBelow30.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profitBelow20 = profitHistoryData.profitBelow20.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profitBelow10 = profitHistoryData.profitBelow10.filter(d => d.time > oneHourAgo);
                 profitHistoryData.lossCount = profitHistoryData.lossCount.filter(d => d.time > oneHourAgo);
@@ -1454,6 +1480,8 @@
             document.getElementById('profit60Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit60, profit60)}`;
             document.getElementById('profit50Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit50, profit50)}`;
             document.getElementById('profit40Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit40, profit40)}`;
+            document.getElementById('profitBelow40Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow40, profitBelow40)}`;
+            document.getElementById('profitBelow30Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow30, profitBelow30)}`;
             document.getElementById('profitBelow20Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow20, profitBelow20)}`;
             document.getElementById('profitBelow10Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow10, profitBelow10)}`;
             document.getElementById('lossCountIncrease').textContent = `1小时内: ${calcIncrease(profitHistoryData.lossCount, lossCount)}`;
