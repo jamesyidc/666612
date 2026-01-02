@@ -7012,7 +7012,7 @@ def api_support_resistance_escape_max_stats():
         
         conn.close()
         
-        # 保存统计数据到crypto_data.db的escape_snapshot_stats表
+        # 查询历史最大值并保存统计数据到crypto_data.db的escape_snapshot_stats表
         try:
             beijing_tz = pytz.timezone('Asia/Shanghai')
             stat_time = datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')
@@ -7028,20 +7028,37 @@ def api_support_resistance_escape_max_stats():
             ''', (stat_time, escape_snapshot_count_24h, escape_snapshot_count_2h, 
                   max_escape_count_24h, max_escape_count_2h))
             
+            # 查询历史最大值
+            crypto_cursor.execute('''
+                SELECT 
+                    MAX(escape_24h_count) as max_24h_snapshot_count,
+                    MAX(escape_2h_count) as max_2h_snapshot_count
+                FROM escape_snapshot_stats
+            ''')
+            
+            max_values = crypto_cursor.fetchone()
+            historical_max_24h = max_values[0] if max_values[0] is not None else escape_snapshot_count_24h
+            historical_max_2h = max_values[1] if max_values[1] is not None else escape_snapshot_count_2h
+            
             crypto_conn.commit()
             crypto_conn.close()
         except Exception as save_error:
             print(f"⚠️  保存逃顶统计数据失败: {save_error}")
+            # 如果查询历史最大值失败，使用当前值
+            historical_max_24h = escape_snapshot_count_24h
+            historical_max_2h = escape_snapshot_count_2h
         
         return jsonify({
             'success': True,
             'stats_24h': {
-                'escape_snapshot_count': escape_snapshot_count_24h,  # 逃顶快照数
-                'max_escape_count': max_escape_count_24h  # 最大的逃顶信号数（S3+S4）
+                'escape_snapshot_count': escape_snapshot_count_24h,  # 当前逃顶快照数
+                'max_escape_count': max_escape_count_24h,  # 当前最大的逃顶信号数（S3+S4）
+                'historical_max_snapshot_count': historical_max_24h  # 历史最大逃顶快照数
             },
             'stats_2h': {
                 'escape_snapshot_count': escape_snapshot_count_2h,
-                'max_escape_count': max_escape_count_2h
+                'max_escape_count': max_escape_count_2h,
+                'historical_max_snapshot_count': historical_max_2h  # 历史最大逃顶快照数
             }
         })
         
