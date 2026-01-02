@@ -927,6 +927,33 @@
             
             if (!statusBar || !statusIcon || !statusTitle || !statusHint) return;
             
+            // 市场下跌等级分析（基于空单盈利≥40%的总数）
+            let marketDownLevel = 0;
+            let marketDownLevelText = '';
+            let marketDownIcon = '';
+            
+            if (stats.profit40 >= 10) {
+                // 5级和4级：空单盈利≥40%的总数大于等于10
+                // 需要额外判断条件来区分5级和4级
+                if (stats.profit50 >= 8 && stats.profit60 >= 5) {
+                    marketDownLevel = 5;
+                    marketDownLevelText = '5级下跌 - 深度下跌';
+                    marketDownIcon = '🔴🔴🔴🔴🔴';
+                } else {
+                    marketDownLevel = 4;
+                    marketDownLevelText = '4级下跌 - 重度下跌';
+                    marketDownIcon = '🔴🔴🔴🔴';
+                }
+            } else if (stats.profit40 >= 8) {
+                marketDownLevel = 3;
+                marketDownLevelText = '3级下跌 - 中度下跌';
+                marketDownIcon = '🔴🔴🔴';
+            } else if (stats.profit40 >= 5) {
+                marketDownLevel = 2;
+                marketDownLevelText = '2级下跌 - 轻度下跌';
+                marketDownIcon = '🔴🔴';
+            }
+            
             // 新的触发规则
             // 触底反弹：profit70 >= 1 AND profit60 >= 2 AND profit50 >= 5 AND profit40 >= 8
             const isBottomRebound = stats.profit70 >= 1 && stats.profit60 >= 2 && stats.profit50 >= 5 && stats.profit40 >= 8;
@@ -937,7 +964,19 @@
             // 多头行情：profitBelow20 >= 8 AND profitBelow10 >= 6 AND lossCount >= 2
             const isBullMarket = stats.profitBelow20 >= 8 && stats.profitBelow10 >= 6 && stats.lossCount >= 2;
             
-            if (isBullMarket) {
+            // 优先显示市场下跌等级（如果存在）
+            if (marketDownLevel >= 2) {
+                // 显示市场下跌等级
+                statusBar.style.display = 'block';
+                statusBar.style.background = 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
+                statusBar.style.border = '3px solid #991b1b';
+                statusIcon.textContent = marketDownIcon;
+                statusTitle.textContent = `市场下跌等级分析：${marketDownLevelText}`;
+                statusTitle.style.color = '#ffffff';
+                statusHint.textContent = `空单盈利≥40%数量: ${stats.profit40} | 操作提示：持有空单`;
+                statusHint.style.color = '#fee2e2';
+                console.log('🔴 状态栏: 市场下跌等级', marketDownLevel, stats);
+            } else if (isBullMarket) {
                 // 显示：多头行情 - 适合做多
                 statusBar.style.display = 'block';
                 statusBar.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
