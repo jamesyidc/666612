@@ -7079,6 +7079,120 @@ def api_support_resistance_escape_max_stats():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/support-resistance/escape-signal-stats')
+def api_support_resistance_escape_signal_stats():
+    """获取逃顶信号数统计（S3+S4）"""
+    try:
+        conn = sqlite3.connect('databases/crypto_data.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 获取最新的信号数统计
+        cursor.execute('''
+            SELECT 
+                signal_24h_count,
+                signal_2h_count,
+                max_signal_24h,
+                max_signal_2h
+            FROM escape_signal_stats
+            ORDER BY stat_time DESC
+            LIMIT 1
+        ''')
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return jsonify({
+                'success': True,
+                'stats_24h': {
+                    'signal_count': row['signal_24h_count'],
+                    'historical_max_signal_count': row['max_signal_24h']
+                },
+                'stats_2h': {
+                    'signal_count': row['signal_2h_count'],
+                    'historical_max_signal_count': row['max_signal_2h']
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '暂无数据'
+            })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/support-resistance/record-escape-signal-stats', methods=['POST'])
+def api_record_escape_signal_stats():
+    """记录前端的逃顶信号数统计"""
+    try:
+        import pytz
+        from datetime import datetime
+        
+        data = request.get_json()
+        signal_24h = data.get('signal_24h', 0)
+        signal_2h = data.get('signal_2h', 0)
+        
+        # 获取北京时间
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        now = datetime.now(beijing_tz)
+        stat_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        
+        conn = sqlite3.connect('databases/crypto_data.db')
+        cursor = conn.cursor()
+        
+        # 获取历史最大值
+        cursor.execute('''
+            SELECT 
+                COALESCE(MAX(max_signal_24h), 0) as max_24h,
+                COALESCE(MAX(max_signal_2h), 0) as max_2h
+            FROM escape_signal_stats
+        ''')
+        
+        max_row = cursor.fetchone()
+        current_max_24h = max_row[0] if max_row else 0
+        current_max_2h = max_row[1] if max_row else 0
+        
+        # 更新最大值
+        new_max_24h = max(current_max_24h, signal_24h)
+        new_max_2h = max(current_max_2h, signal_2h)
+        
+        # 插入新记录
+        cursor.execute('''
+            INSERT INTO escape_signal_stats 
+            (stat_time, signal_24h_count, signal_2h_count, max_signal_24h, max_signal_2h)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (stat_time, signal_24h, signal_2h, new_max_24h, new_max_2h))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '记录成功',
+            'data': {
+                'stat_time': stat_time,
+                'signal_24h': signal_24h,
+                'signal_2h': signal_2h,
+                'max_signal_24h': new_max_24h,
+                'max_signal_2h': new_max_2h
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/support-resistance/escape-stats-history')
 def api_support_resistance_escape_stats_history():
     """获取逃顶快照统计的历史数据"""

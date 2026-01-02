@@ -1152,21 +1152,21 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <!-- 24小时逃顶统计 -->
                 <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%); border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.3);">
-                    <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶快照数统计</div>
+                    <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶信号数统计</div>
                     <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
-                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个快照有逃顶信号（最近24小时）</div>
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近24小时）</div>
                     <div style="font-size: 13px; color: rgba(239, 68, 68, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(239, 68, 68, 0.2);">
-                        逃顶快照数历史最大值：<span id="escape24hMaxValue" style="font-weight: bold; font-size: 18px; color: #fca5a5;">-</span> 个快照
+                        逃顶信号数历史最大值：<span id="escape24hMaxValue" style="font-weight: bold; font-size: 18px; color: #fca5a5;">-</span> 个信号
                     </div>
                 </div>
                 
                 <!-- 2小时逃顶统计 -->
                 <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.15) 100%); border-radius: 12px; border: 2px solid rgba(249, 115, 22, 0.3);">
-                    <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">⚡ 2小时逃顶快照数统计</div>
+                    <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">⚡ 2小时逃顶信号数统计</div>
                     <div id="escape2hCount" style="font-size: 42px; font-weight: 700; color: #f97316; text-shadow: 0 2px 8px rgba(249, 115, 22, 0.5); letter-spacing: 2px;">-</div>
-                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个快照有逃顶信号（最近2小时）</div>
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近2小时）</div>
                     <div style="font-size: 13px; color: rgba(249, 115, 22, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, 0.2);">
-                        逃顶快照数历史最大值：<span id="escape2hMaxValue" style="font-weight: bold; font-size: 18px; color: #fdba74;">-</span> 个快照
+                        逃顶信号数历史最大值：<span id="escape2hMaxValue" style="font-weight: bold; font-size: 18px; color: #fdba74;">-</span> 个信号
                     </div>
                 </div>
             </div>
@@ -2013,10 +2013,10 @@
         }
         
         function loadMaxHistoryStats() {
-            // 同时加载峰值币种数统计和逃顶快照数统计
+            // 同时加载峰值币种数统计和逃顶信号数统计
             Promise.all([
                 fetch('/api/support-resistance/max-history-stats'),
-                fetch('/api/support-resistance/escape-max-stats')
+                fetch('/api/support-resistance/escape-signal-stats')  // 改为信号数API
             ])
             .then(responses => Promise.all(responses.map(r => r.json())))
             .then(([peakResult, escapeResult]) => {
@@ -2029,50 +2029,50 @@
                         peakResult.stats_2h.scenario1_max + peakResult.stats_2h.scenario4_max;
                 }
                 
-                // 更新逃顶快照数历史最大值
+                // 更新逃顶信号数统计
                 if (escapeResult && escapeResult.success) {
-                    // 更新24小时逃顶快照数 - 当前值
-                    const escape24hCount = escapeResult.stats_24h.escape_snapshot_count || 0;
+                    // 更新24小时逃顶信号数 - 当前值
+                    const signal24hCount = escapeResult.stats_24h.signal_count || 0;
                     const escape24hCountEl = document.getElementById('escape24hCount');
                     if (escape24hCountEl) {
-                        escape24hCountEl.textContent = escape24hCount;
+                        escape24hCountEl.textContent = signal24hCount;
                         // 根据数量动态调整颜色
-                        if (escape24hCount === 0) {
+                        if (signal24hCount === 0) {
                             escape24hCountEl.style.color = '#6b7280';
                             escape24hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
-                        } else if (escape24hCount >= 10) {
+                        } else if (signal24hCount >= 100) {
                             escape24hCountEl.style.color = '#dc2626';
                             escape24hCountEl.style.textShadow = '0 2px 8px rgba(220, 38, 38, 0.8)';
-                        } else if (escape24hCount >= 5) {
+                        } else if (signal24hCount >= 50) {
                             escape24hCountEl.style.color = '#ef4444';
                             escape24hCountEl.style.textShadow = '0 2px 8px rgba(239, 68, 68, 0.5)';
                         }
                     }
                     
-                    // 更新24小时逃顶快照数历史最大值
-                    escape24hMaxValue = escapeResult.stats_24h.historical_max_snapshot_count || 0;
+                    // 更新24小时逃顶信号数历史最大值
+                    escape24hMaxValue = escapeResult.stats_24h.historical_max_signal_count || 0;
                     document.getElementById('escape24hMaxValue').textContent = escape24hMaxValue;
                     
-                    // 更新2小时逃顶快照数 - 当前值
-                    const escape2hCount = escapeResult.stats_2h.escape_snapshot_count || 0;
+                    // 更新2小时逃顶信号数 - 当前值
+                    const signal2hCount = escapeResult.stats_2h.signal_count || 0;
                     const escape2hCountEl = document.getElementById('escape2hCount');
                     if (escape2hCountEl) {
-                        escape2hCountEl.textContent = escape2hCount;
+                        escape2hCountEl.textContent = signal2hCount;
                         // 根据数量动态调整颜色（橙色系）
-                        if (escape2hCount === 0) {
+                        if (signal2hCount === 0) {
                             escape2hCountEl.style.color = '#6b7280';
                             escape2hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
-                        } else if (escape2hCount >= 5) {
+                        } else if (signal2hCount >= 10) {
                             escape2hCountEl.style.color = '#ea580c';
                             escape2hCountEl.style.textShadow = '0 2px 8px rgba(234, 88, 12, 0.8)';
-                        } else if (escape2hCount >= 3) {
+                        } else if (signal2hCount >= 5) {
                             escape2hCountEl.style.color = '#f97316';
                             escape2hCountEl.style.textShadow = '0 2px 8px rgba(249, 115, 22, 0.5)';
                         }
                     }
                     
-                    // 更新2小时逃顶快照数历史最大值
-                    escape2hMaxValue = escapeResult.stats_2h.historical_max_snapshot_count || 0;
+                    // 更新2小时逃顶信号数历史最大值
+                    escape2hMaxValue = escapeResult.stats_2h.historical_max_signal_count || 0;
                     document.getElementById('escape2hMaxValue').textContent = escape2hMaxValue;
                 }
             })
@@ -2753,8 +2753,72 @@
                 逃顶2h: sellSignals2h.length
             });
             
-            // 注意：逃顶快照数统计已改为从API获取，不再使用信号点数量
-            // 原来的 escape24hCount/escape2hCount 更新逻辑已移至 loadHistoricalMaxStats() 函数中
+            // 更新24小时逃顶信号统计
+            const escape24hCountEl = document.getElementById('escape24hCount');
+            if (escape24hCountEl) {
+                const currentCount = sellSignals.length;
+                escape24hCountEl.textContent = currentCount;
+                
+                // 根据数量动态调整颜色
+                if (sellSignals.length === 0) {
+                    escape24hCountEl.style.color = '#6b7280';
+                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
+                } else if (sellSignals.length >= 100) {
+                    escape24hCountEl.style.color = '#dc2626';
+                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(220, 38, 38, 0.8)';
+                } else if (sellSignals.length >= 50) {
+                    escape24hCountEl.style.color = '#ef4444';
+                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(239, 68, 68, 0.5)';
+                }
+                
+                // 每分钟向后端发送一次数据用于记录
+                if (!window.lastRecordTime || Date.now() - window.lastRecordTime > 60000) {
+                    window.lastRecordTime = Date.now();
+                    recordEscapeSignalStats(sellSignals.length, sellSignals2h.length);
+                }
+            }
+            
+            // 更新2小时逃顶信号统计
+            const escape2hCountEl = document.getElementById('escape2hCount');
+            if (escape2hCountEl) {
+                const currentCount = sellSignals2h.length;
+                escape2hCountEl.textContent = currentCount;
+                
+                // 根据数量动态调整颜色（橙色系）
+                if (sellSignals2h.length === 0) {
+                    escape2hCountEl.style.color = '#6b7280';
+                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
+                } else if (sellSignals2h.length >= 10) {
+                    escape2hCountEl.style.color = '#ea580c';
+                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(234, 88, 12, 0.8)';
+                } else if (sellSignals2h.length >= 5) {
+                    escape2hCountEl.style.color = '#f97316';
+                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(249, 115, 22, 0.5)';
+                }
+            }
+        }
+        
+        // 向后端记录逃顶信号数统计
+        function recordEscapeSignalStats(signal24h, signal2h) {
+            fetch('/api/support-resistance/record-escape-signal-stats', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    signal_24h: signal24h,
+                    signal_2h: signal2h
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('✅ 逃顶信号数已记录:', signal24h, signal2h);
+                }
+            })
+            .catch(error => {
+                console.error('记录逃顶信号数失败:', error);
+            });
         }
         
         
