@@ -625,8 +625,29 @@
                 <div class="card-title">
                     <span>🏆</span>
                     历史极值记录
+                    <span id="hourlyStatsUpdateTime" style="margin-left: 15px; font-size: 14px; font-weight: normal; color: #718096;">
+                        <!-- 更新时间将在这里显示 -->
+                    </span>
                 </div>
             </div>
+            
+            <!-- 每小时统计数据 -->
+            <div id="hourlyStatsContainer" style="padding: 20px; background: linear-gradient(135deg, #f6f8fb 0%, #f0f4f8 100%); border-radius: 12px; margin: 0 20px 15px 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="font-size: 16px; font-weight: 700; color: #2d3748;">
+                        📊 每小时数据统计
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="loadHourlyStats(6)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #cbd5e0; background: white; border-radius: 6px; cursor: pointer;">最近6小时</button>
+                        <button onclick="loadHourlyStats(12)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #cbd5e0; background: white; border-radius: 6px; cursor: pointer;">最近12小时</button>
+                        <button onclick="loadHourlyStats(24)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #4299e1; background: #4299e1; color: white; font-weight: 600; border-radius: 6px; cursor: pointer;">最近24小时</button>
+                    </div>
+                </div>
+                <div id="hourlyStatsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
+                    <div style="text-align: center; padding: 20px; color: #a0aec0;">加载中...</div>
+                </div>
+            </div>
+            
             <div class="table-container">
                 <table id="recordsTable">
                     <thead>
@@ -900,6 +921,9 @@
                 } else {
                     console.error('❌ 历史极值记录加载失败:', recordsData);
                 }
+                
+                // 加载每小时统计数据（默认24小时）
+                await loadHourlyStats(24);
 
                 // 加载当前持仓情况（实盘模式）
                 const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=real');
@@ -1125,6 +1149,103 @@
             });
             
             console.log('⏰ 持续时间已更新');
+        }
+
+        // 加载每小时统计数据
+        async function loadHourlyStats(hours = 24) {
+            try {
+                const response = await fetch(`/api/anchor-system/profit-records-hourly-stats?trade_mode=real&hours=${hours}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderHourlyStats(data.hourly_stats, hours);
+                    document.getElementById('hourlyStatsUpdateTime').textContent = 
+                        `更新时间: ${new Date().toLocaleString('zh-CN')}`;
+                } else {
+                    console.error('❌ 每小时统计加载失败:', data);
+                    document.getElementById('hourlyStatsGrid').innerHTML = 
+                        '<div style="text-align: center; padding: 20px; color: #e53e3e;">加载失败</div>';
+                }
+            } catch (error) {
+                console.error('❌ 加载每小时统计时出错:', error);
+                document.getElementById('hourlyStatsGrid').innerHTML = 
+                    '<div style="text-align: center; padding: 20px; color: #e53e3e;">加载出错</div>';
+            }
+        }
+        
+        // 渲染每小时统计数据
+        function renderHourlyStats(stats, hours) {
+            const container = document.getElementById('hourlyStatsGrid');
+            
+            if (!stats || stats.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #a0aec0; grid-column: 1 / -1;">最近' + hours + '小时内无数据</div>';
+                return;
+            }
+            
+            container.innerHTML = stats.map(stat => {
+                // 解析时间
+                const hourTime = new Date(stat.hour);
+                const hourStr = hourTime.toLocaleString('zh-CN', { 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit',
+                    hour12: false
+                });
+                
+                // 确定卡片颜色
+                let bgColor = '#f7fafc';
+                let borderColor = '#e2e8f0';
+                if (stat.total_count >= 10) {
+                    bgColor = '#fff5f5';
+                    borderColor = '#fc8181';
+                } else if (stat.total_count >= 5) {
+                    bgColor = '#fffaf0';
+                    borderColor = '#f6ad55';
+                } else if (stat.total_count > 0) {
+                    bgColor = '#f0fff4';
+                    borderColor = '#68d391';
+                }
+                
+                return `
+                <div style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 13px; color: #4a5568; font-weight: 600; margin-bottom: 8px;">
+                        ${hourStr}
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                        <div>
+                            <div style="color: #718096; margin-bottom: 2px;">总数</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #2d3748;">${stat.total_count}</div>
+                        </div>
+                        <div>
+                            <div style="color: #718096; margin-bottom: 2px;">平均收益</div>
+                            <div style="font-size: 16px; font-weight: 700; color: ${stat.avg_profit_rate >= 0 ? '#48bb78' : '#f56565'};">
+                                ${stat.avg_profit_rate}%
+                            </div>
+                        </div>
+                        <div>
+                            <div style="color: #48bb78; margin-bottom: 2px;">🏆 盈利</div>
+                            <div style="font-weight: 600; color: #48bb78;">${stat.profit_count}</div>
+                        </div>
+                        <div>
+                            <div style="color: #f56565; margin-bottom: 2px;">📉 亏损</div>
+                            <div style="font-weight: 600; color: #f56565;">${stat.loss_count}</div>
+                        </div>
+                        <div>
+                            <div style="color: #805ad5; margin-bottom: 2px;">做空</div>
+                            <div style="font-weight: 600; color: #805ad5;">${stat.short_count}</div>
+                        </div>
+                        <div>
+                            <div style="color: #38b2ac; margin-bottom: 2px;">做多</div>
+                            <div style="font-weight: 600; color: #38b2ac;">${stat.long_count}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #718096;">
+                        <div>最高: <span style="color: #48bb78; font-weight: 600;">${stat.max_profit_rate}%</span></div>
+                        <div>最低: <span style="color: #f56565; font-weight: 600;">${stat.min_profit_rate}%</span></div>
+                    </div>
+                </div>
+                `;
+            }).join('');
         }
 
         // 渲染历史极值记录表

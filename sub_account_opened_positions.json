@@ -85,5 +85,11 @@
     "inst_id": "TON-USDT-SWAP",
     "pos_side": "short",
     "opened_at": "2026-01-02 05:07:56"
+  },
+  "Wu666666:LINK-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "LINK-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 05:32:36"
   }
 }

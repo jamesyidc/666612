@@ -12529,6 +12529,69 @@ def get_anchor_profit_records():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/profit-records-hourly-stats')
+def get_profit_records_hourly_stats():
+    """获取历史极值记录的每小时统计"""
+    try:
+        trade_mode = request.args.get('trade_mode', 'real')
+        hours = int(request.args.get('hours', 24))  # 默认统计最近24小时
+        
+        # 根据 trade_mode 选择不同的表
+        table_name = 'anchor_real_profit_records' if trade_mode == 'real' else 'anchor_paper_profit_records'
+        
+        db_path = '/home/user/webapp/anchor_system.db'
+        conn = sqlite3.connect(db_path, timeout=10.0)
+        cursor = conn.cursor()
+        
+        # 获取最近N小时的记录，按小时分组统计
+        cursor.execute(f'''
+        SELECT 
+            strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
+            COUNT(*) as count,
+            SUM(CASE WHEN record_type = 'max_profit' THEN 1 ELSE 0 END) as profit_count,
+            SUM(CASE WHEN record_type = 'max_loss' THEN 1 ELSE 0 END) as loss_count,
+            SUM(CASE WHEN pos_side = 'short' THEN 1 ELSE 0 END) as short_count,
+            SUM(CASE WHEN pos_side = 'long' THEN 1 ELSE 0 END) as long_count,
+            AVG(profit_rate) as avg_profit_rate,
+            MAX(profit_rate) as max_profit_rate,
+            MIN(profit_rate) as min_profit_rate
+        FROM {table_name}
+        WHERE datetime(timestamp) >= datetime('now', '-{hours} hours', 'localtime')
+        GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp)
+        ORDER BY hour DESC
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        hourly_stats = []
+        for row in rows:
+            hourly_stats.append({
+                'hour': row[0],
+                'total_count': row[1],
+                'profit_count': row[2],
+                'loss_count': row[3],
+                'short_count': row[4],
+                'long_count': row[5],
+                'avg_profit_rate': round(row[6], 2) if row[6] else 0,
+                'max_profit_rate': round(row[7], 2) if row[7] else 0,
+                'min_profit_rate': round(row[8], 2) if row[8] else 0
+            })
+        
+        return jsonify({
+            'success': True,
+            'hourly_stats': hourly_stats,
+            'total_hours': len(hourly_stats),
+            'trade_mode': trade_mode,
+            'hours_range': hours
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/anchor-system/cleanup-extremes', methods=['POST'])
 def cleanup_extreme_records():
     """清理错误的极值记录（删除所有亏损记录）"""
