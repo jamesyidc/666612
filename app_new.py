@@ -13921,6 +13921,9 @@ def maintain_anchor_order():
         pos_size = float(data.get('pos_size'))
         auto_adjust = data.get('auto_adjust', False)  # 是否自动调整保证金（只用于自动维护-10%）
         
+        # 固定杠杆为10倍
+        lever = 10
+        
         # 计算10倍数量
         order_size = pos_size * 10
         
