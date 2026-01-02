@@ -1156,7 +1156,7 @@
                     <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
                     <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个快照有逃顶信号（最近24小时）</div>
                     <div style="font-size: 13px; color: rgba(239, 68, 68, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(239, 68, 68, 0.2);">
-                        历史最大值：<span id="escape24hMax" style="font-weight: bold; font-size: 18px;">-</span> 个快照
+                        逃顶信号数历史最大值：<span id="escape24hMaxValue" style="font-weight: bold; font-size: 18px; color: #fca5a5;">-</span> 个币种
                     </div>
                 </div>
                 
@@ -1166,7 +1166,7 @@
                     <div id="escape2hCount" style="font-size: 42px; font-weight: 700; color: #f97316; text-shadow: 0 2px 8px rgba(249, 115, 22, 0.5); letter-spacing: 2px;">-</div>
                     <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个快照有逃顶信号（最近2小时）</div>
                     <div style="font-size: 13px; color: rgba(249, 115, 22, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, 0.2);">
-                        历史最大值：<span id="escape2hMax" style="font-weight: bold; font-size: 18px;">-</span> 个快照
+                        逃顶信号数历史最大值：<span id="escape2hMaxValue" style="font-weight: bold; font-size: 18px; color: #fdba74;">-</span> 个币种
                     </div>
                 </div>
             </div>
@@ -2006,22 +2006,36 @@
         }
         
         function loadMaxHistoryStats() {
-            fetch('/api/support-resistance/max-history-stats')
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        // 更新24小时最大值
-                        document.getElementById('max24hCount').textContent = 
-                            result.stats_24h.scenario1_max + result.stats_24h.scenario4_max;
-                        
-                        // 更新2小时最大值
-                        document.getElementById('max2hCount').textContent = 
-                            result.stats_2h.scenario1_max + result.stats_2h.scenario4_max;
-                    }
-                })
-                .catch(error => {
-                    console.error('加载历史最大值统计失败:', error);
-                });
+            // 同时加载峰值币种数统计和逃顶快照数统计
+            Promise.all([
+                fetch('/api/support-resistance/max-history-stats'),
+                fetch('/api/support-resistance/escape-max-stats')
+            ])
+            .then(responses => Promise.all(responses.map(r => r.json())))
+            .then(([peakResult, escapeResult]) => {
+                // 更新峰值币种数统计
+                if (peakResult && peakResult.success) {
+                    document.getElementById('max24hCount').textContent = 
+                        peakResult.stats_24h.scenario1_max + peakResult.stats_24h.scenario4_max;
+                    
+                    document.getElementById('max2hCount').textContent = 
+                        peakResult.stats_2h.scenario1_max + peakResult.stats_2h.scenario4_max;
+                }
+                
+                // 更新逃顶快照数历史最大值
+                if (escapeResult && escapeResult.success) {
+                    // 更新24小时逃顶快照数历史最大值
+                    escape24hMaxValue = escapeResult.stats_24h.max_escape_count || 0;
+                    document.getElementById('escape24hMaxValue').textContent = escape24hMaxValue;
+                    
+                    // 更新2小时逃顶快照数历史最大值
+                    escape2hMaxValue = escapeResult.stats_2h.max_escape_count || 0;
+                    document.getElementById('escape2hMaxValue').textContent = escape2hMaxValue;
+                }
+            })
+            .catch(error => {
+                console.error('加载历史最大值统计失败:', error);
+            });
         }
         
         // Add click handlers to sortable headers

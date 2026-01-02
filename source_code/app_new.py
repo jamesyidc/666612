@@ -6908,6 +6908,75 @@ def api_support_resistance_dates():
             'message': str(e)
         })
 
+@app.route('/api/support-resistance/escape-max-stats')
+def api_support_resistance_escape_max_stats():
+    """获取逃顶快照数的历史最大值统计"""
+    try:
+        from datetime import datetime, timedelta
+        
+        conn = sqlite3.connect('crypto_data.db')
+        cursor = conn.cursor()
+        
+        # 计算24小时前的时间
+        now = datetime.now()
+        time_24h_ago = (now - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+        time_2h_ago = (now - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 获取所有快照数据并计算逃顶信号数（scenario3 + scenario4 >= 5）
+        # 24小时内的数据
+        cursor.execute('''
+            SELECT 
+                snapshot_time,
+                scenario_3_count + scenario_4_count as escape_count
+            FROM support_resistance_snapshots
+            WHERE snapshot_time >= ?
+            ORDER BY snapshot_time DESC
+        ''', (time_24h_ago,))
+        
+        rows_24h = cursor.fetchall()
+        
+        # 计算24小时内的逃顶快照数和最大的逃顶信号数
+        escape_snapshot_count_24h = sum(1 for row in rows_24h if row[1] >= 5)
+        max_escape_count_24h = max([row[1] for row in rows_24h], default=0)
+        
+        # 2小时内的数据
+        cursor.execute('''
+            SELECT 
+                snapshot_time,
+                scenario_3_count + scenario_4_count as escape_count
+            FROM support_resistance_snapshots
+            WHERE snapshot_time >= ?
+            ORDER BY snapshot_time DESC
+        ''', (time_2h_ago,))
+        
+        rows_2h = cursor.fetchall()
+        
+        # 计算2小时内的逃顶快照数和最大的逃顶信号数
+        escape_snapshot_count_2h = sum(1 for row in rows_2h if row[1] >= 5)
+        max_escape_count_2h = max([row[1] for row in rows_2h], default=0)
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'stats_24h': {
+                'escape_snapshot_count': escape_snapshot_count_24h,  # 逃顶快照数
+                'max_escape_count': max_escape_count_24h  # 最大的逃顶信号数（S3+S4）
+            },
+            'stats_2h': {
+                'escape_snapshot_count': escape_snapshot_count_2h,
+                'max_escape_count': max_escape_count_2h
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 # =====================================================
 # OKEx K线指标系统 API路由
 # =====================================================
