@@ -463,22 +463,6 @@
             </div>
         </div>
 
-        <!-- 支撑阻力信号监控 -->
-        <div class="stats-container" style="margin-top: 20px;">
-            <div class="stat-card" style="border: 2px solid #dc2626; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); cursor: pointer;" onclick="window.location.href='/support-resistance'">
-                <div class="stat-icon">🔴</div>
-                <div class="stat-label" style="color: #991b1b;">24小时顶信号统计</div>
-                <div class="stat-value" id="topSignalCount" style="color: #dc2626; font-size: 42px; font-weight: 800;">--</div>
-                <div class="stat-subvalue" style="color: #991b1b;" id="topSignalTime">个进顶区号：(最近24小时)</div>
-            </div>
-            <div class="stat-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); cursor: pointer;" onclick="window.location.href='/support-resistance'">
-                <div class="stat-icon">⚡</div>
-                <div class="stat-label" style="color: #92400e;">2小时底信号统计</div>
-                <div class="stat-value" id="bottomSignalCount" style="color: #f59e0b; font-size: 42px; font-weight: 800;">--</div>
-                <div class="stat-subvalue" style="color: #92400e;" id="bottomSignalTime">个进底区号：(最近2小时)</div>
-            </div>
-        </div>
-
         <!-- 主要内容 -->
         <div class="main-grid">
             <!-- 收益率趋势图 -->
@@ -536,35 +520,6 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-
-        <!-- 支撑阻力信号历史记录 -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <span>📊</span>
-                    支撑阻力信号历史记录 (最近30条)
-                </div>
-                <div class="update-time" id="signalHistoryUpdateTime" style="font-size: 14px; color: #718096;">
-                    最后更新: --
-                </div>
-            </div>
-            <div class="table-container">
-                <table id="signalHistoryTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 200px;">时间</th>
-                            <th style="width: 150px;">🔴 24小时顶信号</th>
-                            <th style="width: 150px;">⚡ 2小时底信号</th>
-                        </tr>
-                    </thead>
-                    <tbody id="signalHistoryBody">
-                        <tr><td colspan="3" class="loading">加载中...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
         <!-- 历史极值记录 -->
         <div class="card">
@@ -771,70 +726,6 @@
         }
 
         // 加载支撑阻力信号数据
-        async function loadSignalData() {
-            try {
-                const res = await fetch('/api/signal-monitor/latest');
-                const data = await res.json();
-                
-                if (data.success) {
-                    const latest = data.data.latest;
-                    
-                    // 更新顶信号
-                    document.getElementById('topSignalCount').textContent = latest.top_signal || 0;
-                    
-                    // 更新底信号
-                    document.getElementById('bottomSignalCount').textContent = latest.bottom_signal || 0;
-                    
-                    // 渲染信号历史记录表格
-                    renderSignalHistory(data.data.history);
-                    
-                    // 更新时间
-                    const now = new Date();
-                    document.getElementById('signalHistoryUpdateTime').textContent = 
-                        `最后更新: ${now.toLocaleString('zh-CN')}`;
-                    
-                    console.log('📊 信号数据更新:', latest);
-                } else {
-                    console.warn('⚠️ 信号数据加载失败:', data.message);
-                    document.getElementById('topSignalCount').textContent = '--';
-                    document.getElementById('bottomSignalCount').textContent = '--';
-                }
-            } catch (error) {
-                console.error('❌ 加载信号数据失败:', error);
-                document.getElementById('topSignalCount').textContent = '--';
-                document.getElementById('bottomSignalCount').textContent = '--';
-            }
-        }
-
-        // 渲染信号历史记录表格
-        function renderSignalHistory(history) {
-            const tbody = document.getElementById('signalHistoryBody');
-            
-            if (!history || history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 30px; color: #718096;">暂无历史记录</td></tr>';
-                return;
-            }
-            
-            // 只显示最近30条，倒序显示（最新的在前）
-            const recentHistory = history.slice(-30).reverse();
-            
-            let html = '';
-            
-            for (let i = 0; i < recentHistory.length; i++) {
-                const item = recentHistory[i];
-                
-                html += `
-                    <tr>
-                        <td style="font-weight: 600; color: #1e293b; padding: 12px;">${item.timestamp}</td>
-                        <td style="font-weight: 700; font-size: 18px; color: #dc2626; text-align: center; padding: 12px;">${item.top_signal}</td>
-                        <td style="font-weight: 700; font-size: 18px; color: #f59e0b; text-align: center; padding: 12px;">${item.bottom_signal}</td>
-                    </tr>
-                `;
-            }
-            
-            tbody.innerHTML = html;
-        }
-
         // 全局变量：存储当前记录数据
         let currentRecordsData = [];
 
@@ -1592,7 +1483,6 @@
             
             // 初始加载数据
             loadData();
-            loadSignalData();  // 加载信号数据
             
             // 自动刷新数据（每30秒）
             setInterval(() => {
@@ -1600,19 +1490,13 @@
                 refreshData();
             }, 30000);
             
-            // 信号数据刷新（每60秒）
-            setInterval(() => {
-                console.log('📊 刷新信号数据...', new Date().toLocaleString('zh-CN'));
-                loadSignalData();
-            }, 60000);
-            
             // 持续时间独立更新（每30秒）
             setInterval(() => {
                 console.log('⏰ 更新持续时间...', new Date().toLocaleString('zh-CN'));
                 updateDurations();
             }, 30000);
             
-            console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间），60秒刷新信号数据');
+            console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间）');
         });
     </script>
 </body>
