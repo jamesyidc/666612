@@ -17,11 +17,20 @@
       "scenario_3": 1,
       "scenario_4": 0,
       "timestamp": "2026-01-02 08:40:21"
+    },
+    {
+      "top_signal": 0,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 0,
+      "scenario_4": 0,
+      "timestamp": "2026-01-02 08:41:21"
     }
   ],
   "latest": {
-    "top_signal": 1,
+    "top_signal": 0,
     "bottom_signal": 0,
-    "update_time": "2026-01-02 08:40:21"
+    "update_time": "2026-01-02 08:41:21"
   }
 }
