@@ -17227,18 +17227,58 @@ def maintain_sub_account_position():
         print(f"   当前持仓: {pos_size} 张")
         print(f"   今日已维护: {today_maintenance_count} 次")
         
+        # 获取当前保证金
+        # 对于全仓模式（cross），margin字段为空，需要从notionalUsd和lever计算
+        try:
+            current_margin_str = target_position.get('margin', '0')
+            current_margin = float(current_margin_str) if current_margin_str and current_margin_str != '' else 0
+        except (ValueError, TypeError):
+            current_margin = 0
+        
+        # 如果margin为空，从notionalUsd和lever计算
+        if current_margin <= 0:
+            try:
+                notional_usd_str = target_position.get('notionalUsd', '0')
+                leverage_str = target_position.get('lever', '10')
+                
+                notional_usd = float(notional_usd_str) if notional_usd_str and notional_usd_str != '' else 0
+                leverage = float(leverage_str) if leverage_str and leverage_str != '' else 10
+                
+                if notional_usd > 0 and leverage > 0:
+                    current_margin = notional_usd / leverage
+                    print(f"   ℹ️ 全仓模式：从notionalUsd({notional_usd})和杠杆({leverage})计算保证金: {current_margin}U")
+            except (ValueError, TypeError) as e:
+                print(f"   ⚠️ 计算保证金失败: {e}")
+        
+        if current_margin <= 0:
+            return jsonify({'success': False, 'message': f'当前保证金无效: {current_margin}，notionalUsd: {target_position.get("notionalUsd")}'})
+        
+        print(f"   当前保证金: {current_margin}U")
+        
         # 根据维护次数确定目标保证金
         # 0次→10U, 1次→20U, 2次→20U, 3次+→30U
         if today_maintenance_count == 0:
-            target_margin = 10
+            base_target_margin = 10
         elif today_maintenance_count == 1:
-            target_margin = 20
+            base_target_margin = 20
         elif today_maintenance_count == 2:
-            target_margin = 20
+            base_target_margin = 20
         else:  # 3次及以上
-            target_margin = 30
+            base_target_margin = 30
         
-        print(f"   目标保证金: {target_margin}U (基于{today_maintenance_count}次维护)")
+        # 对于高价币，需要调整目标保证金
+        # 计算1张对应的保证金
+        margin_per_contract = mark_price / leverage
+        
+        # 如果目标保证金小于1张的保证金，调整为1张
+        if base_target_margin < margin_per_contract:
+            target_margin = margin_per_contract
+            print(f"   ℹ️ 高价币调整：1张需{margin_per_contract:.2f}U，目标从{base_target_margin}U调整为{target_margin:.2f}U")
+        else:
+            target_margin = base_target_margin
+        
+        print(f"   今日维护次数: {today_maintenance_count}")
+        print(f"   目标保证金: {target_margin}U")
         
         # 计算杠杆（默认10倍）
         try:
@@ -17246,9 +17286,17 @@ def maintain_sub_account_position():
         except (ValueError, TypeError):
             leverage = 10
         
-        # 维护策略：买入100U，然后平掉，保留target_margin对应的数量
-        # 步骤1：买入100U的数量
-        maintenance_buy_amount = 100  # 买入100U
+        # 维护策略：买入10倍底仓金额，使保证金达到目标值
+        # 计算需要增加的保证金
+        margin_needed = target_margin - current_margin
+        
+        # 买入金额 = 需要的保证金 × 10
+        maintenance_buy_amount = margin_needed * 10
+        
+        # 如果需要的金额<20U，至少买20U
+        if maintenance_buy_amount < 20:
+            maintenance_buy_amount = 20
+        
         maintenance_buy_size_raw = (maintenance_buy_amount * leverage) / mark_price
         maintenance_buy_size = max(1, int(maintenance_buy_size_raw))
         
@@ -17258,9 +17306,10 @@ def maintain_sub_account_position():
             print(f"   ⚠️ 警告：币种价格较高({mark_price}U)，单张价值{single_value}U")
             maintenance_buy_size = max(1, maintenance_buy_size)
         
-        print(f"   标记价: {mark_price}")
+        print(f"   标记价: {mark_price}U")
         print(f"   杠杆: {leverage}x")
-        print(f"   维护策略: 买入{maintenance_buy_amount}U → 平掉多余 → 保留{target_margin}U")
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   维护策略: 需要增加保证金{margin_needed:.2f}U → 买入{maintenance_buy_amount:.2f}U（增量×10）→ 最终保留{target_margin}U")
         print(f"   买入数量: {maintenance_buy_size} 张")
         
         # 步骤1: 买入100U（开大仓）
@@ -17315,7 +17364,11 @@ def maintain_sub_account_position():
         
         # 计算应该保留的数量（对应target_margin保证金）
         target_keep_size_raw = (target_margin * leverage) / mark_price
-        target_keep_size = max(1, int(target_keep_size_raw))
+        target_keep_size = max(1, round(target_keep_size_raw))
+        
+        # 重新计算实际保证金（考虑取整）
+        actual_target_margin = (target_keep_size * mark_price) / leverage
+        print(f"   ℹ️ 目标保留{target_keep_size}张，实际保证金约{actual_target_margin:.2f}U")
         
         # 计算需要平掉的数量
         close_size = total_pos_size - target_keep_size
