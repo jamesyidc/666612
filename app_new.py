@@ -7098,16 +7098,28 @@ def api_support_resistance_escape_signal_stats():
         ''')
         
         row = cursor.fetchone()
+        
+        # 获取历史最大值
+        cursor.execute('''
+            SELECT 
+                MAX(signal_24h_count) as max_24h,
+                MAX(signal_2h_count) as max_2h
+            FROM escape_signal_stats
+        ''')
+        
+        max_row = cursor.fetchone()
         conn.close()
         
         if row:
             return jsonify({
                 'success': True,
                 'stats_24h': {
-                    'signal_count': row['signal_24h_count']
+                    'signal_count': row['signal_24h_count'],
+                    'historical_max_signal_count': max_row['max_24h'] if max_row else 0
                 },
                 'stats_2h': {
-                    'signal_count': row['signal_2h_count']
+                    'signal_count': row['signal_2h_count'],
+                    'historical_max_signal_count': max_row['max_2h'] if max_row else 0
                 }
             })
         else:

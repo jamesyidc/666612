@@ -279,6 +279,14 @@
                 <h3>总记录数</h3>
                 <div class="value" id="totalCount">-</div>
             </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%); border: 2px solid rgba(239, 68, 68, 0.3);">
+                <h3>📍 24小时历史最大值</h3>
+                <div class="value" id="max24h" style="color: #ef4444;">-</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.1) 100%); border: 2px solid rgba(249, 115, 22, 0.3);">
+                <h3>⚡ 2小时历史最大值</h3>
+                <div class="value" id="max2h" style="color: #f97316;">-</div>
+            </div>
             <div class="stat-card">
                 <h3>24小时平均值</h3>
                 <div class="value" id="avg24h">-</div>
@@ -362,10 +370,14 @@
             }
 
             // 计算统计信息
+            const max24h = Math.max(...data.map(d => d.signal_24h_count));
+            const max2h = Math.max(...data.map(d => d.signal_2h_count));
             const avg24h = Math.round(data.reduce((sum, d) => sum + d.signal_24h_count, 0) / data.length);
             const avg2h = Math.round(data.reduce((sum, d) => sum + d.signal_2h_count, 0) / data.length);
 
             document.getElementById('totalCount').textContent = data.length;
+            document.getElementById('max24h').textContent = max24h;
+            document.getElementById('max2h').textContent = max2h;
             document.getElementById('avg24h').textContent = avg24h;
             document.getElementById('avg2h').textContent = avg2h;
 
