@@ -17790,23 +17790,31 @@ def close_sub_account_position_by_percent():
         # 2. 计算平仓数量
         close_size = int(current_pos * percent / 100)
         if close_size <= 0:
-            return jsonify({'success': False, 'message': '平仓数量太小'})
+            return jsonify({'success': False, 'message': '平仓数量太小，至少需要平1张'})
+        
+        # 确保不会超过当前持仓
+        if close_size > current_pos:
+            close_size = current_pos
         
         print(f"  当前持仓: {current_pos} 张")
-        print(f"  平仓数量: {close_size} 张 ({percent}%)")
+        print(f"  平仓比例: {percent}%")
+        print(f"  平仓数量: {close_size} 张")
         
         # 3. 执行平仓
         request_path = '/api/v5/trade/order'
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
         
+        # OKX平仓规则：
+        # - 平多仓(long)：side='sell'
+        # - 平空仓(short)：side='buy'
+        # - 双向持仓模式：必须指定posSide
         order_data = {
             'instId': inst_id,
             'tdMode': 'isolated',  # 逐仓
             'side': 'sell' if pos_side == 'long' else 'buy',  # 平多用sell，平空用buy
             'ordType': 'market',
             'sz': str(close_size),
-            'posSide': pos_side,
-            'reduceOnly': True
+            'posSide': pos_side  # 双向持仓必须指定
         }
         
         body = json_lib.dumps(order_data)
@@ -17828,8 +17836,19 @@ def close_sub_account_position_by_percent():
             return jsonify({'success': False, 'message': f'平仓请求失败: HTTP {response.status_code}'})
         
         result = response.json()
+        
+        print(f"📝 OKX API响应: {result}")
+        
         if result.get('code') != '0':
-            return jsonify({'success': False, 'message': f"平仓失败: {result.get('msg', '未知错误')}"})
+            error_msg = result.get('msg', '未知错误')
+            error_code = result.get('code', '')
+            print(f"❌ 平仓失败: [{error_code}] {error_msg}")
+            return jsonify({
+                'success': False, 
+                'message': f"平仓失败: {error_msg}",
+                'error_code': error_code,
+                'okex_response': result
+            })
         
         print(f"✅ 平仓成功: {percent}%")
         return jsonify({
@@ -17938,10 +17957,15 @@ def close_sub_account_position_to_amount():
         close_size = int(current_pos * percent / 100)
         
         if close_size <= 0:
-            return jsonify({'success': False, 'message': '平仓数量太小'})
+            return jsonify({'success': False, 'message': '平仓数量太小，至少需要平1张'})
+        
+        # 确保不会超过当前持仓
+        if close_size > current_pos:
+            close_size = int(current_pos)
         
         print(f"  当前持仓: {current_pos} 张")
         print(f"  当前保证金: {current_margin:.2f} USDT")
+        print(f"  目标保证金: {target_margin} USDT")
         print(f"  平仓比例: {percent:.2f}%")
         print(f"  平仓数量: {close_size} 张")
         
@@ -17949,14 +17973,17 @@ def close_sub_account_position_to_amount():
         request_path = '/api/v5/trade/order'
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
         
+        # OKX平仓规则：
+        # - 平多仓(long)：side='sell'
+        # - 平空仓(short)：side='buy'
+        # - 双向持仓模式：必须指定posSide
         order_data = {
             'instId': inst_id,
             'tdMode': 'isolated',
             'side': 'sell' if pos_side == 'long' else 'buy',
             'ordType': 'market',
             'sz': str(close_size),
-            'posSide': pos_side,
-            'reduceOnly': True
+            'posSide': pos_side  # 双向持仓必须指定
         }
         
         body = json_lib.dumps(order_data)
@@ -17978,8 +18005,19 @@ def close_sub_account_position_to_amount():
             return jsonify({'success': False, 'message': f'平仓请求失败: HTTP {response.status_code}'})
         
         result = response.json()
+        
+        print(f"📝 OKX API响应: {result}")
+        
         if result.get('code') != '0':
-            return jsonify({'success': False, 'message': f"平仓失败: {result.get('msg', '未知错误')}"})
+            error_msg = result.get('msg', '未知错误')
+            error_code = result.get('code', '')
+            print(f"❌ 平仓失败: [{error_code}] {error_msg}")
+            return jsonify({
+                'success': False, 
+                'message': f"平仓失败: {error_msg}",
+                'error_code': error_code,
+                'okex_response': result
+            })
         
         print(f"✅ 平仓成功至 {target_margin}U")
         return jsonify({
