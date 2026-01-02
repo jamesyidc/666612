@@ -5074,9 +5074,19 @@ def gdrive_detector_status():
         import requests
         from datetime import datetime
         import pytz
+        import json
         
         beijing_tz = pytz.timezone('Asia/Shanghai')
         now = datetime.now(beijing_tz)
+        
+        # 首先尝试从状态文件读取
+        status_file = '/home/user/webapp/gdrive_detector_status.json'
+        status_data = {}
+        try:
+            with open(status_file, 'r', encoding='utf-8') as f:
+                status_data = json.load(f)
+        except:
+            pass
         
         # 检查检测器进程是否运行
         result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
@@ -5084,6 +5094,25 @@ def gdrive_detector_status():
                           'gdrive_final_detector.py' in result.stdout or
                           'gdrive_smart_detector.py' in result.stdout)
         
+        # 如果状态文件存在且有效，使用状态文件的数据
+        if status_data and 'check_count' in status_data:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'detector_running': detector_running,
+                    'check_count': status_data.get('check_count', 0),
+                    'last_check_time': status_data.get('last_check_time'),
+                    'file_timestamp': status_data.get('file_timestamp'),
+                    'delay_minutes': status_data.get('delay_minutes'),
+                    'current_time': now.strftime('%Y-%m-%d %H:%M:%S'),
+                    'today_date': now.strftime('%Y年%m月%d日'),
+                    'folder_id': status_data.get('folder_id'),
+                    'root_folder_odd': status_data.get('root_folder_odd'),
+                    'root_folder_even': status_data.get('root_folder_even')
+                }
+            })
+        
+        # 状态文件不存在或无效，使用旧逻辑（从数据库和日志读取）
         # 从数据库读取最新数据时间戳
         file_timestamp = None
         delay_minutes = None
