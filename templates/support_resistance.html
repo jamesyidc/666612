@@ -1155,9 +1155,6 @@
                     <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶信号数统计</div>
                     <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
                     <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近24小时）</div>
-                    <div style="font-size: 13px; color: rgba(239, 68, 68, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(239, 68, 68, 0.2);">
-                        逃顶信号数历史最大值：<span id="escape24hMaxValue" style="font-weight: bold; font-size: 18px; color: #fca5a5;">-</span> 个信号
-                    </div>
                 </div>
                 
                 <!-- 2小时逃顶统计 -->
@@ -1165,9 +1162,6 @@
                     <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">⚡ 2小时逃顶信号数统计</div>
                     <div id="escape2hCount" style="font-size: 42px; font-weight: 700; color: #f97316; text-shadow: 0 2px 8px rgba(249, 115, 22, 0.5); letter-spacing: 2px;">-</div>
                     <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个逃顶信号（最近2小时）</div>
-                    <div style="font-size: 13px; color: rgba(249, 115, 22, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, 0.2);">
-                        逃顶信号数历史最大值：<span id="escape2hMaxValue" style="font-weight: bold; font-size: 18px; color: #fdba74;">-</span> 个信号
-                    </div>
                 </div>
             </div>
             
@@ -1793,8 +1787,7 @@
         let totalPages = 0; // 总页数
         
         // 历史最大值跟踪
-        let escape24hMaxValue = 0;  // 24小时逃顶快照数历史最大值
-        let escape2hMaxValue = 0;   // 2小时逃顶快照数历史最大值
+
         
         function formatPrice(price) {
             if (price === null || price === undefined) return '--';
@@ -2049,10 +2042,6 @@
                         }
                     }
                     
-                    // 更新24小时逃顶信号数历史最大值
-                    escape24hMaxValue = escapeResult.stats_24h.historical_max_signal_count || 0;
-                    document.getElementById('escape24hMaxValue').textContent = escape24hMaxValue;
-                    
                     // 更新2小时逃顶信号数 - 当前值
                     const signal2hCount = escapeResult.stats_2h.signal_count || 0;
                     const escape2hCountEl = document.getElementById('escape2hCount');
@@ -2070,10 +2059,6 @@
                             escape2hCountEl.style.textShadow = '0 2px 8px rgba(249, 115, 22, 0.5)';
                         }
                     }
-                    
-                    // 更新2小时逃顶信号数历史最大值
-                    escape2hMaxValue = escapeResult.stats_2h.historical_max_signal_count || 0;
-                    document.getElementById('escape2hMaxValue').textContent = escape2hMaxValue;
                 }
             })
             .catch(error => {

@@ -7091,9 +7091,7 @@ def api_support_resistance_escape_signal_stats():
         cursor.execute('''
             SELECT 
                 signal_24h_count,
-                signal_2h_count,
-                max_signal_24h,
-                max_signal_2h
+                signal_2h_count
             FROM escape_signal_stats
             ORDER BY stat_time DESC
             LIMIT 1
@@ -7106,12 +7104,10 @@ def api_support_resistance_escape_signal_stats():
             return jsonify({
                 'success': True,
                 'stats_24h': {
-                    'signal_count': row['signal_24h_count'],
-                    'historical_max_signal_count': row['max_signal_24h']
+                    'signal_count': row['signal_24h_count']
                 },
                 'stats_2h': {
-                    'signal_count': row['signal_2h_count'],
-                    'historical_max_signal_count': row['max_signal_2h']
+                    'signal_count': row['signal_2h_count']
                 }
             })
         else:
@@ -7147,28 +7143,12 @@ def api_record_escape_signal_stats():
         conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
-        # 获取历史最大值
-        cursor.execute('''
-            SELECT 
-                COALESCE(MAX(max_signal_24h), 0) as max_24h,
-                COALESCE(MAX(max_signal_2h), 0) as max_2h
-            FROM escape_signal_stats
-        ''')
-        
-        max_row = cursor.fetchone()
-        current_max_24h = max_row[0] if max_row else 0
-        current_max_2h = max_row[1] if max_row else 0
-        
-        # 更新最大值
-        new_max_24h = max(current_max_24h, signal_24h)
-        new_max_2h = max(current_max_2h, signal_2h)
-        
-        # 插入新记录
+        # 插入新记录（只保留信号数，不保留历史最大值）
         cursor.execute('''
             INSERT INTO escape_signal_stats 
-            (stat_time, signal_24h_count, signal_2h_count, max_signal_24h, max_signal_2h)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (stat_time, signal_24h, signal_2h, new_max_24h, new_max_2h))
+            (stat_time, signal_24h_count, signal_2h_count)
+            VALUES (?, ?, ?)
+        ''', (stat_time, signal_24h, signal_2h))
         
         conn.commit()
         conn.close()
@@ -7179,9 +7159,7 @@ def api_record_escape_signal_stats():
             'data': {
                 'stat_time': stat_time,
                 'signal_24h': signal_24h,
-                'signal_2h': signal_2h,
-                'max_signal_24h': new_max_24h,
-                'max_signal_2h': new_max_2h
+                'signal_2h': signal_2h
             }
         })
         
