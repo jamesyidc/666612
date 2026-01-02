@@ -17102,7 +17102,7 @@ def open_sub_account_position():
 
 @app.route('/api/sub-account/maintain', methods=['POST'])
 def maintain_sub_account_position():
-    """维护子账户持仓：买100U然后立即平掉"""
+    """维护子账户持仓：买20U然后立即平掉（降低成本）"""
     try:
         import requests
         import hmac
@@ -17141,31 +17141,171 @@ def maintain_sub_account_position():
         
         OKEX_REST_URL = 'https://www.okx.com'
         
-        # 调用维护脚本
-        import subprocess
-        result = subprocess.run(
-            ['python3', 'sub_account_maintenance.py', account_name, inst_id, pos_side],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        # 获取当前持仓信息
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "GET"
+        request_path = f"/api/v5/account/positions?instType=SWAP&instId={inst_id}"
         
-        if result.returncode == 0:
-            print(f"✅ 维护成功: {account_name} - {inst_id} {pos_side}")
-            return jsonify({
-                'success': True,
-                'message': '维护成功'
-            })
+        prehash = timestamp + method + request_path
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(OKEX_REST_URL + request_path, headers=headers, timeout=10)
+        positions_data = response.json()
+        
+        if positions_data.get('code') != '0':
+            return jsonify({'success': False, 'message': f'获取持仓失败: {positions_data.get("msg")}'})
+        
+        # 找到对应持仓
+        target_position = None
+        for pos in positions_data.get('data', []):
+            if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                target_position = pos
+                break
+        
+        if not target_position:
+            return jsonify({'success': False, 'message': '未找到对应持仓'})
+        
+        pos_size = abs(float(target_position.get('pos', 0)))
+        mark_price = float(target_position.get('markPx', 0))
+        
+        # 计算维护金额：20U
+        maintenance_amount = 20
+        maintenance_size = int(maintenance_amount / mark_price) if mark_price > 0 else 1
+        
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   标记价: {mark_price}")
+        print(f"   维护金额: {maintenance_amount}U")
+        print(f"   维护数量: {maintenance_size} 张")
+        
+        # 步骤1: 买入20U
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "POST"
+        request_path = "/api/v5/trade/order"
+        
+        order_data = {
+            "instId": inst_id,
+            "tdMode": "cross",
+            "side": "buy" if pos_side == "long" else "sell",
+            "ordType": "market",
+            "sz": str(maintenance_size),
+            "posSide": pos_side
+        }
+        
+        body = json_lib.dumps(order_data)
+        prehash = timestamp + method + request_path + body
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
+        result = response.json()
+        
+        if result.get('code') != '0':
+            return jsonify({'success': False, 'message': f'买入失败: {result.get("msg")}'})
+        
+        open_order_id = result['data'][0].get('ordId')
+        print(f"   ✅ 步骤1完成 - 买入订单ID: {open_order_id}")
+        
+        # 等待1秒
+        import time
+        time.sleep(1)
+        
+        # 步骤2: 立即平掉刚买入的
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "POST"
+        request_path = "/api/v5/trade/order"
+        
+        order_data = {
+            "instId": inst_id,
+            "tdMode": "cross",
+            "side": "sell" if pos_side == "long" else "buy",
+            "ordType": "market",
+            "sz": str(maintenance_size),
+            "posSide": pos_side,
+            "reduceOnly": True
+        }
+        
+        body = json_lib.dumps(order_data)
+        prehash = timestamp + method + request_path + body
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
+        result = response.json()
+        
+        if result.get('code') != '0':
+            return jsonify({'success': False, 'message': f'平仓失败: {result.get("msg")}'})
+        
+        close_order_id = result['data'][0].get('ordId')
+        print(f"   ✅ 步骤2完成 - 平仓订单ID: {close_order_id}")
+        
+        # 更新维护次数
+        try:
+            with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+                maintenance_data = json_lib.load(f)
+        except FileNotFoundError:
+            maintenance_data = {}
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        import pytz
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        today_date = now_beijing.strftime('%Y-%m-%d')
+        
+        if key not in maintenance_data or maintenance_data[key].get('date') != today_date:
+            maintenance_data[key] = {
+                'count': 1,
+                'date': today_date,
+                'last_maintenance': now_beijing.isoformat()
+            }
         else:
-            error_msg = result.stderr or result.stdout or '未知错误'
-            print(f"❌ 维护失败: {error_msg}")
-            return jsonify({
-                'success': False,
-                'message': f'维护失败: {error_msg}'
-            })
+            maintenance_data[key]['count'] += 1
+            maintenance_data[key]['last_maintenance'] = now_beijing.isoformat()
+        
+        with open('sub_account_maintenance.json', 'w', encoding='utf-8') as f:
+            json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+        
+        print(f"✅ 维护成功: {account_name} - {inst_id} {pos_side}")
+        print(f"   今日维护次数: {maintenance_data[key]['count']}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'维护成功！买入并平仓{maintenance_size}张，今日维护{maintenance_data[key]["count"]}次',
+            'open_order_id': open_order_id,
+            'close_order_id': close_order_id,
+            'maintenance_count': maintenance_data[key]['count']
+        })
     except Exception as e:
         import traceback
         print(f"❌ 维护异常: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({
             'success': False,
             'message': f'维护异常: {str(e)}',

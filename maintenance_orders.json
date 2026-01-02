@@ -1,5 +1,50 @@
 [
   {
+    "id": 28,
+    "account_name": "JAMESYI",
+    "inst_id": "HBAR-USDT-SWAP",
+    "pos_side": "short",
+    "original_size": 0.9,
+    "open_order_id": "3182132171483635712",
+    "open_size": 9.0,
+    "open_fills": [
+      {
+        "trade_id": "167189741",
+        "qty": 8.9,
+        "price": 0.1168,
+        "value": 1.03952,
+        "fee": 0.051976,
+        "fee_currency": "USDT"
+      },
+      {
+        "trade_id": "167189740",
+        "qty": 0.1,
+        "price": 0.1168,
+        "value": 0.011680000000000001,
+        "fee": 0.000584,
+        "fee_currency": "USDT"
+      }
+    ],
+    "open_total_qty": 9.0,
+    "open_avg_price": 0.11679999999999999,
+    "open_total_fee": 0.05256,
+    "close_order_id": "SKIPPED",
+    "close_size": 0,
+    "close_fills": [],
+    "close_total_qty": 0,
+    "close_avg_price": 0,
+    "close_total_fee": 0,
+    "remaining_size": 9.0,
+    "total_fee": 0.05256,
+    "total_cost": 0.05256,
+    "fee_rate": 5.000000000000001,
+    "total_profit": 0.0,
+    "net_profit": -0.05256,
+    "created_at": "2026-01-02 07:02:12",
+    "status": "success",
+    "flow_type": "optimized"
+  },
+  {
     "id": 27,
     "account_name": "JAMESYI",
     "inst_id": "TAO-USDT-SWAP",
