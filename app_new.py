@@ -12571,9 +12571,9 @@ def check_and_fix_anchor_position():
         secret_key = OKEX_SECRET_KEY
         passphrase = OKEX_PASSPHRASE
         
-        # 主账户保证金范围
+        # 主账户保证金范围（0.6-1.3U，给小持仓更多空间）
         MARGIN_MIN = 0.6
-        MARGIN_MAX = 1.2
+        MARGIN_MAX = 1.3
         
         # 获取当前持仓
         timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
@@ -12664,9 +12664,9 @@ def check_and_fix_anchor_position():
         # 需要纠错
         if current_margin > MARGIN_MAX:
             # 保证金过多，需要平仓
-            target_margin = (MARGIN_MIN + MARGIN_MAX) / 2  # 目标0.9U
+            target_margin = (MARGIN_MIN + MARGIN_MAX) / 2  # 目标0.85U
             close_percent = ((current_margin - target_margin) / current_margin) * 100
-            close_size = int(pos_size * ((current_margin - target_margin) / current_margin))
+            close_size = round(pos_size * ((current_margin - target_margin) / current_margin))  # 使用round而不是int
             
             if close_size < 1:
                 return jsonify({
@@ -12738,9 +12738,9 @@ def check_and_fix_anchor_position():
         
         else:
             # 保证金不足，需要加仓
-            target_margin = (MARGIN_MIN + MARGIN_MAX) / 2  # 目标0.9U
+            target_margin = (MARGIN_MIN + MARGIN_MAX) / 2  # 目标0.85U
             add_margin = target_margin - current_margin
-            add_size = int((add_margin * pos_size) / current_margin)
+            add_size = round((add_margin * pos_size) / current_margin)  # 使用round而不是int
             
             if add_size < 1:
                 return jsonify({
@@ -14383,8 +14383,8 @@ def maintain_anchor_order():
         # 固定杠杆为10倍
         lever = 10
         
-        # 目标保证金（默认0.8U，在0.6-1U之间）
-        target_margin = 0.8
+        # 目标保证金（默认0.85U，在0.6-1.1U之间）
+        target_margin = 0.85
         
         # 计算10倍数量
         order_size = pos_size * 10
