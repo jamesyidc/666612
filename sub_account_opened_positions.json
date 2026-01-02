@@ -109,5 +109,23 @@
     "inst_id": "STX-USDT-SWAP",
     "pos_side": "short",
     "opened_at": "2026-01-02 10:02:25"
+  },
+  "Wu666666:BNB-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "BNB-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 10:07:30"
+  },
+  "Wu666666:CRO-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "CRO-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 10:07:33"
+  },
+  "Wu666666:CRV-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "CRV-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 10:09:37"
   }
 }
