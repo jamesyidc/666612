@@ -772,6 +772,24 @@
         // 加载数据
         async function loadData() {
             try {
+                // 加载子账户配置（读取开关状态）
+                try {
+                    const configRes = await fetch('/api/sub-account/config');
+                    const configData = await configRes.json();
+                    
+                    if (configData.success) {
+                        const config = configData.config;
+                        // 设置开关状态
+                        document.getElementById('followShortLoss').checked = config.follow_short_loss_enabled || false;
+                        document.getElementById('followLongLoss').checked = config.follow_long_loss_enabled || false;
+                        document.getElementById('subSuperMaintainLong').checked = config.super_maintain_long_enabled || false;
+                        document.getElementById('subSuperMaintainShort').checked = config.super_maintain_short_enabled || false;
+                        console.log('✅ 子账户配置已加载:', config);
+                    }
+                } catch (error) {
+                    console.error('加载子账户配置失败:', error);
+                }
+                
                 // 加载状态
                 const statusRes = await fetch('/api/anchor-system/status');
                 const statusData = await statusRes.json();
@@ -1912,7 +1930,7 @@
                 console.log(`📊 跟空单亏损开单: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/sub-account/follow-config', {
+                    const response = await fetch('/api/sub-account/config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -1942,7 +1960,7 @@
                 console.log(`📊 跟多单亏损开单: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/sub-account/follow-config', {
+                    const response = await fetch('/api/sub-account/config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
