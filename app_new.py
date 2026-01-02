@@ -17302,19 +17302,38 @@ def maintain_sub_account_position():
                 'action': 'skip'
             })
         
-        # 计算需要买入的张数
-        # 在全仓模式下，imr ≈ 持仓价值 * 初始保证金率
-        # 简化估算：假设imr ≈ 持仓价值 / 杠杆（虽然不完全准确）
-        # 需要增加的持仓价值 ≈ margin_needed * leverage
-        # 需要买入的张数 = 持仓价值增量 / 标记价
-        value_needed = margin_needed * leverage
-        buy_size_raw = value_needed / mark_price
+        # 判断差距倍数
+        gap_ratio = target_margin / current_margin if current_margin > 0 else 999
         
-        # 至少买1张
-        buy_size = max(1, round(buy_size_raw))
+        # 计算单张合约价值
+        # 从当前持仓反推：imr ≈ (张数 × 单张价值) / 杠杆
+        # 单张价值 ≈ (imr × 杠杆) / 张数
+        if pos_size > 0:
+            contract_value = (current_margin * leverage) / pos_size
+            print(f"   ℹ️ 从当前持仓计算：单张合约价值 ≈ {contract_value:.4f}U")
+        else:
+            # 如果没有持仓，使用标记价作为估算
+            # 对于TAO-USDT-SWAP，通常是 mark_price / 100
+            contract_value = mark_price / 100
+            print(f"   ℹ️ 无持仓，估算单张合约价值 ≈ {contract_value:.4f}U (标记价/{100})")
+        
+        # 计算需要买入的张数
+        # 需要增加的持仓价值 = margin_needed * leverage
+        # 需要买入的张数 = 持仓价值增量 / 单张价值
+        value_needed = margin_needed * leverage
+        buy_size_raw = value_needed / contract_value
+        
+        if gap_ratio >= 10:
+            # 差距10倍或以上：直接开仓到目标值
+            print(f"   ⚡ 差距过大({gap_ratio:.1f}倍)，直接开仓到目标值")
+            buy_size = max(1, round(buy_size_raw))
+        else:
+            # 差距小于10倍：逐步增加
+            print(f"   📈 差距{gap_ratio:.1f}倍，逐步增加保证金")
+            buy_size = max(1, round(buy_size_raw))
         
         # 预估买入后的保证金增量
-        estimated_value_increase = buy_size * mark_price
+        estimated_value_increase = buy_size * contract_value
         estimated_margin_increase = estimated_value_increase / leverage
         estimated_new_margin = current_margin + estimated_margin_increase
         
@@ -17323,9 +17342,11 @@ def maintain_sub_account_position():
         print(f"   当前持仓: {pos_size} 张")
         print(f"   当前保证金: {current_margin:.4f}U")
         print(f"   目标保证金: {target_margin}U")
-        print(f"   需要增加: {margin_needed:.4f}U")
+        print(f"   差距倍数: {gap_ratio:.1f}倍")
+        print(f"   需要增加保证金: {margin_needed:.4f}U")
+        print(f"   需要增加持仓价值: {value_needed:.2f}U")
         print(f"   计划买入: {buy_size} 张")
-        print(f"   预估买入后保证金: {estimated_new_margin:.4f}U")
+        print(f"   预估买入后保证金: {estimated_new_margin:.2f}U")
         
         # 下单买入
         timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
