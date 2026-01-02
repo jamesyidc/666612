@@ -560,6 +560,65 @@
                 </div>
             </div>
 
+        <!-- 市场下跌等级分析 -->
+        <div class="card" id="marketDropAnalysis" style="margin-bottom: 30px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-title" style="color: white;">
+                    <span>📊</span>
+                    市场下跌等级分析
+                </div>
+                <div class="update-time" style="font-size: 14px; color: rgba(255,255,255,0.9);">
+                    最后更新: <span id="dropAnalysisTime">--</span>
+                </div>
+            </div>
+            <div style="padding: 20px;">
+                <!-- 下跌等级显示 -->
+                <div id="dropLevelDisplay" style="text-align: center; padding: 30px; border-radius: 15px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">
+                        <span id="dropLevelIcon">🔥</span>
+                    </div>
+                    <div style="font-size: 32px; font-weight: 700; margin-bottom: 10px;">
+                        <span id="dropLevelText">下跌等级4 - 超高强度下跌</span>
+                    </div>
+                    <div style="font-size: 18px; opacity: 0.9;">
+                        <span id="dropLevelDesc">交易对的空仓盈利要大于90%</span>
+                    </div>
+                </div>
+                
+                <!-- 统计详情 -->
+                <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥100%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop100Count">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥90%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop90Count">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥80%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop80Count">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥70%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop70Count">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥60%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop60Count">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥50%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop50Count">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥40%</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop40Count">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 历史极值记录 -->
         <div class="card">
             <div class="card-header">
@@ -1189,6 +1248,9 @@
             document.getElementById('profitBelow10').textContent = profitBelow10;
             document.getElementById('lossCount').textContent = lossCount;
             
+            // 计算并更新市场下跌等级
+            updateDropLevel(profit100, profit90, profit80, profit70, profit60, profit50, profit40);
+            
             // 计算1小时内增量
             const now = Date.now();
             const oneHourAgo = now - 60 * 60 * 1000;
@@ -1223,6 +1285,85 @@
                 profitHistoryData.profitBelow20 = profitHistoryData.profitBelow20.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profitBelow10 = profitHistoryData.profitBelow10.filter(d => d.time > oneHourAgo);
                 profitHistoryData.lossCount = profitHistoryData.lossCount.filter(d => d.time > oneHourAgo);
+            }
+            
+            // 计算市场下跌等级
+            function updateDropLevel(p100, p90, p80, p70, p60, p50, p40) {
+                let level = 0;
+                let levelText = '';
+                let levelDesc = '';
+                let levelIcon = '';
+                let bgGradient = '';
+                
+                // 下跌等级5：极端下跌
+                if (p100 >= 1 && p40 > 10) {
+                    level = 5;
+                    levelText = '下跌等级5 - 极端下跌';
+                    levelDesc = '交易对的空仓盈利要大于100%';
+                    levelIcon = '🔥🔥🔥🔥🔥';
+                    bgGradient = 'linear-gradient(135deg, #ff0844 0%, #cc0000 100%)';
+                }
+                // 下跌等级4：超高强度下跌
+                else if (p100 === 0 && p90 >= 1 && p80 >= 1 && p40 > 10) {
+                    level = 4;
+                    levelText = '下跌等级4 - 超高强度下跌';
+                    levelDesc = '交易对的空仓盈利要大于90%';
+                    levelIcon = '🔥🔥🔥🔥';
+                    bgGradient = 'linear-gradient(135deg, #f5576c 0%, #e53e3e 100%)';
+                }
+                // 下跌等级3：高强度下跌
+                else if (p100 === 0 && p90 === 0 && p80 === 0 && p70 >= 1 && p60 >= 2 && p40 > 8) {
+                    level = 3;
+                    levelText = '下跌等级3 - 高强度下跌';
+                    levelDesc = '交易对的空仓盈利要大于70%';
+                    levelIcon = '🔥🔥🔥';
+                    bgGradient = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                }
+                // 下跌等级2：中等强度下跌
+                else if (p100 === 0 && p90 === 0 && p80 === 0 && p70 === 0 && p60 >= 2 && p40 > 5) {
+                    level = 2;
+                    levelText = '下跌等级2 - 中等强度下跌';
+                    levelDesc = '交易对的空仓盈利要大于60%';
+                    levelIcon = '🔥🔥';
+                    bgGradient = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                }
+                // 下跌等级1：轻度下跌
+                else if (p100 === 0 && p90 === 0 && p80 === 0 && p70 === 0 && p60 === 0 && p50 === 0 && p40 >= 3) {
+                    level = 1;
+                    levelText = '下跌等级1 - 轻度下跌';
+                    levelDesc = '交易对的空仓盈利要大于40%';
+                    levelIcon = '🔥';
+                    bgGradient = 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)';
+                }
+                // 无明显下跌
+                else {
+                    level = 0;
+                    levelText = '市场正常';
+                    levelDesc = '无明显下跌趋势';
+                    levelIcon = '✅';
+                    bgGradient = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+                }
+                
+                // 更新显示
+                document.getElementById('dropLevelIcon').textContent = levelIcon;
+                document.getElementById('dropLevelText').textContent = levelText;
+                document.getElementById('dropLevelDesc').textContent = levelDesc;
+                document.getElementById('dropLevelDisplay').style.background = bgGradient;
+                
+                // 更新统计计数
+                document.getElementById('drop100Count').textContent = p100;
+                document.getElementById('drop90Count').textContent = p90;
+                document.getElementById('drop80Count').textContent = p80;
+                document.getElementById('drop70Count').textContent = p70;
+                document.getElementById('drop60Count').textContent = p60;
+                document.getElementById('drop50Count').textContent = p50;
+                document.getElementById('drop40Count').textContent = p40;
+                
+                // 更新时间
+                const now = new Date();
+                document.getElementById('dropAnalysisTime').textContent = now.toLocaleString('zh-CN');
+                
+                console.log(`📊 市场下跌等级分析: Level ${level} - ${levelText}`);
             }
             
             // 计算增量

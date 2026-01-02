@@ -79,5 +79,11 @@
     "inst_id": "CFX-USDT-SWAP",
     "pos_side": "short",
     "opened_at": "2026-01-02 05:06:52"
+  },
+  "Wu666666:TON-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "TON-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 05:07:56"
   }
 }
