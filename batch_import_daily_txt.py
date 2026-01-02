@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from calculate_count_score import calculate_count_score
 
 # 配置
-DB_PATH = "/home/user/webapp/crypto_data.db"
+DB_PATH = "/home/user/webapp/databases/crypto_data.db"
 CONFIG_FILE = "/home/user/webapp/daily_folder_config.json"
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
