@@ -368,11 +368,56 @@
       "scenario_3": 0,
       "scenario_4": 0,
       "timestamp": "2026-01-02 09:19:24"
+    },
+    {
+      "top_signal": 3,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 2,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:20:24"
+    },
+    {
+      "top_signal": 3,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 2,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:21:24"
+    },
+    {
+      "top_signal": 3,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 2,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:22:24"
+    },
+    {
+      "top_signal": 3,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 2,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:24:24"
+    },
+    {
+      "top_signal": 3,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 2,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:25:24"
     }
   ],
   "latest": {
-    "top_signal": 0,
+    "top_signal": 3,
     "bottom_signal": 0,
-    "update_time": "2026-01-02 09:19:24"
+    "update_time": "2026-01-02 09:25:24"
   }
 }
