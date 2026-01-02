@@ -359,11 +359,20 @@
       "scenario_3": 0,
       "scenario_4": 0,
       "timestamp": "2026-01-02 09:18:24"
+    },
+    {
+      "top_signal": 0,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 0,
+      "scenario_4": 0,
+      "timestamp": "2026-01-02 09:19:24"
     }
   ],
   "latest": {
     "top_signal": 0,
     "bottom_signal": 0,
-    "update_time": "2026-01-02 09:18:24"
+    "update_time": "2026-01-02 09:19:24"
   }
 }
