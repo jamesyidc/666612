@@ -565,6 +565,12 @@
                 <div class="stat-value" id="lossCount" style="color: #ef4444; font-size: 42px; font-weight: 800;">--</div>
                 <div class="stat-subvalue" style="color: #991b1b;" id="lossCountIncrease">1小时内: --</div>
             </div>
+            <div class="stat-card" style="border: 2px solid #dc2626; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-label" style="color: #92400e;">多单亏损</div>
+                <div class="stat-value" id="longLossCount" style="color: #dc2626; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #92400e;" id="longLossCountIncrease">1小时内: --</div>
+            </div>
         </div>
 
         <!-- 主要内容 -->
@@ -681,6 +687,41 @@
                     <div style="text-align: center; padding: 15px; background: rgba(139, 92, 246, 0.1); border-radius: 10px;">
                         <div style="font-size: 14px; color: #666; margin-bottom: 5px;">≥40%</div>
                         <div style="font-size: 28px; font-weight: 700; color: #8b5cf6;" id="drop40Count">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 市场上涨强度分析 -->
+        <div class="card" id="marketRiseAnalysis" style="margin-bottom: 30px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                <div class="card-title" style="color: white;">
+                    <span>📈</span>
+                    市场上涨强度分析
+                </div>
+                <div class="update-time" style="font-size: 14px; color: rgba(255,255,255,0.9);">
+                    最后更新: <span id="riseAnalysisTime">--</span>
+                </div>
+            </div>
+            <div style="padding: 20px;">
+                <!-- 上涨强度显示 -->
+                <div id="riseLevelDisplay" style="text-align: center; padding: 30px; border-radius: 15px; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">
+                        <span id="riseLevelIcon">✅</span>
+                    </div>
+                    <div style="font-size: 32px; font-weight: 700; margin-bottom: 10px;">
+                        <span id="riseLevelText">市场正常</span>
+                    </div>
+                    <div style="font-size: 18px; opacity: 0.9;">
+                        <span id="riseLevelDesc">多单亏损<2个，无明显上涨</span>
+                    </div>
+                </div>
+                
+                <!-- 统计详情 -->
+                <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="text-align: center; padding: 15px; background: rgba(245, 158, 11, 0.1); border-radius: 10px;">
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">多单亏损数量</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #f59e0b;" id="riseLossCount">0</div>
                     </div>
                 </div>
             </div>
@@ -1174,6 +1215,7 @@
             profitBelow20: [],
             profitBelow10: [],
             lossCount: [],
+            longLossCount: [],
             lastUpdate: null
         };
 
@@ -1441,6 +1483,8 @@
                 document.getElementById('profitBelow20Increase').textContent = '1小时内: --';
                 document.getElementById('profitBelow10Increase').textContent = '1小时内: --';
                 document.getElementById('lossCountIncrease').textContent = '1小时内: --';
+                document.getElementById('longLossCount').textContent = '0';
+                document.getElementById('longLossCountIncrease').textContent = '1小时内: --';
                 return;
             }
 
@@ -1462,6 +1506,10 @@
             const lossCount = shortPositions.filter(item => item.profit_rate < 0).length;
             const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
             
+            // 统计做多持仓各亏损级别
+            const longPositions = data.filter(item => item.pos_side === 'long');
+            const longLossCount = longPositions.filter(item => item.profit_rate < 0).length;
+            
             // 更新顶部统计卡片
             document.getElementById('profit120Plus').textContent = profit120;
             document.getElementById('profit110Plus').textContent = profit110;
@@ -1477,9 +1525,13 @@
             document.getElementById('profitBelow20').textContent = profitBelow20;
             document.getElementById('profitBelow10').textContent = profitBelow10;
             document.getElementById('lossCount').textContent = lossCount;
+            document.getElementById('longLossCount').textContent = longLossCount;
             
             // 计算并更新市场下跌等级
             updateDropLevel(profit100, profit90, profit80, profit70, profit60, profit50, profit40);
+            
+            // 计算并更新市场上涨强度等级
+            updateRiseLevel(longLossCount);
             
             // 计算1小时内增量
             const now = Date.now();
@@ -1502,6 +1554,7 @@
                 profitHistoryData.profitBelow20.push({ time: now, count: profitBelow20 });
                 profitHistoryData.profitBelow10.push({ time: now, count: profitBelow10 });
                 profitHistoryData.lossCount.push({ time: now, count: lossCount });
+                profitHistoryData.longLossCount.push({ time: now, count: longLossCount });
                 profitHistoryData.lastUpdate = now;
                 
                 // 清理超过1小时的数据
@@ -1519,6 +1572,7 @@
                 profitHistoryData.profitBelow20 = profitHistoryData.profitBelow20.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profitBelow10 = profitHistoryData.profitBelow10.filter(d => d.time > oneHourAgo);
                 profitHistoryData.lossCount = profitHistoryData.lossCount.filter(d => d.time > oneHourAgo);
+                profitHistoryData.longLossCount = profitHistoryData.longLossCount.filter(d => d.time > oneHourAgo);
             }
             
             // 计算市场下跌等级
@@ -1600,6 +1654,79 @@
                 console.log(`📊 市场下跌等级分析: Level ${level} - ${levelText}`);
             }
             
+            // 计算上涨强度等级（基于多单亏损数量）
+            function updateRiseLevel(longLoss) {
+                let level = 0;
+                let levelText = '';
+                let levelDesc = '';
+                let levelIcon = '';
+                let bgGradient = '';
+                
+                // 上涨强度5级：极端逼空阶段
+                if (longLoss >= 10) {
+                    level = 5;
+                    levelText = '上涨强度5级 - 极端逼空阶段';
+                    levelDesc = '多单亏损>=10个，极端逼空';
+                    levelIcon = '🚀🚀🚀🚀🚀';
+                    bgGradient = 'linear-gradient(135deg, #ff0844 0%, #cc0000 100%)';
+                }
+                // 上涨强度4级：加速赶顶
+                else if (longLoss >= 8 && longLoss < 10) {
+                    level = 4;
+                    levelText = '上涨强度4级 - 加速赶顶';
+                    levelDesc = '多单亏损8-9个，加速赶顶';
+                    levelIcon = '🚀🚀🚀🚀';
+                    bgGradient = 'linear-gradient(135deg, #f5576c 0%, #e53e3e 100%)';
+                }
+                // 上涨强度3级：阶段性加速
+                else if (longLoss >= 5 && longLoss < 8) {
+                    level = 3;
+                    levelText = '上涨强度3级 - 阶段性加速';
+                    levelDesc = '多单亏损5-7个，阶段性加速';
+                    levelIcon = '🚀🚀🚀';
+                    bgGradient = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                }
+                // 上涨强度2级：加速阶段
+                else if (longLoss >= 4 && longLoss < 5) {
+                    level = 2;
+                    levelText = '上涨强度2级 - 加速阶段';
+                    levelDesc = '多单亏损4个，加速阶段';
+                    levelIcon = '🚀🚀';
+                    bgGradient = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)';
+                }
+                // 上涨强度1级：起涨阶段
+                else if (longLoss >= 2 && longLoss < 4) {
+                    level = 1;
+                    levelText = '上涨强度1级 - 起涨阶段';
+                    levelDesc = '多单亏损2-3个，起涨阶段';
+                    levelIcon = '🚀';
+                    bgGradient = 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)';
+                }
+                // 市场正常
+                else {
+                    level = 0;
+                    levelText = '市场正常';
+                    levelDesc = '多单亏损<2个，无明显上涨';
+                    levelIcon = '✅';
+                    bgGradient = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+                }
+                
+                // 更新显示
+                document.getElementById('riseLevelIcon').textContent = levelIcon;
+                document.getElementById('riseLevelText').textContent = levelText;
+                document.getElementById('riseLevelDesc').textContent = levelDesc;
+                document.getElementById('riseLevelDisplay').style.background = bgGradient;
+                
+                // 更新统计计数
+                document.getElementById('riseLossCount').textContent = longLoss;
+                
+                // 更新时间
+                const now = new Date();
+                document.getElementById('riseAnalysisTime').textContent = now.toLocaleString('zh-CN');
+                
+                console.log(`📊 市场上涨强度分析: Level ${level} - ${levelText}`);
+            }
+            
             // 计算增量
             function calcIncrease(historyArray, currentCount) {
                 if (historyArray.length < 2) return '--';
@@ -1628,6 +1755,7 @@
             document.getElementById('profitBelow20Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow20, profitBelow20)}`;
             document.getElementById('profitBelow10Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profitBelow10, profitBelow10)}`;
             document.getElementById('lossCountIncrease').textContent = `1小时内: ${calcIncrease(profitHistoryData.lossCount, lossCount)}`;
+            document.getElementById('longLossCountIncrease').textContent = `1小时内: ${calcIncrease(profitHistoryData.longLossCount, longLossCount)}`;
             
             // 更新操作提示状态栏（使用新规则）
             updateOperationStatusBar({
