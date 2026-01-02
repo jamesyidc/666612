@@ -17723,7 +17723,9 @@ def close_sub_account_position_by_percent():
         pos_side = data.get('pos_side')
         percent = data.get('percent', 100)
         
+        print(f"\n{'='*80}")
         print(f"📊 按百分比平仓: {account_name} - {inst_id} {pos_side} - {percent}%")
+        print(f"{'='*80}\n")
         
         # 读取子账户配置
         try:
@@ -17774,11 +17776,24 @@ def close_sub_account_position_by_percent():
             return jsonify({'success': False, 'message': f"获取持仓失败: {data_resp.get('msg', '未知错误')}"})
         
         positions = data_resp.get('data', [])
+        
+        # 找到对应的持仓 (优先选择逐仓模式，因为逐仓有margin字段)
         target_position = None
+        isolated_positions = []
+        cross_positions = []
+        
         for pos in positions:
             if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
-                target_position = pos
-                break
+                if pos.get('mgnMode') == 'isolated':
+                    isolated_positions.append(pos)
+                else:
+                    cross_positions.append(pos)
+        
+        # 优先使用逐仓持仓
+        if isolated_positions:
+            target_position = isolated_positions[0]
+        elif cross_positions:
+            target_position = cross_positions[0]
         
         if not target_position:
             return jsonify({'success': False, 'message': '未找到对应持仓'})
@@ -17786,6 +17801,8 @@ def close_sub_account_position_by_percent():
         current_pos = float(target_position.get('pos', 0))
         if current_pos <= 0:
             return jsonify({'success': False, 'message': '持仓量为0'})
+        
+        print(f"\n🔍 DEBUG: target_position = {json_lib.dumps(target_position, indent=2)}")
         
         # 2. 计算平仓数量
         close_size = int(current_pos * percent / 100)
@@ -17796,9 +17813,12 @@ def close_sub_account_position_by_percent():
         if close_size > current_pos:
             close_size = current_pos
         
+        print(f"\n{'='*80}")
         print(f"  当前持仓: {current_pos} 张")
         print(f"  平仓比例: {percent}%")
+        print(f"  计算平仓: {current_pos} * {percent} / 100 = {current_pos * percent / 100}")
         print(f"  平仓数量: {close_size} 张")
+        print(f"{'='*80}\n")
         
         # 3. 执行平仓
         request_path = '/api/v5/trade/order'
@@ -17934,20 +17954,40 @@ def close_sub_account_position_to_amount():
             return jsonify({'success': False, 'message': f"获取持仓失败: {data_resp.get('msg', '未知错误')}"})
         
         positions = data_resp.get('data', [])
+        
+        # 找到对应的持仓 (优先选择逐仓模式，因为逐仓有margin字段)
         target_position = None
+        isolated_positions = []
+        cross_positions = []
+        
         for pos in positions:
             if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
-                target_position = pos
-                break
+                if pos.get('mgnMode') == 'isolated':
+                    isolated_positions.append(pos)
+                else:
+                    cross_positions.append(pos)
+        
+        # 优先使用逐仓持仓
+        if isolated_positions:
+            target_position = isolated_positions[0]
+        elif cross_positions:
+            target_position = cross_positions[0]
         
         if not target_position:
             return jsonify({'success': False, 'message': '未找到对应持仓'})
         
-        current_pos = float(target_position.get('pos', 0))
-        current_margin = float(target_position.get('margin', 0))
+        current_pos = float(target_position.get('pos', 0) or 0)
+        margin_value = target_position.get('margin', 0)
+        current_margin = float(margin_value) if margin_value and margin_value != '' else 0
+        
+        print(f"  当前持仓: {current_pos} 张")
+        print(f"  当前保证金: {current_margin} USDT")
         
         if current_pos <= 0:
             return jsonify({'success': False, 'message': '持仓量为0'})
+        
+        if current_margin <= 0:
+            return jsonify({'success': False, 'message': '无法获取当前保证金数据'})
         
         if current_margin <= target_margin:
             return jsonify({'success': False, 'message': f'当前保证金({current_margin:.2f}U)已经小于或等于目标保证金({target_margin}U)'})
