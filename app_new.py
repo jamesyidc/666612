@@ -13239,14 +13239,40 @@ def get_current_positions():
             mark_price = safe_float(pos.get('markPx', 0))
             lever = safe_int(pos.get('lever', 10))
             upl = safe_float(pos.get('upl', 0))
-            # 使用理论保证金：持仓价值 / 杠杆
-            # 这与OKEx Web界面显示的"保证金"一致
-            pos_value_abs = abs(pos_value)  # 持仓数量（绝对值）
-            margin = (pos_value_abs * mark_price) / lever if lever > 0 and mark_price > 0 else 0.01
             
-            # 直接使用OKEx的收益率（uplRatio），转换为百分比
+            # 方法1：使用OKEx的保证金字段（最准确）
+            okex_margin = safe_float(pos.get('margin', 0))
+            
+            # 方法2：理论计算保证金：持仓价值 / 杠杆
+            pos_value_abs = abs(pos_value)  # 持仓数量（绝对值）
+            calculated_margin = (pos_value_abs * mark_price) / lever if lever > 0 and mark_price > 0 else 0.01
+            
+            # 方法3：通过UPL和收益率反推保证金（验证方法）
             okex_profit_ratio = safe_float(pos.get('uplRatio', 0))
             profit_rate = okex_profit_ratio * 100  # 转换为百分比
+            
+            # 使用UPL和收益率反推保证金进行验证
+            verified_margin = None
+            if upl != 0 and profit_rate != 0:
+                verified_margin = abs(upl) / abs(profit_rate / 100)
+            
+            # 保证金选择策略：
+            # 1. 优先使用OKEx直接返回的margin字段（最准确）
+            # 2. 如果OKEx的margin为0或不合理，使用理论计算值
+            # 3. 如果有验证值且差异很大，记录警告
+            margin = okex_margin if okex_margin > 0 else calculated_margin
+            
+            # 验证保证金准确性
+            if verified_margin and abs(verified_margin - margin) > 0.5:
+                print(f"⚠️ 保证金验证警告 {inst_id} {pos_side}:")
+                print(f"   OKEx保证金: {okex_margin:.4f} USDT")
+                print(f"   理论保证金: {calculated_margin:.4f} USDT")
+                print(f"   反推保证金: {verified_margin:.4f} USDT (UPL={upl:.4f}, 收益率={profit_rate:.2f}%)")
+                print(f"   使用值: {margin:.4f} USDT")
+                # 如果反推值与当前值差异很大，使用反推值（更准确）
+                if abs(verified_margin - margin) > margin * 0.5:  # 差异超过50%
+                    print(f"   ⚠️ 差异过大，使用反推值")
+                    margin = verified_margin
             
             # 如果数据库中有记录，使用数据库的开仓价格
             if db_record:
@@ -13539,6 +13565,18 @@ def get_sub_account_positions():
                             else:
                                 profit_rate = 0
                                 print(f"⚠️ {pos['instId']} 价格数据异常，收益率设为0")
+                            
+                            # 🔍 验证保证金准确性：通过UPL和收益率反推
+                            if upl != 0 and profit_rate != 0:
+                                verified_margin = abs(upl) / abs(profit_rate / 100)
+                                if abs(verified_margin - margin) > 1.0:  # 差异超过1U
+                                    print(f"⚠️ 子账户保证金验证警告 {account_name} {pos['instId']} {pos_side}:")
+                                    print(f"   当前保证金: {margin:.4f} USDT")
+                                    print(f"   反推保证金: {verified_margin:.4f} USDT (UPL={upl:.4f}, 收益率={profit_rate:.2f}%)")
+                                    # 如果差异很大，使用反推值
+                                    if abs(verified_margin - margin) > margin * 0.5:  # 差异超过50%
+                                        print(f"   ⚠️ 差异过大（{abs(verified_margin - margin):.2f}U），使用反推值")
+                                        margin = verified_margin
                             
                             # 获取维护次数
                             maintenance_count = 0

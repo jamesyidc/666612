@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 子账户超级维护守护进程
-功能：监控子账户持仓，收益率跌破-10%时自动维护
+功能：监控子账户持仓，收益率接近-10%时自动维护（更早介入）
 """
 
 import json
@@ -14,7 +14,8 @@ import traceback
 
 # 配置
 CHECK_INTERVAL = 30  # 30秒检查一次
-TRIGGER_RATE = -10  # 触发维护的收益率阈值
+TRIGGER_RATE = -8  # 触发维护的收益率阈值（改为-8%，提前介入）
+PREPARE_RATE = -6  # 准备维护的收益率阈值（改为-6%）
 MAINTENANCE_AMOUNT = 20  # 维护金额20U（进一步降低以确保成功）
 MAX_MAINTENANCE_COUNT = 3  # 最大维护次数
 STOP_LOSS_RATE = -20  # 止损线
@@ -287,12 +288,12 @@ def main_loop():
                 should_maintain = False
                 prepare_maintain = False
                 
-                if profit_rate <= TRIGGER_RATE:  # <= -10%
+                if profit_rate <= TRIGGER_RATE:  # <= -8% 立即维护（提前介入）
                     should_maintain = True
-                    log(f"    ⚠️  收益率跌破维护阈值{TRIGGER_RATE}%")
-                elif profit_rate <= -8:  # <= -8%
+                    log(f"    ⚠️  收益率跌破维护阈值{TRIGGER_RATE}%（提前介入）")
+                elif profit_rate <= PREPARE_RATE:  # <= -6% 准备维护
                     prepare_maintain = True
-                    log(f"    📢 收益率跌破准备维护阈值-8%")
+                    log(f"    📢 收益率跌破准备维护阈值{PREPARE_RATE}%")
                 
                 if should_maintain:
                     # 获取今日维护次数
