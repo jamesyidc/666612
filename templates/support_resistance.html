@@ -1230,6 +1230,21 @@
         </div>
         
         <div class="stats-summary" id="statsSummary">
+            <!-- 历史最大值统计卡片 -->
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05)); border: 2px solid rgba(239, 68, 68, 0.4);">
+                <h3>⏰ 24小时极值记录数统计</h3>
+                <div class="value" id="max24hCount" style="color: #ef4444; font-size: 48px; font-weight: 800;">0</div>
+                <div style="color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 5px;">
+                    个监控币对（最近24小时）
+                </div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, rgba(251, 146, 60, 0.2), rgba(251, 146, 60, 0.05)); border: 2px solid rgba(251, 146, 60, 0.4);">
+                <h3>⚡ 2小时极值记录数统计</h3>
+                <div class="value" id="max2hCount" style="color: #fb923c; font-size: 48px; font-weight: 800;">0</div>
+                <div style="color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 5px;">
+                    个监控币对（最近2小时）
+                </div>
+            </div>
             <div class="stat-card">
                 <h3>监控币种数</h3>
                 <div class="value" id="totalCoins">0</div>
@@ -1974,6 +1989,28 @@
                 })
                 .catch(error => {
                     document.getElementById('loading').textContent = '数据加载错误: ' + error;
+                });
+            
+            // 加载历史最大值统计
+            loadMaxHistoryStats();
+        }
+        
+        function loadMaxHistoryStats() {
+            fetch('/api/support-resistance/max-history-stats')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        // 更新24小时最大值
+                        document.getElementById('max24hCount').textContent = 
+                            result.stats_24h.scenario1_max + result.stats_24h.scenario4_max;
+                        
+                        // 更新2小时最大值
+                        document.getElementById('max2hCount').textContent = 
+                            result.stats_2h.scenario1_max + result.stats_2h.scenario4_max;
+                    }
+                })
+                .catch(error => {
+                    console.error('加载历史最大值统计失败:', error);
                 });
         }
         

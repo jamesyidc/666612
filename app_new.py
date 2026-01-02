@@ -9551,6 +9551,69 @@ def api_support_resistance_import():
             'error': str(e)
         })
 
+@app.route('/api/support-resistance/max-history-stats')
+def api_support_resistance_max_history_stats():
+    """获取历史最大值统计（24小时和2小时）"""
+    try:
+        import sqlite3
+        
+        conn = sqlite3.connect('support_resistance.db')
+        cursor = conn.cursor()
+        
+        # 查询24小时内的最大值
+        cursor.execute("""
+        SELECT 
+            MAX(scenario_1_count) as max_24h_scenario1,
+            MAX(scenario_4_count) as max_24h_scenario4
+        FROM support_resistance_snapshots
+        WHERE datetime(snapshot_time) >= datetime('now', '-24 hours')
+        """)
+        stats_24h = cursor.fetchone()
+        
+        # 查询2小时内的最大值
+        cursor.execute("""
+        SELECT 
+            MAX(scenario_1_count) as max_2h_scenario1,
+            MAX(scenario_4_count) as max_2h_scenario4
+        FROM support_resistance_snapshots
+        WHERE datetime(snapshot_time) >= datetime('now', '-2 hours')
+        """)
+        stats_2h = cursor.fetchone()
+        
+        # 查询当前值（最新记录）
+        cursor.execute("""
+        SELECT scenario_1_count, scenario_4_count
+        FROM support_resistance_snapshots
+        ORDER BY id DESC
+        LIMIT 1
+        """)
+        current = cursor.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'stats_24h': {
+                'scenario1_max': stats_24h[0] or 0,  # 48h低位预警最大值
+                'scenario4_max': stats_24h[1] or 0   # 7天高位预警最大值
+            },
+            'stats_2h': {
+                'scenario1_max': stats_2h[0] or 0,   # 48h低位预警最大值
+                'scenario4_max': stats_2h[1] or 0    # 7天高位预警最大值
+            },
+            'current': {
+                'scenario1': current[0] if current else 0,
+                'scenario4': current[1] if current else 0
+            }
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/query/batch-import', methods=['POST'])
 def api_query_batch_import():
     """批量导入当天所有TXT文件数据"""
