@@ -1781,6 +1781,10 @@
                                     style="padding: 5px 10px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
                                 🔧 维护
                             </button>
+                            <button onclick="checkAndFixSubAccountPosition('${item.account_name}', '${item.inst_id}', '${item.pos_side}', ${item.maintenance_count || 0})" 
+                                    style="padding: 5px 10px; background: #f59e0b; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                🔍 纠错
+                            </button>
                             <div style="position: relative; display: inline-block;">
                                 <button onclick="toggleCloseMenu('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
                                         style="padding: 5px 10px; background: #f56565; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
@@ -2348,6 +2352,52 @@
                 } catch (error) {
                     console.error('维护失败:', error);
                     alert(`❌ 维护失败：${error.message}`);
+                }
+            }
+            
+            // 检查并纠正子账户持仓
+            async function checkAndFixSubAccountPosition(accountName, instId, posSide, maintenanceCount) {
+                // 计算目标保证金
+                let targetMargin = 10;
+                if (maintenanceCount === 1) targetMargin = 20;
+                else if (maintenanceCount === 2) targetMargin = 20;
+                else if (maintenanceCount >= 3) targetMargin = 30;
+                
+                if (!confirm(`确认要纠错 ${accountName} 的 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓吗？\n\n当前维护次数: ${maintenanceCount}\n目标保证金: ${targetMargin}U\n\n系统将自动调整持仓，使保证金符合规则`)) {
+                    return;
+                }
+                
+                alert('🔍 正在检查并纠正持仓...');
+                
+                try {
+                    const response = await fetch('/api/sub-account/check-and-fix-position', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        if (data.action === 'none') {
+                            alert(`✅ ${data.message}`);
+                        } else if (data.action === 'reduce') {
+                            alert(`✅ ${data.message}\n\n平仓数量: ${data.closed_size} 张\n订单ID: ${data.order_id}`);
+                        } else if (data.action === 'increase') {
+                            alert(`✅ ${data.message}\n\n加仓数量: ${data.added_size} 张\n订单ID: ${data.order_id}`);
+                        }
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ 纠错失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('纠错失败:', error);
+                    alert(`❌ 纠错失败：${error.message}`);
                 }
             }
             

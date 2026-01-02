@@ -17142,6 +17142,328 @@ def close_sub_account_position_to_amount():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sub-account/check-and-fix-position', methods=['POST'])
+def check_and_fix_sub_account_position():
+    """检查并纠正子账户持仓"""
+    try:
+        import json as json_lib
+        from datetime import datetime
+        import pytz
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        
+        data = request.json
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        
+        if not all([account_name, inst_id, pos_side]):
+            return jsonify({
+                'success': False,
+                'message': '缺少必要参数'
+            })
+        
+        # 读取子账户配置
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except FileNotFoundError:
+            return jsonify({
+                'success': False,
+                'message': '子账户配置文件不存在'
+            })
+        
+        # 找到对应的子账户
+        sub_account = None
+        for acc in config.get('sub_accounts', []):
+            if acc.get('account_name') == account_name and acc.get('enabled', False):
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({
+                'success': False,
+                'message': f'未找到子账户: {account_name}'
+            })
+        
+        api_key = sub_account.get('api_key')
+        secret_key = sub_account.get('secret_key')
+        passphrase = sub_account.get('passphrase')
+        
+        # 读取维护记录
+        maintenance_file = 'sub_account_maintenance.json'
+        try:
+            with open(maintenance_file, 'r', encoding='utf-8') as f:
+                maintenance_data = json.load(f)
+        except FileNotFoundError:
+            maintenance_data = {}
+        
+        # 获取今日维护次数
+        record_key = f"{account_name}_{inst_id}_{pos_side}"
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        today_date = now_beijing.strftime('%Y-%m-%d')
+        
+        maintenance_count = 0
+        if record_key in maintenance_data:
+            record = maintenance_data[record_key]
+            if record.get('date') == today_date:
+                maintenance_count = record.get('count', 0)
+        
+        # 计算目标保证金
+        def calculate_target_margin(count):
+            if count == 0:
+                return 10.0
+            elif count == 1:
+                return 20.0
+            elif count == 2:
+                return 20.0
+            else:  # count >= 3
+                return 30.0
+        
+        target_margin = calculate_target_margin(maintenance_count)
+        
+        # 获取当前持仓
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "GET"
+        request_path = f"/api/v5/account/positions?instType=SWAP&instId={inst_id}"
+        
+        prehash = timestamp + method + request_path
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            "https://www.okx.com" + request_path,
+            headers=headers,
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'message': f'获取持仓失败: {response.text}'
+            })
+        
+        positions_data = response.json()
+        if positions_data.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f'获取持仓失败: {positions_data.get("msg")}'
+            })
+        
+        # 找到对应持仓
+        target_position = None
+        for pos in positions_data.get('data', []):
+            if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                target_position = pos
+                break
+        
+        if not target_position:
+            return jsonify({
+                'success': False,
+                'message': '未找到对应持仓'
+            })
+        
+        current_margin = float(target_position.get('margin', 0))
+        pos_size = abs(float(target_position.get('pos', 0)))
+        mark_price = float(target_position.get('markPx', 0))
+        
+        print(f"🔍 纠错检查 - 账户: {account_name}, 币种: {inst_id}, 方向: {pos_side}")
+        print(f"   今日维护次数: {maintenance_count}")
+        print(f"   目标保证金: {target_margin} USDT")
+        print(f"   当前保证金: {current_margin} USDT")
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   标记价: {mark_price}")
+        
+        # 判断是否需要纠错
+        margin_diff = current_margin - target_margin
+        tolerance = 0.5  # 容差0.5 USDT
+        
+        if abs(margin_diff) <= tolerance:
+            return jsonify({
+                'success': True,
+                'message': f'持仓正常，无需纠错（当前: {current_margin:.2f}U，目标: {target_margin:.2f}U）',
+                'current_margin': current_margin,
+                'target_margin': target_margin,
+                'maintenance_count': maintenance_count,
+                'action': 'none'
+            })
+        
+        # 需要纠错
+        action = 'reduce' if margin_diff > 0 else 'increase'
+        
+        if action == 'reduce':
+            # 保证金过多，需要平仓
+            # 计算需要平掉的比例
+            close_percent = (margin_diff / current_margin) * 100
+            close_size = int(pos_size * (margin_diff / current_margin))
+            
+            if close_size < 1:
+                return jsonify({
+                    'success': True,
+                    'message': f'保证金略高（当前: {current_margin:.2f}U，目标: {target_margin:.2f}U），但差额过小无需平仓',
+                    'current_margin': current_margin,
+                    'target_margin': target_margin,
+                    'maintenance_count': maintenance_count,
+                    'action': 'none'
+                })
+            
+            print(f"   ⚠️ 需要平仓 {close_size} 张（约 {close_percent:.1f}%）")
+            
+            # 执行平仓
+            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+            method = "POST"
+            request_path = "/api/v5/trade/order"
+            
+            order_data = {
+                "instId": inst_id,
+                "tdMode": "cross",
+                "side": "sell" if pos_side == "long" else "buy",
+                "ordType": "market",
+                "sz": str(close_size),
+                "posSide": pos_side,
+                "reduceOnly": True
+            }
+            
+            body = json.dumps(order_data)
+            prehash = timestamp + method + request_path + body
+            signature = base64.b64encode(
+                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+            ).decode()
+            
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": timestamp,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(
+                "https://www.okx.com" + request_path,
+                headers=headers,
+                json=order_data,
+                timeout=10
+            )
+            
+            result = response.json()
+            
+            if result.get('code') == '0':
+                order_id = result['data'][0].get('ordId')
+                print(f"   ✅ 纠错平仓成功，订单ID: {order_id}")
+                return jsonify({
+                    'success': True,
+                    'message': f'纠错成功：平仓 {close_size} 张，保证金从 {current_margin:.2f}U 降至约 {target_margin:.2f}U',
+                    'action': 'reduce',
+                    'closed_size': close_size,
+                    'order_id': order_id,
+                    'current_margin': current_margin,
+                    'target_margin': target_margin,
+                    'maintenance_count': maintenance_count
+                })
+            else:
+                print(f"   ❌ 平仓失败: {result.get('msg')}")
+                return jsonify({
+                    'success': False,
+                    'message': f'平仓失败: {result.get("msg")}'
+                })
+        
+        else:
+            # 保证金不足，需要加仓
+            # 计算需要加多少张
+            add_margin = target_margin - current_margin
+            add_size = int((add_margin * pos_size) / current_margin)
+            
+            if add_size < 1:
+                return jsonify({
+                    'success': True,
+                    'message': f'保证金略低（当前: {current_margin:.2f}U，目标: {target_margin:.2f}U），但差额过小无需加仓',
+                    'current_margin': current_margin,
+                    'target_margin': target_margin,
+                    'maintenance_count': maintenance_count,
+                    'action': 'none'
+                })
+            
+            print(f"   ⚠️ 需要加仓 {add_size} 张")
+            
+            # 执行加仓
+            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+            method = "POST"
+            request_path = "/api/v5/trade/order"
+            
+            order_data = {
+                "instId": inst_id,
+                "tdMode": "cross",
+                "side": "buy" if pos_side == "long" else "sell",
+                "ordType": "market",
+                "sz": str(add_size),
+                "posSide": pos_side
+            }
+            
+            body = json.dumps(order_data)
+            prehash = timestamp + method + request_path + body
+            signature = base64.b64encode(
+                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+            ).decode()
+            
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": timestamp,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(
+                "https://www.okx.com" + request_path,
+                headers=headers,
+                json=order_data,
+                timeout=10
+            )
+            
+            result = response.json()
+            
+            if result.get('code') == '0':
+                order_id = result['data'][0].get('ordId')
+                print(f"   ✅ 纠错加仓成功，订单ID: {order_id}")
+                return jsonify({
+                    'success': True,
+                    'message': f'纠错成功：加仓 {add_size} 张，保证金从 {current_margin:.2f}U 升至约 {target_margin:.2f}U',
+                    'action': 'increase',
+                    'added_size': add_size,
+                    'order_id': order_id,
+                    'current_margin': current_margin,
+                    'target_margin': target_margin,
+                    'maintenance_count': maintenance_count
+                })
+            else:
+                print(f"   ❌ 加仓失败: {result.get('msg')}")
+                return jsonify({
+                    'success': False,
+                    'message': f'加仓失败: {result.get("msg")}'
+                })
+    
+    except Exception as e:
+        import traceback
+        print(f"❌ 纠错异常: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'message': f'纠错异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/sub-account/reset-maintenance-count', methods=['POST'])
 def reset_sub_account_maintenance_count():
     """清零子账户今日维护次数"""
