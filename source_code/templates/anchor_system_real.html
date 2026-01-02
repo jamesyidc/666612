@@ -2399,8 +2399,36 @@
             }
             
             async function resetSubAccountMaintenanceCount(accountName, instId, posSide) {
-                // TODO: 实现子账户维护次数清零
-                alert('子账户维护次数清零功能开发中...');
+                const direction = posSide === 'short' ? '做空' : '做多';
+                
+                if (!confirm(`确认清零 ${accountName} 的 ${instId} ${direction} 今日维护次数？\n\n清零后，下次维护将保留10U保证金。`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/sub-account/reset-maintenance-count', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`✅ 清零成功！\n\n币种: ${data.inst_id}\n方向: ${direction}\n原维护次数: ${data.old_count}次\n当前维护次数: ${data.new_count}次`);
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ 清零失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('清零失败:', error);
+                    alert(`❌ 清零失败：${error.message}`);
+                }
             }
             
             // 维护子账户持仓（买100U然后立即平掉）

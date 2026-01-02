@@ -17206,31 +17206,64 @@ def maintain_sub_account_position():
         if pos_size <= 0:
             return jsonify({'success': False, 'message': f'持仓数量无效: {pos_size}'})
         
-        # 计算维护金额：20U，但需要考虑高价币种
+        # 获取今日维护次数
+        try:
+            with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+                maintenance_data = json_lib.load(f)
+        except FileNotFoundError:
+            maintenance_data = {}
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        import pytz
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        today_date = now_beijing.strftime('%Y-%m-%d')
+        
+        # 获取今日维护次数
+        today_maintenance_count = 0
+        if key in maintenance_data and maintenance_data[key].get('date') == today_date:
+            today_maintenance_count = maintenance_data[key].get('count', 0)
+        
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   今日已维护: {today_maintenance_count} 次")
+        
+        # 根据维护次数确定目标保证金
+        # 0次→10U, 1次→20U, 2次→20U, 3次+→30U
+        if today_maintenance_count == 0:
+            target_margin = 10
+        elif today_maintenance_count == 1:
+            target_margin = 20
+        elif today_maintenance_count == 2:
+            target_margin = 20
+        else:  # 3次及以上
+            target_margin = 30
+        
+        print(f"   目标保证金: {target_margin}U (基于{today_maintenance_count}次维护)")
+        
         # 计算杠杆（默认10倍）
         try:
             leverage = float(target_position.get('lever', 10))
         except (ValueError, TypeError):
             leverage = 10
         
-        # 维护策略：买入的价值至少是20U，确保至少1张
-        maintenance_amount = 20  # 目标金额
-        maintenance_size_raw = (maintenance_amount * leverage) / mark_price  # 考虑杠杆的数量
-        maintenance_size = max(1, int(maintenance_size_raw))  # 至少1张
+        # 维护策略：买入100U，然后平掉，保留target_margin对应的数量
+        # 步骤1：买入100U的数量
+        maintenance_buy_amount = 100  # 买入100U
+        maintenance_buy_size_raw = (maintenance_buy_amount * leverage) / mark_price
+        maintenance_buy_size = max(1, int(maintenance_buy_size_raw))
         
-        # 如果价格太高（单张超过200U），调整为至少1张，但警告
-        single_value = mark_price  # 单张合约价值（1倍杠杆）
+        # 对于高价币（单张>200U），至少买1张
+        single_value = mark_price
         if single_value > 200:
-            print(f"   ⚠️ 警告：币种价格较高({mark_price}U)，单张价值{single_value}U，维护成本较高")
-            # 对于高价币，可以降低维护数量，但至少1张
-            maintenance_size = 1
+            print(f"   ⚠️ 警告：币种价格较高({mark_price}U)，单张价值{single_value}U")
+            maintenance_buy_size = max(1, maintenance_buy_size)
         
-        print(f"   当前持仓: {pos_size} 张")
         print(f"   标记价: {mark_price}")
-        print(f"   维护金额: {maintenance_amount}U")
-        print(f"   维护数量: {maintenance_size} 张")
+        print(f"   杠杆: {leverage}x")
+        print(f"   维护策略: 买入{maintenance_buy_amount}U → 平掉多余 → 保留{target_margin}U")
+        print(f"   买入数量: {maintenance_buy_size} 张")
         
-        # 步骤1: 买入20U
+        # 步骤1: 买入100U（开大仓）
         timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
         method = "POST"
         request_path = "/api/v5/trade/order"
@@ -17240,7 +17273,7 @@ def maintain_sub_account_position():
             "tdMode": "cross",
             "side": "buy" if pos_side == "long" else "sell",
             "ordType": "market",
-            "sz": str(maintenance_size),
+            "sz": str(maintenance_buy_size),
             "posSide": pos_side
         }
         
@@ -17276,57 +17309,69 @@ def maintain_sub_account_position():
         import time
         time.sleep(1)
         
-        # 步骤2: 立即平掉刚买入的
-        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
-        method = "POST"
-        request_path = "/api/v5/trade/order"
+        # 步骤2: 平掉多余持仓，保留target_margin对应的数量
+        # 计算总持仓 = 原持仓 + 新买入
+        total_pos_size = pos_size + maintenance_buy_size
         
-        order_data = {
-            "instId": inst_id,
-            "tdMode": "cross",
-            "side": "sell" if pos_side == "long" else "buy",
-            "ordType": "market",
-            "sz": str(maintenance_size),
-            "posSide": pos_side,
-            "reduceOnly": True
-        }
+        # 计算应该保留的数量（对应target_margin保证金）
+        target_keep_size_raw = (target_margin * leverage) / mark_price
+        target_keep_size = max(1, int(target_keep_size_raw))
         
-        body = json_lib.dumps(order_data)
-        prehash = timestamp + method + request_path + body
-        signature = base64.b64encode(
-            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
-        ).decode()
+        # 计算需要平掉的数量
+        close_size = total_pos_size - target_keep_size
         
-        headers = {
-            "OK-ACCESS-KEY": api_key,
-            "OK-ACCESS-SIGN": signature,
-            "OK-ACCESS-TIMESTAMP": timestamp,
-            "OK-ACCESS-PASSPHRASE": passphrase,
-            "Content-Type": "application/json"
-        }
+        if close_size <= 0:
+            print(f"   ⚠️ 无需平仓：总持仓{total_pos_size}张，目标保留{target_keep_size}张")
+            close_order_id = 'SKIPPED'
+        else:
+            print(f"   步骤2: 平仓多余持仓")
+            print(f"   总持仓: {total_pos_size} 张")
+            print(f"   目标保留: {target_keep_size} 张 (对应{target_margin}U)")
+            print(f"   需要平掉: {close_size} 张")
+            
+            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+            method = "POST"
+            request_path = "/api/v5/trade/order"
+            
+            order_data = {
+                "instId": inst_id,
+                "tdMode": "cross",
+                "side": "sell" if pos_side == "long" else "buy",
+                "ordType": "market",
+                "sz": str(int(close_size)),
+                "posSide": pos_side,
+                "reduceOnly": True
+            }
+            }
+            
+            body = json_lib.dumps(order_data)
+            prehash = timestamp + method + request_path + body
+            signature = base64.b64encode(
+                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+            ).decode()
+            
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": timestamp,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
+            result = response.json()
+            
+            print(f"   步骤2响应: {result}")
+            
+            if result.get('code') != '0':
+                error_msg = result.get("msg", "未知错误")
+                print(f"   ❌ 平仓失败: {error_msg}")
+                return jsonify({'success': False, 'message': f'平仓失败: {error_msg}', 'detail': result})
+            
+            close_order_id = result['data'][0].get('ordId')
+            print(f"   ✅ 步骤2完成 - 平仓订单ID: {close_order_id}")
         
-        response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
-        result = response.json()
-        
-        if result.get('code') != '0':
-            return jsonify({'success': False, 'message': f'平仓失败: {result.get("msg")}'})
-        
-        close_order_id = result['data'][0].get('ordId')
-        print(f"   ✅ 步骤2完成 - 平仓订单ID: {close_order_id}")
-        
-        # 更新维护次数
-        try:
-            with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
-                maintenance_data = json_lib.load(f)
-        except FileNotFoundError:
-            maintenance_data = {}
-        
-        key = f"{account_name}_{inst_id}_{pos_side}"
-        import pytz
-        beijing_tz = pytz.timezone('Asia/Shanghai')
-        now_beijing = datetime.now(beijing_tz)
-        today_date = now_beijing.strftime('%Y-%m-%d')
-        
+        # 更新维护次数（注意：这段代码在前面已经读取过了，这里直接更新）
         if key not in maintenance_data or maintenance_data[key].get('date') != today_date:
             maintenance_data[key] = {
                 'count': 1,
@@ -17340,15 +17385,22 @@ def maintain_sub_account_position():
         with open('sub_account_maintenance.json', 'w', encoding='utf-8') as f:
             json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
         
+        final_maintenance_count = maintenance_data[key]['count']
         print(f"✅ 维护成功: {account_name} - {inst_id} {pos_side}")
-        print(f"   今日维护次数: {maintenance_data[key]['count']}")
+        print(f"   买入: {maintenance_buy_size} 张")
+        print(f"   平仓: {close_size if close_size > 0 else 0} 张")
+        print(f"   目标保证金: {target_margin}U")
+        print(f"   今日维护次数: {final_maintenance_count}")
         
         return jsonify({
             'success': True,
-            'message': f'维护成功！买入并平仓{maintenance_size}张，今日维护{maintenance_data[key]["count"]}次',
+            'message': f'维护成功！买入{maintenance_buy_size}张，平掉{int(close_size) if close_size > 0 else 0}张，保留约{target_margin}U，今日第{final_maintenance_count}次维护',
             'open_order_id': open_order_id,
             'close_order_id': close_order_id,
-            'maintenance_count': maintenance_data[key]['count']
+            'maintenance_count': final_maintenance_count,
+            'target_margin': target_margin,
+            'buy_size': maintenance_buy_size,
+            'close_size': int(close_size) if close_size > 0 else 0
         })
     except Exception as e:
         import traceback
