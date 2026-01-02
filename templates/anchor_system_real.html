@@ -573,8 +573,28 @@
                         <!-- 统计信息将在这里动态显示 -->
                     </span>
                 </div>
-                <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
-                    最后更新: --
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="autoMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🟢 自动维护多单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: #718096; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="autoMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🔴 自动维护空单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: #ff6b35; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="superMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护多单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: #ff6b35; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="superMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护空单-10%</span>
+                        </label>
+                    </div>
+                    <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
+                        最后更新: --
+                    </div>
                 </div>
             </div>
             <div class="table-container">
@@ -598,6 +618,66 @@
                     </thead>
                     <tbody id="currentPositionBody">
                         <tr><td colspan="13" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 子账户持仓情况 -->
+        <div class="card" style="border: 2px solid #667eea;">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card-title" style="color: white;">
+                    <span>👥</span>
+                    子账户持仓情况
+                    <span id="subAccountStats" style="margin-left: 15px; font-size: 14px; font-weight: normal; opacity: 0.9;">
+                        <!-- 统计信息将在这里动态显示 -->
+                    </span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="subSuperMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护多单-10%</span>
+                        </label>
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="subSuperMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🚀 超级维护空单-10%</span>
+                        </label>
+                    </div>
+                    <button id="closeAllSubAccountPositions" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'">
+                        🚨 一键全部平仓
+                    </button>
+                    <div style="font-size: 13px; opacity: 0.9;">
+                        账户数量: <strong id="subAccountCount">--</strong>
+                    </div>
+                    <div class="update-time" id="subAccountPositionTime" style="font-size: 14px; opacity: 0.9; color: white;">
+                        最后更新: --
+                    </div>
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="subAccountPositionTable" style="width: 100%; table-layout: fixed;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #000;">
+                            <th style="color: #000; width: 7%;">账户名</th>
+                            <th style="color: #000; width: 4%;">编号</th>
+                            <th style="color: #000; width: 10%;">币种</th>
+                            <th style="color: #000; width: 5%;">方向</th>
+                            <th style="color: #000; width: 7%;">持仓量</th>
+                            <th style="color: #000; width: 8%;">开仓均价</th>
+                            <th style="color: #000; width: 8%;">标记价格</th>
+                            <th style="color: #000; width: 4%;">杠杆</th>
+                            <th style="color: #000; width: 10%;">未实现盈亏</th>
+                            <th style="color: #000; width: 9%;">保证金</th>
+                            <th style="color: #000; width: 7%;">收益率</th>
+                            <th style="color: #000; width: 7%;">今日维护</th>
+                            <th style="color: #000; width: 5%;">清零</th>
+                            <th style="color: #000; width: 6%;">状态</th>
+                            <th style="color: #000; width: 8%;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subAccountPositionBody">
+                        <tr><td colspan="15" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1483,6 +1563,219 @@
             
             // 初始加载数据
             loadData();
+            
+            // 自动维护开关事件监听
+            document.getElementById('autoMaintainLong').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🟢 自动维护多单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            auto_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '✅ 多单自动维护已开启' : '❌ 多单自动维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled; // 回滚
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled; // 回滚
+                }
+            });
+            
+            document.getElementById('autoMaintainShort').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🔴 自动维护空单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            auto_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '✅ 空单自动维护已开启' : '❌ 空单自动维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 超级维护开关事件监听
+            document.getElementById('superMaintainLong').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 超级维护多单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '🚀 多单超级维护已开启' : '❌ 多单超级维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            document.getElementById('superMaintainShort').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 超级维护空单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '🚀 空单超级维护已开启' : '❌ 空单超级维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 子账户超级维护多单开关
+            document.getElementById('subSuperMaintainLong').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 子账户超级维护多单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '🚀 子账户多单超级维护已开启' : '❌ 子账户多单超级维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 子账户超级维护空单开关
+            document.getElementById('subSuperMaintainShort').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🚀 子账户超级维护空单-10%: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            super_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '🚀 子账户空单超级维护已开启' : '❌ 子账户空单超级维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 一键全部平仓按钮
+            document.getElementById('closeAllSubAccountPositions').addEventListener('click', async function() {
+                // 二次确认
+                const confirmMessage = '⚠️ 确认要平掉所有子账户持仓吗？\n\n这将关闭所有子账户的所有持仓，此操作不可撤销！';
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+                
+                console.log('🚨 开始执行一键全部平仓...');
+                alert('🔄 正在平仓所有持仓...');
+                
+                try {
+                    const response = await fetch('/api/sub-account/close-all-positions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`✅ 平仓完成！成功: ${data.success_count}个，失败: ${data.fail_count}个`);
+                        // 刷新数据
+                        setTimeout(() => {
+                            loadData();
+                        }, 2000);
+                    } else {
+                        alert(`❌ 平仓失败: ${data.message}`);
+                    }
+                } catch (error) {
+                    console.error('一键平仓失败:', error);
+                    alert('❌ 一键平仓失败');
+                }
+            });
             
             // 自动刷新数据（每30秒）
             setInterval(() => {
