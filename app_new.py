@@ -13080,6 +13080,7 @@ def get_sub_account_positions():
                                 continue
                             
                             try:
+                                leverage = float(pos.get('lever') or 10)  # 确保leverage是float类型
                                 avg_px = float(pos.get('avgPx') or 0)
                                 mark_px = float(pos.get('markPx') or 0)
                                 upl = float(pos.get('upl') or 0)
@@ -13103,7 +13104,6 @@ def get_sub_account_positions():
                                 print(f"⚠️ 数据转换失败: {e}, pos={pos}")
                                 continue
                             
-                            leverage = float(pos.get('lever') or 10)  # 确保leverage是float类型
                             pos_side = pos.get('posSide')
                             
                             # ✅ 使用实时价格计算收益率（与前端一致）
