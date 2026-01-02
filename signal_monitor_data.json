@@ -80,11 +80,29 @@
       "scenario_3": 1,
       "scenario_4": 0,
       "timestamp": "2026-01-02 08:47:21"
+    },
+    {
+      "top_signal": 1,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 0,
+      "timestamp": "2026-01-02 08:48:21"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 2,
+      "scenario_4": 0,
+      "timestamp": "2026-01-02 08:49:21"
     }
   ],
   "latest": {
-    "top_signal": 1,
+    "top_signal": 2,
     "bottom_signal": 0,
-    "update_time": "2026-01-02 08:47:21"
+    "update_time": "2026-01-02 08:49:21"
   }
 }
