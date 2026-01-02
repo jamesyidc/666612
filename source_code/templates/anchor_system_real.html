@@ -909,6 +909,19 @@
                     renderCurrentPositions(positionsData.positions);
                 }
 
+                // 加载子账户持仓情况（实盘模式）
+                const subPositionsRes = await fetch('/api/anchor-system/sub-account-positions?trade_mode=real');
+                const subPositionsData = await subPositionsRes.json();
+                
+                console.log('👥 子账户持仓数据:', subPositionsData);
+                
+                if (subPositionsData.success) {
+                    renderSubAccountPositions(subPositionsData.positions);
+                    document.getElementById('subAccountCount').textContent = subPositionsData.total || 0;
+                    document.getElementById('subAccountPositionTime').textContent = 
+                        `最后更新: ${new Date().toLocaleString('zh-CN')}`;
+                }
+
                 // 加载当前预警（实盘模式）
                 const warningsRes = await fetch('/api/anchor-system/warnings?trade_mode=real');
                 const warningsData = await warningsRes.json();
@@ -1651,6 +1664,76 @@
             }
         }
 
+        // 渲染子账户持仓表
+        function renderSubAccountPositions(data) {
+            const tbody = document.getElementById('subAccountPositionBody');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="15" class="empty">暂无子账户持仓</td></tr>';
+                return;
+            }
+            
+            console.log('📊 渲染子账户持仓:', data.length, '条');
+            
+            // 币种编号映射
+            const coinNumbers = {
+                'CFX-USDT-SWAP': 'NO.1',
+                'FIL-USDT-SWAP': 'NO.2',
+                'CRO-USDT-SWAP': 'NO.3',
+                'UNI-USDT-SWAP': 'NO.4',
+                'CRV-USDT-SWAP': 'NO.5',
+                'LDO-USDT-SWAP': 'NO.6'
+            };
+            
+            tbody.innerHTML = data.map(item => {
+                const coinNumber = coinNumbers[item.inst_id] || '--';
+                return `
+                <tr>
+                    <td style="font-weight: 600; color: #667eea;">${item.account_name || '--'}</td>
+                    <td style="font-weight: 700; color: #667eea;">${coinNumber}</td>
+                    <td style="font-weight: 600;">${item.inst_id || '--'}</td>
+                    <td>
+                        <span class="badge ${item.pos_side === 'short' ? 'badge-short' : 'badge-long'}">
+                            ${item.pos_side === 'short' ? '做空' : '做多'}
+                        </span>
+                    </td>
+                    <td>${(item.pos_size || 0).toFixed(4)}</td>
+                    <td>$${(item.avg_price || 0).toFixed(4)}</td>
+                    <td>$${(item.mark_price || 0).toFixed(4)}</td>
+                    <td>${item.leverage || 10}x</td>
+                    <td style="color: ${item.upl >= 0 ? '#48bb78' : '#f56565'}; font-weight: 600;">
+                        ${item.upl >= 0 ? '+' : ''}${(item.upl || 0).toFixed(4)} USDT
+                    </td>
+                    <td>${(item.margin || 0).toFixed(4)} USDT</td>
+                    <td style="color: ${item.profit_rate >= 0 ? '#48bb78' : '#f56565'}; font-weight: 700; font-size: 16px;">
+                        ${item.profit_rate >= 0 ? '+' : ''}${(item.profit_rate || 0).toFixed(2)}%
+                    </td>
+                    <td>
+                        <button onclick="showSubAccountMaintenanceCount('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
+                                style="padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 18px; font-weight: 700;">
+                            ${item.maintenance_count || 0}次
+                        </button>
+                    </td>
+                    <td>
+                        <button onclick="resetSubAccountMaintenanceCount('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
+                                style="padding: 5px 10px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                            🔄 清零
+                        </button>
+                    </td>
+                    <td>
+                        <span class="badge badge-normal">${item.status || '正常'}</span>
+                    </td>
+                    <td>
+                        <button onclick="closeSubAccountPosition('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
+                                style="padding: 5px 10px; background: #f56565; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                            🚨 平仓
+                        </button>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+        }
+
         // 渲染预警表
         function renderWarnings(data) {
             const tbody = document.getElementById('warningsBody');
@@ -2124,6 +2207,53 @@
                     e.target.checked = !enabled;
                 }
             });
+            
+            // 子账户操作函数
+            async function showSubAccountMaintenanceCount(accountName, instId, posSide) {
+                // TODO: 实现子账户维护次数查询
+                alert('子账户维护次数查询功能开发中...');
+            }
+            
+            async function resetSubAccountMaintenanceCount(accountName, instId, posSide) {
+                // TODO: 实现子账户维护次数清零
+                alert('子账户维护次数清零功能开发中...');
+            }
+            
+            async function closeSubAccountPosition(accountName, instId, posSide) {
+                if (!confirm(`确认要平掉 ${accountName} 的 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓吗？`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/sub-account/close-position', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`✅ 平仓成功！`);
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ 平仓失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('平仓失败:', error);
+                    alert(`❌ 平仓失败：${error.message}`);
+                }
+            }
+            
+            // 将函数暴露到全局作用域
+            window.showSubAccountMaintenanceCount = showSubAccountMaintenanceCount;
+            window.resetSubAccountMaintenanceCount = resetSubAccountMaintenanceCount;
+            window.closeSubAccountPosition = closeSubAccountPosition;
             
             // 一键全部平仓按钮
             document.getElementById('closeAllSubAccountPositions').addEventListener('click', async function() {
