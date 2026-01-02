@@ -16825,5 +16825,72 @@ def test_reset_api_page():
     """测试清零API页面"""
     return render_template('test_reset_api.html')
 
+@app.route('/api/signal-monitor/latest')
+def api_signal_monitor_latest():
+    """获取最新的支撑阻力信号监控数据"""
+    try:
+        import json
+        import os
+        
+        data_file = 'signal_monitor_data.json'
+        
+        if not os.path.exists(data_file):
+            return jsonify({
+                'success': False,
+                'message': '暂无监控数据，守护进程可能未启动'
+            })
+        
+        with open(data_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'data': data
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+@app.route('/api/signal-monitor/history')
+def api_signal_monitor_history():
+    """获取支撑阻力信号历史记录（最近N条）"""
+    try:
+        import json
+        import os
+        
+        limit = request.args.get('limit', 100, type=int)
+        
+        data_file = 'signal_monitor_data.json'
+        
+        if not os.path.exists(data_file):
+            return jsonify({
+                'success': False,
+                'message': '暂无监控数据'
+            })
+        
+        with open(data_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        history = data.get('history', [])
+        
+        # 返回最近N条
+        history = history[-limit:] if len(history) > limit else history
+        
+        return jsonify({
+            'success': True,
+            'history': history,
+            'total': len(data.get('history', [])),
+            'returned': len(history)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

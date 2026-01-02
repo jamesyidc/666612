@@ -463,6 +463,22 @@
             </div>
         </div>
 
+        <!-- 支撑阻力信号监控 -->
+        <div class="stats-container" style="margin-top: 20px;">
+            <div class="stat-card" style="border: 2px solid #dc2626; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); cursor: pointer;" onclick="window.location.href='/support-resistance'">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-label" style="color: #991b1b;">24小时顶信号统计</div>
+                <div class="stat-value" id="topSignalCount" style="color: #dc2626; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #991b1b;" id="topSignalTime">个进顶区号：(最近24小时)</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); cursor: pointer;" onclick="window.location.href='/support-resistance'">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-label" style="color: #92400e;">2小时底信号统计</div>
+                <div class="stat-value" id="bottomSignalCount" style="color: #f59e0b; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #92400e;" id="bottomSignalTime">个进底区号：(最近2小时)</div>
+            </div>
+        </div>
+
         <!-- 主要内容 -->
         <div class="main-grid">
             <!-- 收益率趋势图 -->
@@ -723,6 +739,34 @@
 
             } catch (error) {
                 console.error('加载数据失败:', error);
+            }
+        }
+
+        // 加载支撑阻力信号数据
+        async function loadSignalData() {
+            try {
+                const res = await fetch('/api/signal-monitor/latest');
+                const data = await res.json();
+                
+                if (data.success) {
+                    const latest = data.data.latest;
+                    
+                    // 更新顶信号
+                    document.getElementById('topSignalCount').textContent = latest.top_signal || 0;
+                    
+                    // 更新底信号
+                    document.getElementById('bottomSignalCount').textContent = latest.bottom_signal || 0;
+                    
+                    console.log('📊 信号数据更新:', latest);
+                } else {
+                    console.warn('⚠️ 信号数据加载失败:', data.message);
+                    document.getElementById('topSignalCount').textContent = '--';
+                    document.getElementById('bottomSignalCount').textContent = '--';
+                }
+            } catch (error) {
+                console.error('❌ 加载信号数据失败:', error);
+                document.getElementById('topSignalCount').textContent = '--';
+                document.getElementById('bottomSignalCount').textContent = '--';
             }
         }
 
@@ -1367,6 +1411,7 @@
             
             // 初始加载数据
             loadData();
+            loadSignalData();  // 加载信号数据
             
             // 自动刷新数据（每30秒）
             setInterval(() => {
@@ -1374,13 +1419,19 @@
                 refreshData();
             }, 30000);
             
+            // 信号数据刷新（每60秒）
+            setInterval(() => {
+                console.log('📊 刷新信号数据...', new Date().toLocaleString('zh-CN'));
+                loadSignalData();
+            }, 60000);
+            
             // 持续时间独立更新（每30秒）
             setInterval(() => {
                 console.log('⏰ 更新持续时间...', new Date().toLocaleString('zh-CN'));
                 updateDurations();
             }, 30000);
             
-            console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间）');
+            console.log('✅ 页面初始化完成，30秒自动刷新已启动（数据+持续时间），60秒刷新信号数据');
         });
     </script>
 </body>

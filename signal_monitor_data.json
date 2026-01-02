@@ -1,0 +1,27 @@
+{
+  "history": [
+    {
+      "top_signal": 1,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 0,
+      "timestamp": "2026-01-02 08:39:21"
+    },
+    {
+      "top_signal": 1,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 0,
+      "timestamp": "2026-01-02 08:40:21"
+    }
+  ],
+  "latest": {
+    "top_signal": 1,
+    "bottom_signal": 0,
+    "update_time": "2026-01-02 08:40:21"
+  }
+}
