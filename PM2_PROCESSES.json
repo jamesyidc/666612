@@ -1,0 +1,122 @@
+[
+  {
+    "name": "support-resistance-collector",
+    "script": "/home/user/webapp/support_resistance_collector.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/support-resistance-collector-out.log",
+    "log_err": "/home/user/.pm2/logs/support-resistance-collector-error.log",
+    "pid_file": "/home/user/.pm2/pids/support-resistance-collector-1.pid"
+  },
+  {
+    "name": "support-snapshot-collector",
+    "script": "/home/user/webapp/support_resistance_snapshot_collector.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/support-snapshot-collector-out.log",
+    "log_err": "/home/user/.pm2/logs/support-snapshot-collector-error.log",
+    "pid_file": "/home/user/.pm2/pids/support-snapshot-collector-2.pid"
+  },
+  {
+    "name": "gdrive-detector",
+    "script": "/home/user/webapp/gdrive_final_detector.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/gdrive-detector-out.log",
+    "log_err": "/home/user/.pm2/logs/gdrive-detector-error.log",
+    "pid_file": "/home/user/.pm2/pids/gdrive-detector-3.pid"
+  },
+  {
+    "name": "telegram-notifier",
+    "script": "/home/user/webapp/telegram_signal_system.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/telegram-notifier-out.log",
+    "log_err": "/home/user/.pm2/logs/telegram-notifier-error.log",
+    "pid_file": "/home/user/.pm2/pids/telegram-notifier-4.pid"
+  },
+  {
+    "name": "anchor-maintenance",
+    "script": "/home/user/webapp/anchor_maintenance_realtime_daemon.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/anchor-maintenance-out.log",
+    "log_err": "/home/user/.pm2/logs/anchor-maintenance-error.log",
+    "pid_file": "/home/user/.pm2/pids/anchor-maintenance-6.pid"
+  },
+  {
+    "name": "profit-extremes-tracker",
+    "script": "/usr/bin/bash",
+    "cwd": "/home/user/webapp",
+    "interpreter": "none",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/profit-extremes-tracker-out.log",
+    "log_err": "/home/user/.pm2/logs/profit-extremes-tracker-error.log",
+    "pid_file": "/home/user/.pm2/pids/profit-extremes-tracker-9.pid"
+  },
+  {
+    "name": "flask-app",
+    "script": "/usr/bin/bash",
+    "cwd": "/home/user/webapp",
+    "interpreter": "none",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/flask-app-out.log",
+    "log_err": "/home/user/.pm2/logs/flask-app-error.log",
+    "pid_file": "/home/user/.pm2/pids/flask-app-14.pid"
+  },
+  {
+    "name": "sub-account-opener",
+    "script": "/home/user/webapp/sub_account_opener_daemon.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/sub-account-opener-out.log",
+    "log_err": "/home/user/.pm2/logs/sub-account-opener-error.log",
+    "pid_file": "/home/user/.pm2/pids/sub-account-opener-15.pid"
+  },
+  {
+    "name": "sub-account-super-maintenance",
+    "script": "/home/user/webapp/sub_account_super_maintenance.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/sub-account-super-maintenance-out.log",
+    "log_err": "/home/user/.pm2/logs/sub-account-super-maintenance-error.log",
+    "pid_file": "/home/user/.pm2/pids/sub-account-super-maintenance-16.pid"
+  },
+  {
+    "name": "escape-stats-recorder",
+    "script": "/home/user/webapp/escape_stats_recorder.py",
+    "cwd": "/home/user/webapp",
+    "interpreter": "python3",
+    "exec_mode": "fork_mode",
+    "autorestart": true,
+    "watch": false,
+    "log_out": "/home/user/.pm2/logs/escape-stats-recorder-out.log",
+    "log_err": "/home/user/.pm2/logs/escape-stats-recorder-error.log",
+    "pid_file": "/home/user/.pm2/pids/escape-stats-recorder-17.pid"
+  }
+]
