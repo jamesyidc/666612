@@ -12754,37 +12754,32 @@ def get_current_positions():
         # 将数据库记录转换为字典
         db_positions_dict = {(row['inst_id'], row['pos_side']): row for row in db_positions}
         
-        # 获取维护次数统计（从anchor_maintenance_records.json读取今日次数）
+        # 获取维护次数统计（从maintenance_orders.json读取今日次数）
         import json as json_lib
         from datetime import datetime
         from collections import defaultdict
+        import os
         
-        # 读取实时维护记录文件（守护进程使用的文件）
-        maintenance_file = 'anchor_maintenance_records.json'
+        # 读取维护记录文件
+        maintenance_file = 'maintenance_orders.json'
         today_maintenance_counts = defaultdict(int)  # 今日维护次数
-        total_maintenance_counts = defaultdict(int)  # 总维护次数
         
         if os.path.exists(maintenance_file):
             try:
                 with open(maintenance_file, 'r', encoding='utf-8') as f:
                     maintenance_records = json_lib.load(f)
                 
-                # 从维护记录中获取今日次数和总次数
-                for key, record in maintenance_records.items():
-                    # key格式: "FIL-USDT-SWAP_short"
-                    parts = key.rsplit('_', 1)
-                    if len(parts) == 2:
-                        inst_id = parts[0]
-                        pos_side = parts[1]
+                # 今天的日期
+                today = get_china_today()
+                
+                # 统计今天每个币种+方向的维护次数
+                for record in maintenance_records:
+                    created_at = record.get('created_at', '')
+                    if created_at.startswith(today):
+                        inst_id = record.get('inst_id', '')
+                        pos_side = record.get('pos_side', '')
                         record_key = (inst_id, pos_side)
-                        
-                        # 今日维护次数
-                        today_count = record.get('today_count', 0)
-                        today_maintenance_counts[record_key] = today_count
-                        
-                        # 总维护次数
-                        total_count = record.get('total_count', 0)
-                        total_maintenance_counts[record_key] = total_count
+                        today_maintenance_counts[record_key] += 1
             except Exception as e:
                 print(f"读取维护记录失败: {e}")
         
@@ -12897,8 +12892,7 @@ def get_current_positions():
                 'status': status,
                 'status_class': status_class,
                 'is_anchor': is_anchor,
-                'maintenance_count_today': today_maintenance_counts.get((inst_id, pos_side), 0),  # 今日维护次数
-                'total_maintenance_count': total_maintenance_counts.get((inst_id, pos_side), 0),  # 总维护次数
+                'today_maintenance_count': today_maintenance_counts.get((inst_id, pos_side), 0),  # 今日维护次数
                 'max_profit_rate': max_profit_rate,  # 本次持仓的最高盈利率 ✨
                 'max_profit_time': max_profit_time,  # 达到最高盈利率的时间
                 'max_loss_rate': max_loss_rate,      # 本次持仓的最大亏损率 ✨
@@ -13906,6 +13900,12 @@ def super_maintain_anchor_order():
 @app.route('/api/anchor/maintain-anchor', methods=['POST'])
 def maintain_anchor_order():
     """维护锚点单：以市价买入10倍底仓数量（10倍杠杆），然后立即平掉92%"""
+    # 重定向stdout避免print污染HTTP响应
+    import sys
+    import io
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    
     try:
         import requests
         import hmac
@@ -13923,6 +13923,9 @@ def maintain_anchor_order():
         
         # 固定杠杆为10倍
         lever = 10
+        
+        # 目标保证金（默认0.8U，在0.6-1U之间）
+        target_margin = 0.8
         
         # 计算10倍数量
         order_size = pos_size * 10
@@ -14049,6 +14052,9 @@ def maintain_anchor_order():
             if 'permission' in error_msg.lower():
                 error_msg = f"{error_msg}\n\n💡 解决方案：\n1. 登录OKEx后台 (www.okx.com)\n2. 进入API管理页面\n3. 确认API密钥已勾选「交易」权限\n4. 如未勾选，需要重新创建API密钥"
             
+            # 恢复stdout
+            sys.stdout = old_stdout
+            
             return jsonify({
                 'success': False,
                 'message': f"开仓失败: {error_msg}",
@@ -14081,6 +14087,40 @@ def maintain_anchor_order():
                 print(f"⚠️ 订单未完全成交，状态: {order_state}")
                 # 继续尝试平仓
         
+        
+        # 获取当前标记价格（用于计算保留数量）
+        print(f"📊 获取当前标记价格...")
+        position_path = f'/api/v5/account/positions?instType=SWAP&instId={inst_id}'
+        headers = get_headers('GET', position_path)
+        pos_response = requests.get(OKEX_REST_URL + position_path, headers=headers, timeout=10)
+        pos_data = pos_response.json()
+        
+        mark_price = 0
+        if pos_data.get('code') == '0' and pos_data.get('data'):
+            for position in pos_data['data']:
+                if position.get('posSide') == pos_side:
+                    mark_price = float(position.get('markPx', 0))
+                    break
+        
+        if mark_price == 0:
+            # 如果无法从持仓获取，尝试从市场行情获取
+            ticker_path = f'/api/v5/market/ticker?instId={inst_id}'
+            headers = get_headers('GET', ticker_path)
+            ticker_response = requests.get(OKEX_REST_URL + ticker_path, headers=headers, timeout=10)
+            ticker_data = ticker_response.json()
+            if ticker_data.get('code') == '0' and ticker_data.get('data'):
+                mark_price = float(ticker_data['data'][0].get('last', 0))
+        
+        if mark_price == 0:
+            # 恢复stdout
+            sys.stdout = old_stdout
+            
+            return jsonify({
+                'success': False,
+                'message': f'无法获取{inst_id}的标记价格'
+            })
+        
+        print(f"✅ 当前标记价格: ${mark_price}")
         
         # 第二步：平掉多余持仓，保留target_margin对应的数量
         print(f"📊 第2步：平到目标保证金 {target_margin}U（平掉多余持仓）")
@@ -14144,6 +14184,9 @@ def maintain_anchor_order():
                 error_msg = close_result.get('msg', '未知错误')
                 error_code = close_result.get('code', '未知代码')
                 print(f"❌ 平仓失败 - Code: {error_code}, Message: {error_msg}")
+                
+                # 恢复stdout
+                sys.stdout = old_stdout
                 
                 return jsonify({
                     'success': False,
@@ -14516,6 +14559,9 @@ def maintain_anchor_order():
             response_data['adjustment_order_id'] = adjustment_order_id
             response_data['adjustment_size'] = adjustment_size
         
+        # 恢复stdout
+        sys.stdout = old_stdout
+        
         return jsonify({
             'success': True,
             'message': '维护锚点单执行成功' + (f'，已调整保证金（平仓{adjustment_size}）' if adjustment_order_id else ''),
@@ -14523,12 +14569,18 @@ def maintain_anchor_order():
         })
         
     except Exception as e:
+        # 恢复stdout
+        sys.stdout = old_stdout
+        
         import traceback
         return jsonify({
             'success': False,
             'message': f'执行失败: {str(e)}',
             'traceback': traceback.format_exc()
         })
+    finally:
+        # 确保stdout一定被恢复
+        sys.stdout = old_stdout
 
 @app.route('/api/anchor/maintenance-orders', methods=['GET'])
 def get_maintenance_orders():
@@ -14785,6 +14837,10 @@ def sub_account_config_v2():
                 config['super_maintain_long_enabled'] = data['super_maintain_long_enabled']
             if 'super_maintain_short_enabled' in data:
                 config['super_maintain_short_enabled'] = data['super_maintain_short_enabled']
+            if 'follow_short_loss_enabled' in data:
+                config['follow_short_loss_enabled'] = data['follow_short_loss_enabled']
+            if 'follow_long_loss_enabled' in data:
+                config['follow_long_loss_enabled'] = data['follow_long_loss_enabled']
             
             # 保存配置
             with open(config_file, 'w', encoding='utf-8') as f:
@@ -14846,6 +14902,67 @@ def get_maintenance_stats():
             'success': True,
             'stats': dict(stats),
             'today_date': today
+        })
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'查询失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/anchor/maintenance-count', methods=['GET'])
+def get_maintenance_count():
+    """获取特定币种+方向的今日维护次数"""
+    try:
+        import json as json_lib
+        import os
+        from datetime import datetime
+        
+        inst_id = request.args.get('inst_id')
+        pos_side = request.args.get('pos_side')
+        trade_mode = request.args.get('trade_mode', 'real')
+        
+        if not inst_id or not pos_side:
+            return jsonify({
+                'success': False,
+                'message': '缺少必要参数'
+            })
+        
+        maintenance_file = 'maintenance_orders.json'
+        
+        if not os.path.exists(maintenance_file):
+            return jsonify({
+                'success': True,
+                'count': 0,
+                'last_time': None
+            })
+        
+        # 读取维护记录
+        with open(maintenance_file, 'r', encoding='utf-8') as f:
+            records = json_lib.load(f)
+        
+        # 今天的日期
+        today = get_china_today()
+        
+        # 统计今天该币种+方向的维护次数
+        count = 0
+        last_time = None
+        
+        for record in records:
+            created_at = record.get('created_at', '')
+            if (created_at.startswith(today) and 
+                record.get('inst_id') == inst_id and 
+                record.get('pos_side') == pos_side):
+                count += 1
+                if not last_time or created_at > last_time:
+                    last_time = created_at
+        
+        return jsonify({
+            'success': True,
+            'count': count,
+            'last_time': last_time
         })
     
     except Exception as e:
@@ -15216,73 +15333,124 @@ def get_trading_positions_opens():
 
 @app.route('/api/anchor/reset-maintenance-count', methods=['POST'])
 def reset_maintenance_count():
-    """清零子账户今日维护次数"""
+    """清零维护次数（支持主账户和子账户）"""
     try:
+        import json as json_lib
+        import os
         from datetime import datetime
         import pytz
         
         data = request.json
-        account_name = data.get('account_name')
+        account_name = data.get('account_name')  # 子账户名称（可选）
         inst_id = data.get('inst_id')
         pos_side = data.get('pos_side')
+        trade_mode = data.get('trade_mode', 'real')
         
-        if not all([account_name, inst_id, pos_side]):
+        if not inst_id or not pos_side:
             return jsonify({
                 'success': False,
                 'message': '缺少必要参数'
             })
         
-        # 读取维护记录文件
-        maintenance_file = 'sub_account_maintenance.json'
-        try:
+        # 如果没有account_name，说明是主账户，清零主账户的维护记录
+        if not account_name:
+            # 主账户的维护记录在 maintenance_orders.json 中
+            maintenance_file = 'maintenance_orders.json'
+            
+            if not os.path.exists(maintenance_file):
+                return jsonify({
+                    'success': True,
+                    'message': '没有维护记录'
+                })
+            
+            # 读取所有记录
             with open(maintenance_file, 'r', encoding='utf-8') as f:
-                maintenance_data = json.load(f)
-        except FileNotFoundError:
-            maintenance_data = {}
-        
-        # 构建记录键
-        record_key = f"{account_name}_{inst_id}_{pos_side}"
-        
-        # 获取当前北京时间的日期
-        beijing_tz = pytz.timezone('Asia/Shanghai')
-        now_beijing = datetime.now(beijing_tz)
-        today_date = now_beijing.strftime('%Y-%m-%d')
-        
-        # 检查是否存在今日记录
-        if record_key not in maintenance_data:
+                records = json_lib.load(f)
+            
+            # 今天的日期
+            today = get_china_today()
+            
+            # 过滤掉今天该币种+方向的记录
+            original_count = len(records)
+            filtered_records = []
+            removed_count = 0
+            
+            for record in records:
+                created_at = record.get('created_at', '')
+                if (created_at.startswith(today) and 
+                    record.get('inst_id') == inst_id and 
+                    record.get('pos_side') == pos_side):
+                    removed_count += 1
+                else:
+                    filtered_records.append(record)
+            
+            # 保存过滤后的记录
+            with open(maintenance_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(filtered_records, f, ensure_ascii=False, indent=2)
+            
             return jsonify({
-                'success': False,
-                'message': '该持仓没有维护记录'
+                'success': True,
+                'message': f'清零成功！已删除 {removed_count} 条今日维护记录',
+                'data': {
+                    'inst_id': inst_id,
+                    'pos_side': pos_side,
+                    'removed_count': removed_count
+                }
             })
         
-        record = maintenance_data[record_key]
-        
-        # 清零今日维护次数
-        old_count = record.get('count', 0)
-        old_date = record.get('date', '')
-        
-        # 重置记录
-        record['count'] = 0
-        record['date'] = today_date
-        record['last_reset'] = now_beijing.strftime('%Y-%m-%d %H:%M:%S')
-        
-        # 保存更新后的数据
-        with open(maintenance_file, 'w', encoding='utf-8') as f:
-            json.dump(maintenance_data, f, ensure_ascii=False, indent=2)
-        
-        return jsonify({
-            'success': True,
-            'message': f'清零成功！原维护次数: {old_count}次',
-            'data': {
-                'account_name': account_name,
-                'inst_id': inst_id,
-                'pos_side': pos_side,
-                'old_count': old_count,
-                'old_date': old_date,
-                'new_count': 0,
-                'reset_time': record['last_reset']
-            }
-        })
+        # 子账户的清零逻辑（原有代码）
+        else:
+            # 读取维护记录文件
+            maintenance_file = 'sub_account_maintenance.json'
+            try:
+                with open(maintenance_file, 'r', encoding='utf-8') as f:
+                    maintenance_data = json_lib.load(f)
+            except FileNotFoundError:
+                maintenance_data = {}
+            
+            # 构建记录键
+            record_key = f"{account_name}_{inst_id}_{pos_side}"
+            
+            # 获取当前北京时间的日期
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            now_beijing = datetime.now(beijing_tz)
+            today_date = now_beijing.strftime('%Y-%m-%d')
+            
+            # 检查是否存在今日记录
+            if record_key not in maintenance_data:
+                return jsonify({
+                    'success': False,
+                    'message': '该持仓没有维护记录'
+                })
+            
+            record = maintenance_data[record_key]
+            
+            # 清零今日维护次数
+            old_count = record.get('count', 0)
+            old_date = record.get('date', '')
+            
+            # 重置记录
+            record['count'] = 0
+            record['date'] = today_date
+            record['last_reset'] = now_beijing.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 保存更新后的数据
+            with open(maintenance_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(maintenance_data, f, ensure_ascii=False, indent=2)
+            
+            return jsonify({
+                'success': True,
+                'message': f'清零成功！原维护次数: {old_count}次',
+                'data': {
+                    'account_name': account_name,
+                    'inst_id': inst_id,
+                    'pos_side': pos_side,
+                    'old_count': old_count,
+                    'old_date': old_date,
+                    'new_count': 0,
+                    'reset_time': record['last_reset']
+                }
+            })
         
     except Exception as e:
         import traceback

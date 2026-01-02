@@ -416,6 +416,40 @@
             </div>
         </div>
 
+        <!-- 空单超高盈利统计 -->
+        <div class="stats-grid" style="margin-top: 20px;">
+            <div class="stat-card" style="border: 2px solid #9333ea; background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+                <div class="stat-icon">💎</div>
+                <div class="stat-label" style="color: #581c87;">空单盈利≥120%</div>
+                <div class="stat-value" id="profit120Plus" style="color: #9333ea; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #581c87;" id="profit120Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #7c3aed; background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);">
+                <div class="stat-icon">👑</div>
+                <div class="stat-label" style="color: #5b21b6;">空单盈利≥110%</div>
+                <div class="stat-value" id="profit110Plus" style="color: #7c3aed; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #5b21b6;" id="profit110Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #8b5cf6; background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);">
+                <div class="stat-icon">🌟</div>
+                <div class="stat-label" style="color: #6b21a8;">空单盈利≥100%</div>
+                <div class="stat-value" id="profit100Plus" style="color: #8b5cf6; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #6b21a8;" id="profit100Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #a855f7; background: linear-gradient(135deg, #fae8ff 0%, #f5d0fe 100%);">
+                <div class="stat-icon">⭐</div>
+                <div class="stat-label" style="color: #86198f;">空单盈利≥90%</div>
+                <div class="stat-value" id="profit90Plus" style="color: #a855f7; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #86198f;" id="profit90Increase">1小时内: --</div>
+            </div>
+            <div class="stat-card" style="border: 2px solid #c026d3; background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);">
+                <div class="stat-icon">🏆</div>
+                <div class="stat-label" style="color: #a21caf;">空单盈利≥80%</div>
+                <div class="stat-value" id="profit80Plus" style="color: #c026d3; font-size: 42px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #a21caf;" id="profit80Increase">1小时内: --</div>
+            </div>
+        </div>
+
         <!-- 空单盈利分级统计 -->
         <div class="stats-grid" style="margin-top: 20px;">
             <div class="stat-card" style="border: 2px solid #dc2626; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
@@ -491,9 +525,10 @@
                     <div class="loading">加载中...</div>
                 </div>
             </div>
+        </div>
 
-            <!-- 当前预警 -->
-            <div class="card">
+        <!-- 当前预警 -->
+        <div class="card">
                 <div class="card-header">
                     <div class="card-title">
                         <span>⚠️</span>
@@ -617,11 +652,13 @@
                             <th>收益率</th>
                             <th>极值</th>
                             <th>状态</th>
+                            <th>今日维护</th>
+                            <th>清零</th>
                             <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="currentPositionBody">
-                        <tr><td colspan="13" class="loading">加载中...</td></tr>
+                        <tr><td colspan="15" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -639,6 +676,14 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 20px;">
                     <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="followShortLoss" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>📊 跟空单亏损开单</span>
+                        </label>
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="followLongLoss" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>📊 跟多单亏损开单</span>
+                        </label>
                         <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
                             <input type="checkbox" id="subSuperMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>🚀 超级维护多单-10%</span>
@@ -860,6 +905,11 @@
 
         // 存储历史盈利数据用于计算1小时内增量
         let profitHistoryData = {
+            profit120: [],
+            profit110: [],
+            profit100: [],
+            profit90: [],
+            profit80: [],
             profit70: [],
             profit60: [],
             profit50: [],
@@ -1061,9 +1111,14 @@
             const statsDiv = document.getElementById('positionStats');
             
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="empty">当前无持仓</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="15" class="empty">当前无持仓</td></tr>';
                 statsDiv.innerHTML = '';
                 // 清空盈利统计显示
+                document.getElementById('profit120Plus').textContent = '0';
+                document.getElementById('profit110Plus').textContent = '0';
+                document.getElementById('profit100Plus').textContent = '0';
+                document.getElementById('profit90Plus').textContent = '0';
+                document.getElementById('profit80Plus').textContent = '0';
                 document.getElementById('profit70Plus').textContent = '0';
                 document.getElementById('profit60Plus').textContent = '0';
                 document.getElementById('profit50Plus').textContent = '0';
@@ -1071,6 +1126,11 @@
                 document.getElementById('profitBelow20').textContent = '0';
                 document.getElementById('profitBelow10').textContent = '0';
                 document.getElementById('lossCount').textContent = '0';
+                document.getElementById('profit120Increase').textContent = '1小时内: --';
+                document.getElementById('profit110Increase').textContent = '1小时内: --';
+                document.getElementById('profit100Increase').textContent = '1小时内: --';
+                document.getElementById('profit90Increase').textContent = '1小时内: --';
+                document.getElementById('profit80Increase').textContent = '1小时内: --';
                 document.getElementById('profit70Increase').textContent = '1小时内: --';
                 document.getElementById('profit60Increase').textContent = '1小时内: --';
                 document.getElementById('profit50Increase').textContent = '1小时内: --';
@@ -1083,6 +1143,11 @@
 
             // 统计做空持仓各盈利级别
             const shortPositions = data.filter(item => item.pos_side === 'short');
+            const profit120 = shortPositions.filter(item => item.profit_rate >= 120).length;
+            const profit110 = shortPositions.filter(item => item.profit_rate >= 110).length;
+            const profit100 = shortPositions.filter(item => item.profit_rate >= 100).length;
+            const profit90 = shortPositions.filter(item => item.profit_rate >= 90).length;
+            const profit80 = shortPositions.filter(item => item.profit_rate >= 80).length;
             const profit70 = shortPositions.filter(item => item.profit_rate >= 70).length;
             const profit60 = shortPositions.filter(item => item.profit_rate >= 60).length;
             const profit50 = shortPositions.filter(item => item.profit_rate >= 50).length;
@@ -1093,6 +1158,11 @@
             const lossBelow10 = shortPositions.filter(item => item.profit_rate <= -10).length;
             
             // 更新顶部统计卡片
+            document.getElementById('profit120Plus').textContent = profit120;
+            document.getElementById('profit110Plus').textContent = profit110;
+            document.getElementById('profit100Plus').textContent = profit100;
+            document.getElementById('profit90Plus').textContent = profit90;
+            document.getElementById('profit80Plus').textContent = profit80;
             document.getElementById('profit70Plus').textContent = profit70;
             document.getElementById('profit60Plus').textContent = profit60;
             document.getElementById('profit50Plus').textContent = profit50;
@@ -1108,6 +1178,11 @@
             // 保存当前数据到历史
             if (!profitHistoryData.lastUpdate || now - profitHistoryData.lastUpdate > 60000) {
                 // 每分钟记录一次
+                profitHistoryData.profit120.push({ time: now, count: profit120 });
+                profitHistoryData.profit110.push({ time: now, count: profit110 });
+                profitHistoryData.profit100.push({ time: now, count: profit100 });
+                profitHistoryData.profit90.push({ time: now, count: profit90 });
+                profitHistoryData.profit80.push({ time: now, count: profit80 });
                 profitHistoryData.profit70.push({ time: now, count: profit70 });
                 profitHistoryData.profit60.push({ time: now, count: profit60 });
                 profitHistoryData.profit50.push({ time: now, count: profit50 });
@@ -1118,6 +1193,11 @@
                 profitHistoryData.lastUpdate = now;
                 
                 // 清理超过1小时的数据
+                profitHistoryData.profit120 = profitHistoryData.profit120.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit110 = profitHistoryData.profit110.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit100 = profitHistoryData.profit100.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit90 = profitHistoryData.profit90.filter(d => d.time > oneHourAgo);
+                profitHistoryData.profit80 = profitHistoryData.profit80.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit70 = profitHistoryData.profit70.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit60 = profitHistoryData.profit60.filter(d => d.time > oneHourAgo);
                 profitHistoryData.profit50 = profitHistoryData.profit50.filter(d => d.time > oneHourAgo);
@@ -1141,6 +1221,11 @@
                 }
             }
             
+            document.getElementById('profit120Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit120, profit120)}`;
+            document.getElementById('profit110Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit110, profit110)}`;
+            document.getElementById('profit100Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit100, profit100)}`;
+            document.getElementById('profit90Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit90, profit90)}`;
+            document.getElementById('profit80Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit80, profit80)}`;
             document.getElementById('profit70Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit70, profit70)}`;
             document.getElementById('profit60Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit60, profit60)}`;
             document.getElementById('profit50Increase').textContent = `1小时内: ${calcIncrease(profitHistoryData.profit50, profit50)}`;
@@ -1251,18 +1336,76 @@
                         </span>
                     </td>
                     <td>
+                        <button onclick="showMaintenanceCount('${item.inst_id}', '${item.pos_side}')" 
+                                style="padding: 5px 10px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                            ${item.today_maintenance_count || 0}次
+                        </button>
+                    </td>
+                    <td>
+                        <button onclick="resetMaintenanceCount('${item.inst_id}', '${item.pos_side}')" 
+                                style="padding: 5px 10px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                            🔄 清零
+                        </button>
+                    </td>
+                    <td>
                         <button onclick="manualMaintainPosition('${item.inst_id}', '${item.pos_side}', ${item.pos_size})" 
                                 style="padding: 5px 10px; background: #f97316; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; margin-right: 5px;">
-                            🔧 手动维护
-                        </button>
-                        <button onclick="showPositionDetail('${item.inst_id}', '${item.pos_side}')" 
-                                style="padding: 5px 10px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
-                            📊 详情
+                            🔧 维护锚点单
                         </button>
                     </td>
                 </tr>
             `;
             }).join('');
+        }
+
+        // 显示今日维护次数
+        async function showMaintenanceCount(instId, posSide) {
+            try {
+                const response = await fetch(`/api/anchor/maintenance-count?inst_id=${instId}&pos_side=${posSide}&trade_mode=real`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`📊 ${instId} ${posSide === 'short' ? '做空' : '做多'}\n\n今日维护次数: ${data.count || 0}次\n最后维护时间: ${data.last_time || '暂无'}`);
+                } else {
+                    alert('⚠️ 获取维护次数失败');
+                }
+            } catch (error) {
+                console.error('获取维护次数失败:', error);
+                alert('⚠️ 获取维护次数失败');
+            }
+        }
+
+        // 清零维护次数
+        async function resetMaintenanceCount(instId, posSide) {
+            if (!confirm(`确认清零 ${instId} ${posSide === 'short' ? '做空' : '做多'} 的今日维护次数？`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/anchor/reset-maintenance-count', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inst_id: instId,
+                        pos_side: posSide,
+                        trade_mode: 'real'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ 清零成功');
+                    loadData(); // 刷新页面数据
+                } else {
+                    alert('⚠️ 清零失败：' + (data.message || '未知错误'));
+                }
+            } catch (error) {
+                console.error('清零失败:', error);
+                alert('⚠️ 清零失败');
+            }
         }
 
         // 手动维护持仓
@@ -1272,7 +1415,7 @@
             }
             
             try {
-                const response = await fetch('/api/anchor/maintain-order', {
+                const response = await fetch('/api/anchor/maintain-anchor', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1281,11 +1424,28 @@
                         inst_id: instId,
                         pos_side: posSide,
                         pos_size: parseFloat(posSize),
+                        trade_mode: 'real',
                         auto_adjust: false
                     })
                 });
                 
-                const result = await response.json();
+                // 检查响应状态
+                console.log('维护API响应状态:', response.status);
+                console.log('维护API响应头:', response.headers);
+                
+                // 先获取响应文本，再尝试解析JSON
+                const responseText = await response.text();
+                console.log('维护API响应文本:', responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('JSON解析失败:', parseError);
+                    console.error('响应文本:', responseText);
+                    alert(`❌ 维护失败：服务器返回了无效的响应\n\n${responseText.substring(0, 200)}`);
+                    return;
+                }
                 
                 if (result.success) {
                     alert(`✅ 维护成功！\n\n${result.message || '维护完成'}`);
@@ -1735,6 +1895,66 @@
                     const data = await response.json();
                     if (data.success) {
                         alert(enabled ? '🚀 子账户空单超级维护已开启' : '❌ 子账户空单超级维护已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 跟空单亏损开单开关
+            document.getElementById('followShortLoss').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`📊 跟空单亏损开单: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/follow-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            follow_short_loss_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '📊 跟空单亏损开单已开启' : '❌ 跟空单亏损开单已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 跟多单亏损开单开关
+            document.getElementById('followLongLoss').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`📊 跟多单亏损开单: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/follow-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            follow_long_loss_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '📊 跟多单亏损开单已开启' : '❌ 跟多单亏损开单已关闭');
                     } else {
                         alert('⚠️ 配置保存失败');
                         e.target.checked = !enabled;
