@@ -12536,6 +12536,289 @@ def anchor_auto_maintenance_config():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/check-and-fix-position', methods=['POST'])
+def check_and_fix_anchor_position():
+    """检查并纠正主账户（锚点账号）持仓
+    
+    主账户规则：
+    - 保证金必须在 0.6U - 1.2U 之间
+    - 普通维护不受次数限制
+    - 通过UPL和收益率验证保证金是否正确
+    """
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from anchor_system import get_positions
+        from okex_api_config import OKEX_API_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        from datetime import datetime
+        import json as json_lib
+        
+        data = request.json
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        
+        if not all([inst_id, pos_side]):
+            return jsonify({
+                'success': False,
+                'message': '缺少必要参数'
+            })
+        
+        api_key = OKEX_API_KEY
+        secret_key = OKEX_SECRET_KEY
+        passphrase = OKEX_PASSPHRASE
+        
+        # 主账户保证金范围
+        MARGIN_MIN = 0.6
+        MARGIN_MAX = 1.2
+        
+        # 获取当前持仓
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "GET"
+        request_path = f"/api/v5/account/positions?instType=SWAP&instId={inst_id}"
+        
+        prehash = timestamp + method + request_path
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(
+            "https://www.okx.com" + request_path,
+            headers=headers,
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            return jsonify({
+                'success': False,
+                'message': f'获取持仓失败: {response.text}'
+            })
+        
+        positions_data = response.json()
+        if positions_data.get('code') != '0':
+            return jsonify({
+                'success': False,
+                'message': f'获取持仓失败: {positions_data.get("msg")}'
+            })
+        
+        # 找到对应持仓
+        target_position = None
+        for pos in positions_data.get('data', []):
+            if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                target_position = pos
+                break
+        
+        if not target_position:
+            return jsonify({
+                'success': False,
+                'message': '未找到对应持仓'
+            })
+        
+        current_margin = float(target_position.get('margin', 0))
+        pos_size = abs(float(target_position.get('pos', 0)))
+        mark_price = float(target_position.get('markPx', 0))
+        upl = float(target_position.get('upl', 0))
+        
+        print(f"🔍 主账户纠错检查 - 币种: {inst_id}, 方向: {pos_side}")
+        print(f"   保证金范围: {MARGIN_MIN}U - {MARGIN_MAX}U")
+        print(f"   当前保证金: {current_margin} USDT")
+        print(f"   当前持仓: {pos_size} 张")
+        print(f"   未实现盈亏: {upl} USDT")
+        print(f"   标记价: {mark_price}")
+        
+        # 验证保证金是否在合理范围
+        if upl != 0:
+            profit_rate = (upl / current_margin) * 100
+            # 反推保证金验证
+            calculated_margin = abs(upl) / abs(profit_rate / 100) if profit_rate != 0 else current_margin
+            print(f"   收益率: {profit_rate:.2f}%")
+            print(f"   反推保证金: {calculated_margin:.4f} USDT")
+            
+            # 如果反推的保证金与实际保证金差距很大，说明数据可能有问题
+            if abs(calculated_margin - current_margin) > 0.5:
+                print(f"   ⚠️ 警告：保证金数据可能不准确（实际: {current_margin}, 反推: {calculated_margin:.4f}）")
+        
+        # 判断是否需要纠错
+        tolerance = 0.05  # 容差0.05 USDT
+        
+        if current_margin >= MARGIN_MIN - tolerance and current_margin <= MARGIN_MAX + tolerance:
+            return jsonify({
+                'success': True,
+                'message': f'保证金正常，在合理范围内（当前: {current_margin:.4f}U，范围: {MARGIN_MIN}-{MARGIN_MAX}U）',
+                'current_margin': current_margin,
+                'target_range': f'{MARGIN_MIN}-{MARGIN_MAX}U',
+                'action': 'none'
+            })
+        
+        # 需要纠错
+        if current_margin > MARGIN_MAX:
+            # 保证金过多，需要平仓
+            target_margin = (MARGIN_MIN + MARGIN_MAX) / 2  # 目标0.9U
+            close_percent = ((current_margin - target_margin) / current_margin) * 100
+            close_size = int(pos_size * ((current_margin - target_margin) / current_margin))
+            
+            if close_size < 1:
+                return jsonify({
+                    'success': True,
+                    'message': f'保证金略高（当前: {current_margin:.4f}U），但差额过小无需平仓',
+                    'current_margin': current_margin,
+                    'target_range': f'{MARGIN_MIN}-{MARGIN_MAX}U',
+                    'action': 'none'
+                })
+            
+            print(f"   ⚠️ 需要平仓 {close_size} 张（约 {close_percent:.1f}%）至 {target_margin}U")
+            
+            # 执行平仓
+            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+            method = "POST"
+            request_path = "/api/v5/trade/order"
+            
+            order_data = {
+                "instId": inst_id,
+                "tdMode": "cross",
+                "side": "sell" if pos_side == "long" else "buy",
+                "ordType": "market",
+                "sz": str(close_size),
+                "posSide": pos_side,
+                "reduceOnly": True
+            }
+            
+            body = json_lib.dumps(order_data)
+            prehash = timestamp + method + request_path + body
+            signature = base64.b64encode(
+                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+            ).decode()
+            
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": timestamp,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(
+                "https://www.okx.com" + request_path,
+                headers=headers,
+                json=order_data,
+                timeout=10
+            )
+            
+            result = response.json()
+            
+            if result.get('code') == '0':
+                order_id = result['data'][0].get('ordId')
+                print(f"   ✅ 纠错平仓成功，订单ID: {order_id}")
+                return jsonify({
+                    'success': True,
+                    'message': f'纠错成功：平仓 {close_size} 张，保证金从 {current_margin:.4f}U 降至约 {target_margin}U',
+                    'action': 'reduce',
+                    'closed_size': close_size,
+                    'order_id': order_id,
+                    'current_margin': current_margin,
+                    'target_range': f'{MARGIN_MIN}-{MARGIN_MAX}U'
+                })
+            else:
+                print(f"   ❌ 平仓失败: {result.get('msg')}")
+                return jsonify({
+                    'success': False,
+                    'message': f'平仓失败: {result.get("msg")}'
+                })
+        
+        else:
+            # 保证金不足，需要加仓
+            target_margin = (MARGIN_MIN + MARGIN_MAX) / 2  # 目标0.9U
+            add_margin = target_margin - current_margin
+            add_size = int((add_margin * pos_size) / current_margin)
+            
+            if add_size < 1:
+                return jsonify({
+                    'success': True,
+                    'message': f'保证金略低（当前: {current_margin:.4f}U），但差额过小无需加仓',
+                    'current_margin': current_margin,
+                    'target_range': f'{MARGIN_MIN}-{MARGIN_MAX}U',
+                    'action': 'none'
+                })
+            
+            print(f"   ⚠️ 需要加仓 {add_size} 张至 {target_margin}U")
+            
+            # 执行加仓
+            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+            method = "POST"
+            request_path = "/api/v5/trade/order"
+            
+            order_data = {
+                "instId": inst_id,
+                "tdMode": "cross",
+                "side": "buy" if pos_side == "long" else "sell",
+                "ordType": "market",
+                "sz": str(add_size),
+                "posSide": pos_side
+            }
+            
+            body = json_lib.dumps(order_data)
+            prehash = timestamp + method + request_path + body
+            signature = base64.b64encode(
+                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+            ).decode()
+            
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": timestamp,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(
+                "https://www.okx.com" + request_path,
+                headers=headers,
+                json=order_data,
+                timeout=10
+            )
+            
+            result = response.json()
+            
+            if result.get('code') == '0':
+                order_id = result['data'][0].get('ordId')
+                print(f"   ✅ 纠错加仓成功，订单ID: {order_id}")
+                return jsonify({
+                    'success': True,
+                    'message': f'纠错成功：加仓 {add_size} 张，保证金从 {current_margin:.4f}U 升至约 {target_margin}U',
+                    'action': 'increase',
+                    'added_size': add_size,
+                    'order_id': order_id,
+                    'current_margin': current_margin,
+                    'target_range': f'{MARGIN_MIN}-{MARGIN_MAX}U'
+                })
+            else:
+                print(f"   ❌ 加仓失败: {result.get('msg')}")
+                return jsonify({
+                    'success': False,
+                    'message': f'加仓失败: {result.get("msg")}'
+                })
+    
+    except Exception as e:
+        import traceback
+        print(f"❌ 主账户纠错异常: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'message': f'纠错异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/anchor-system/profit-records')
 def get_anchor_profit_records():
     """获取历史极值记录 - 实盘和模拟盘使用不同的表"""

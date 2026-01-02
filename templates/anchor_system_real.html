@@ -1572,10 +1572,16 @@
                         </button>
                     </td>
                     <td>
-                        <button onclick="manualMaintainPosition('${item.inst_id}', '${item.pos_side}', ${item.pos_size})" 
-                                style="padding: 5px 10px; background: #f97316; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; margin-right: 5px;">
-                            🔧 维护锚点单
-                        </button>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;">
+                            <button onclick="manualMaintainPosition('${item.inst_id}', '${item.pos_side}', ${item.pos_size})" 
+                                    style="padding: 5px 10px; background: #f97316; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                🔧 维护锚点单
+                            </button>
+                            <button onclick="checkAndFixAnchorPosition('${item.inst_id}', '${item.pos_side}', ${item.margin || 0})" 
+                                    style="padding: 5px 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                🔍 纠错
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1681,6 +1687,48 @@
             } catch (error) {
                 console.error('维护失败:', error);
                 alert(`❌ 维护失败：${error.message}`);
+            }
+        }
+        
+        // 检查并纠正主账户（锚点账号）持仓
+        async function checkAndFixAnchorPosition(instId, posSide, currentMargin) {
+            const MARGIN_MIN = 0.6;
+            const MARGIN_MAX = 1.2;
+            
+            if (!confirm(`确认要纠错 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓吗？\n\n主账户（锚点账号）保证金规则：\n目标范围: ${MARGIN_MIN}U - ${MARGIN_MAX}U\n当前保证金: ${currentMargin.toFixed(4)}U\n\n系统将自动调整持仓，使保证金符合规则\n\n注意：主账户普通维护不受次数限制`)) {
+                return;
+            }
+            
+            alert('🔍 正在检查并纠正持仓...');
+            
+            try {
+                const response = await fetch('/api/anchor-system/check-and-fix-position', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inst_id: instId,
+                        pos_side: posSide
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    if (data.action === 'none') {
+                        alert(`✅ ${data.message}`);
+                    } else if (data.action === 'reduce') {
+                        alert(`✅ ${data.message}\n\n平仓数量: ${data.closed_size} 张\n订单ID: ${data.order_id}`);
+                    } else if (data.action === 'increase') {
+                        alert(`✅ ${data.message}\n\n加仓数量: ${data.added_size} 张\n订单ID: ${data.order_id}`);
+                    }
+                    loadData(); // 刷新数据
+                } else {
+                    alert(`❌ 纠错失败：${data.message || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('纠错失败:', error);
+                alert(`❌ 纠错失败：${error.message}`);
             }
         }
         
