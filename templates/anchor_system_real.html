@@ -1845,10 +1845,56 @@
                         <span class="badge badge-normal">${item.status || '正常'}</span>
                     </td>
                     <td>
-                        <button onclick="closeSubAccountPosition('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
-                                style="padding: 5px 10px; background: #f56565; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
-                            🚨 平仓
-                        </button>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;">
+                            <button onclick="maintainSubAccountPosition('${item.account_name}', '${item.inst_id}', '${item.pos_side}', ${item.margin || 0})" 
+                                    style="padding: 5px 10px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                🔧 维护
+                            </button>
+                            <div style="position: relative; display: inline-block;">
+                                <button onclick="toggleCloseMenu('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
+                                        style="padding: 5px 10px; background: #f56565; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                    🚨 平仓 ▼
+                                </button>
+                                <div id="closeMenu_${item.account_name}_${item.inst_id}_${item.pos_side}" 
+                                     style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e2e8f0; border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; min-width: 120px; margin-top: 2px;">
+                                    <button onclick="closeSubAccountPositionByPercent('${item.account_name}', '${item.inst_id}', '${item.pos_side}', 20, ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #2d3748; border: none; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 12px; text-align: left;"
+                                            onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">
+                                        平仓 20%
+                                    </button>
+                                    <button onclick="closeSubAccountPositionByPercent('${item.account_name}', '${item.inst_id}', '${item.pos_side}', 33, ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #2d3748; border: none; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 12px; text-align: left;"
+                                            onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">
+                                        平仓 33%
+                                    </button>
+                                    <button onclick="closeSubAccountPositionByPercent('${item.account_name}', '${item.inst_id}', '${item.pos_side}', 50, ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #2d3748; border: none; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 12px; text-align: left;"
+                                            onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">
+                                        平仓 50%
+                                    </button>
+                                    <button onclick="closeSubAccountPositionByPercent('${item.account_name}', '${item.inst_id}', '${item.pos_side}', 66, ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #2d3748; border: none; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 12px; text-align: left;"
+                                            onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">
+                                        平仓 66%
+                                    </button>
+                                    <button onclick="closeSubAccountPositionByPercent('${item.account_name}', '${item.inst_id}', '${item.pos_side}', 75, ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #2d3748; border: none; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 12px; text-align: left;"
+                                            onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">
+                                        平仓 75%
+                                    </button>
+                                    <button onclick="closeSubAccountPositionTo10U('${item.account_name}', '${item.inst_id}', '${item.pos_side}', ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #2d3748; border: none; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-size: 12px; text-align: left;"
+                                            onmouseover="this.style.background='#f7fafc'" onmouseout="this.style.background='white'">
+                                        平至10U
+                                    </button>
+                                    <button onclick="closeSubAccountPositionByPercent('${item.account_name}', '${item.inst_id}', '${item.pos_side}', 100, ${item.margin || 0})" 
+                                            style="width: 100%; padding: 8px 12px; background: white; color: #e53e3e; border: none; cursor: pointer; font-size: 12px; font-weight: 600; text-align: left;"
+                                            onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='white'">
+                                        全部平仓 100%
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -2340,6 +2386,142 @@
                 alert('子账户维护次数清零功能开发中...');
             }
             
+            // 维护子账户持仓（买100U然后立即平掉）
+            async function maintainSubAccountPosition(accountName, instId, posSide, currentMargin) {
+                if (!confirm(`确认要维护 ${accountName} 的 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓吗？\n\n维护操作：买100U并立即平掉`)) {
+                    return;
+                }
+                
+                alert('🔄 正在执行维护操作...');
+                
+                try {
+                    const response = await fetch('/api/sub-account/maintain', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`✅ 维护成功！`);
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ 维护失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('维护失败:', error);
+                    alert(`❌ 维护失败：${error.message}`);
+                }
+            }
+            
+            // 切换平仓菜单显示/隐藏
+            function toggleCloseMenu(accountName, instId, posSide) {
+                const menuId = `closeMenu_${accountName}_${instId}_${posSide}`;
+                const menu = document.getElementById(menuId);
+                
+                // 关闭所有其他菜单
+                document.querySelectorAll('[id^="closeMenu_"]').forEach(m => {
+                    if (m.id !== menuId) {
+                        m.style.display = 'none';
+                    }
+                });
+                
+                // 切换当前菜单
+                if (menu) {
+                    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+                }
+            }
+            
+            // 按百分比平仓
+            async function closeSubAccountPositionByPercent(accountName, instId, posSide, percent, currentMargin) {
+                // 关闭菜单
+                toggleCloseMenu(accountName, instId, posSide);
+                
+                if (!confirm(`确认要平掉 ${accountName} 的 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓的 ${percent}% 吗？\n\n当前保证金: ${currentMargin.toFixed(2)} USDT`)) {
+                    return;
+                }
+                
+                alert('🔄 正在平仓...');
+                
+                try {
+                    const response = await fetch('/api/sub-account/close-position-percent', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide,
+                            percent: percent
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`✅ 平仓 ${percent}% 成功！`);
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ 平仓失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('平仓失败:', error);
+                    alert(`❌ 平仓失败：${error.message}`);
+                }
+            }
+            
+            // 平至10U（99U的持仓平掉）
+            async function closeSubAccountPositionTo10U(accountName, instId, posSide, currentMargin) {
+                // 关闭菜单
+                toggleCloseMenu(accountName, instId, posSide);
+                
+                if (currentMargin <= 10) {
+                    alert('❌ 当前保证金已经小于或等于10U，无需平仓');
+                    return;
+                }
+                
+                const closeAmount = currentMargin - 10;
+                const percent = (closeAmount / currentMargin * 100).toFixed(2);
+                
+                if (!confirm(`确认要平掉 ${accountName} 的 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓至10U吗？\n\n当前保证金: ${currentMargin.toFixed(2)} USDT\n平仓比例: ${percent}%\n保留保证金: 10 USDT`)) {
+                    return;
+                }
+                
+                alert('🔄 正在平仓...');
+                
+                try {
+                    const response = await fetch('/api/sub-account/close-position-to-amount', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide,
+                            target_margin: 10
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(`✅ 平仓成功！保证金已降至约10U`);
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ 平仓失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('平仓失败:', error);
+                    alert(`❌ 平仓失败：${error.message}`);
+                }
+            }
+            
             async function closeSubAccountPosition(accountName, instId, posSide) {
                 if (!confirm(`确认要平掉 ${accountName} 的 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓吗？`)) {
                     return;
@@ -2375,6 +2557,19 @@
             window.showSubAccountMaintenanceCount = showSubAccountMaintenanceCount;
             window.resetSubAccountMaintenanceCount = resetSubAccountMaintenanceCount;
             window.closeSubAccountPosition = closeSubAccountPosition;
+            window.maintainSubAccountPosition = maintainSubAccountPosition;
+            window.toggleCloseMenu = toggleCloseMenu;
+            window.closeSubAccountPositionByPercent = closeSubAccountPositionByPercent;
+            window.closeSubAccountPositionTo10U = closeSubAccountPositionTo10U;
+            
+            // 点击页面其他地方时关闭所有菜单
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('[onclick*="toggleCloseMenu"]') && !event.target.closest('[id^="closeMenu_"]')) {
+                    document.querySelectorAll('[id^="closeMenu_"]').forEach(m => {
+                        m.style.display = 'none';
+                    });
+                }
+            });
             
             // 一键全部平仓按钮
             document.getElementById('closeAllSubAccountPositions').addEventListener('click', async function() {

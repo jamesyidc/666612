@@ -16704,6 +16704,369 @@ def open_sub_account_position():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sub-account/maintain', methods=['POST'])
+def maintain_sub_account_position():
+    """维护子账户持仓：买100U然后立即平掉"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        
+        data = request.get_json()
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        
+        print(f"🔧 维护子账户持仓: {account_name} - {inst_id} {pos_side}")
+        
+        # 读取子账户配置
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config_data = json_lib.load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'message': '子账户配置文件不存在'})
+        
+        # 找到对应的子账户
+        sub_account = None
+        for acc in config_data.get('sub_accounts', []):
+            if acc.get('account_name') == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({'success': False, 'message': f'未找到子账户: {account_name}'})
+        
+        api_key = sub_account.get('api_key', '')
+        secret_key = sub_account.get('secret_key', '')
+        passphrase = sub_account.get('passphrase', '')
+        
+        OKEX_REST_URL = 'https://www.okx.com'
+        
+        # 调用维护脚本
+        import subprocess
+        result = subprocess.run(
+            ['python3', 'sub_account_maintenance.py', account_name, inst_id, pos_side],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            print(f"✅ 维护成功: {account_name} - {inst_id} {pos_side}")
+            return jsonify({
+                'success': True,
+                'message': '维护成功'
+            })
+        else:
+            error_msg = result.stderr or result.stdout or '未知错误'
+            print(f"❌ 维护失败: {error_msg}")
+            return jsonify({
+                'success': False,
+                'message': f'维护失败: {error_msg}'
+            })
+    except Exception as e:
+        import traceback
+        print(f"❌ 维护异常: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'维护异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/sub-account/close-position-percent', methods=['POST'])
+def close_sub_account_position_by_percent():
+    """按百分比平仓子账户持仓"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        
+        data = request.get_json()
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        percent = data.get('percent', 100)
+        
+        print(f"📊 按百分比平仓: {account_name} - {inst_id} {pos_side} - {percent}%")
+        
+        # 读取子账户配置
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config_data = json_lib.load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'message': '子账户配置文件不存在'})
+        
+        # 找到对应的子账户
+        sub_account = None
+        for acc in config_data.get('sub_accounts', []):
+            if acc.get('account_name') == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({'success': False, 'message': f'未找到子账户: {account_name}'})
+        
+        api_key = sub_account.get('api_key', '')
+        secret_key = sub_account.get('secret_key', '')
+        passphrase = sub_account.get('passphrase', '')
+        
+        OKEX_REST_URL = 'https://www.okx.com'
+        
+        # 1. 获取当前持仓
+        request_path = '/api/v5/account/positions'
+        query_string = f'instType=SWAP&instId={inst_id}'
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        message = timestamp + 'GET' + request_path + '?' + query_string
+        mac = hmac.new(bytes(secret_key, encoding='utf-8'), bytes(message, encoding='utf-8'), hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(f"{OKEX_REST_URL}{request_path}?{query_string}", headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'获取持仓失败: HTTP {response.status_code}'})
+        
+        data_resp = response.json()
+        if data_resp.get('code') != '0':
+            return jsonify({'success': False, 'message': f"获取持仓失败: {data_resp.get('msg', '未知错误')}"})
+        
+        positions = data_resp.get('data', [])
+        target_position = None
+        for pos in positions:
+            if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                target_position = pos
+                break
+        
+        if not target_position:
+            return jsonify({'success': False, 'message': '未找到对应持仓'})
+        
+        current_pos = float(target_position.get('pos', 0))
+        if current_pos <= 0:
+            return jsonify({'success': False, 'message': '持仓量为0'})
+        
+        # 2. 计算平仓数量
+        close_size = int(current_pos * percent / 100)
+        if close_size <= 0:
+            return jsonify({'success': False, 'message': '平仓数量太小'})
+        
+        print(f"  当前持仓: {current_pos} 张")
+        print(f"  平仓数量: {close_size} 张 ({percent}%)")
+        
+        # 3. 执行平仓
+        request_path = '/api/v5/trade/order'
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        
+        order_data = {
+            'instId': inst_id,
+            'tdMode': 'isolated',  # 逐仓
+            'side': 'sell' if pos_side == 'long' else 'buy',  # 平多用sell，平空用buy
+            'ordType': 'market',
+            'sz': str(close_size),
+            'posSide': pos_side,
+            'reduceOnly': True
+        }
+        
+        body = json_lib.dumps(order_data)
+        message = timestamp + 'POST' + request_path + body
+        mac = hmac.new(bytes(secret_key, encoding='utf-8'), bytes(message, encoding='utf-8'), hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(f"{OKEX_REST_URL}{request_path}", headers=headers, data=body, timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'平仓请求失败: HTTP {response.status_code}'})
+        
+        result = response.json()
+        if result.get('code') != '0':
+            return jsonify({'success': False, 'message': f"平仓失败: {result.get('msg', '未知错误')}"})
+        
+        print(f"✅ 平仓成功: {percent}%")
+        return jsonify({
+            'success': True,
+            'message': f'平仓 {percent}% 成功',
+            'closed_size': close_size,
+            'order_id': result.get('data', [{}])[0].get('ordId', '')
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ 平仓异常: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'平仓异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/sub-account/close-position-to-amount', methods=['POST'])
+def close_sub_account_position_to_amount():
+    """平仓至指定保证金金额（如10U）"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        
+        data = request.get_json()
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        target_margin = data.get('target_margin', 10)  # 目标保证金，默认10U
+        
+        print(f"💰 平仓至指定金额: {account_name} - {inst_id} {pos_side} - 目标保证金: {target_margin}U")
+        
+        # 读取子账户配置
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config_data = json_lib.load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'message': '子账户配置文件不存在'})
+        
+        # 找到对应的子账户
+        sub_account = None
+        for acc in config_data.get('sub_accounts', []):
+            if acc.get('account_name') == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({'success': False, 'message': f'未找到子账户: {account_name}'})
+        
+        api_key = sub_account.get('api_key', '')
+        secret_key = sub_account.get('secret_key', '')
+        passphrase = sub_account.get('passphrase', '')
+        
+        OKEX_REST_URL = 'https://www.okx.com'
+        
+        # 1. 获取当前持仓
+        request_path = '/api/v5/account/positions'
+        query_string = f'instType=SWAP&instId={inst_id}'
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        message = timestamp + 'GET' + request_path + '?' + query_string
+        mac = hmac.new(bytes(secret_key, encoding='utf-8'), bytes(message, encoding='utf-8'), hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(f"{OKEX_REST_URL}{request_path}?{query_string}", headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'获取持仓失败: HTTP {response.status_code}'})
+        
+        data_resp = response.json()
+        if data_resp.get('code') != '0':
+            return jsonify({'success': False, 'message': f"获取持仓失败: {data_resp.get('msg', '未知错误')}"})
+        
+        positions = data_resp.get('data', [])
+        target_position = None
+        for pos in positions:
+            if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                target_position = pos
+                break
+        
+        if not target_position:
+            return jsonify({'success': False, 'message': '未找到对应持仓'})
+        
+        current_pos = float(target_position.get('pos', 0))
+        current_margin = float(target_position.get('margin', 0))
+        
+        if current_pos <= 0:
+            return jsonify({'success': False, 'message': '持仓量为0'})
+        
+        if current_margin <= target_margin:
+            return jsonify({'success': False, 'message': f'当前保证金({current_margin:.2f}U)已经小于或等于目标保证金({target_margin}U)'})
+        
+        # 2. 计算需要平仓的比例
+        percent = ((current_margin - target_margin) / current_margin) * 100
+        close_size = int(current_pos * percent / 100)
+        
+        if close_size <= 0:
+            return jsonify({'success': False, 'message': '平仓数量太小'})
+        
+        print(f"  当前持仓: {current_pos} 张")
+        print(f"  当前保证金: {current_margin:.2f} USDT")
+        print(f"  平仓比例: {percent:.2f}%")
+        print(f"  平仓数量: {close_size} 张")
+        
+        # 3. 执行平仓
+        request_path = '/api/v5/trade/order'
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        
+        order_data = {
+            'instId': inst_id,
+            'tdMode': 'isolated',
+            'side': 'sell' if pos_side == 'long' else 'buy',
+            'ordType': 'market',
+            'sz': str(close_size),
+            'posSide': pos_side,
+            'reduceOnly': True
+        }
+        
+        body = json_lib.dumps(order_data)
+        message = timestamp + 'POST' + request_path + body
+        mac = hmac.new(bytes(secret_key, encoding='utf-8'), bytes(message, encoding='utf-8'), hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(f"{OKEX_REST_URL}{request_path}", headers=headers, data=body, timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'平仓请求失败: HTTP {response.status_code}'})
+        
+        result = response.json()
+        if result.get('code') != '0':
+            return jsonify({'success': False, 'message': f"平仓失败: {result.get('msg', '未知错误')}"})
+        
+        print(f"✅ 平仓成功至 {target_margin}U")
+        return jsonify({
+            'success': True,
+            'message': f'平仓成功，保证金已降至约 {target_margin}U',
+            'closed_size': close_size,
+            'order_id': result.get('data', [{}])[0].get('ordId', '')
+        })
+    except Exception as e:
+        import traceback
+        print(f"❌ 平仓异常: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'平仓异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/sub-account/reset-maintenance-count', methods=['POST'])
 def reset_sub_account_maintenance_count():
     """清零子账户今日维护次数"""
