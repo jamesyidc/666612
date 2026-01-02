@@ -539,12 +539,12 @@
             </div>
         </div>
 
-        <!-- 支撑阻力信号变化记录 -->
+        <!-- 支撑阻力信号历史记录 -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
                     <span>📊</span>
-                    支撑阻力信号变化记录 (最近30条)
+                    支撑阻力信号历史记录 (最近30条)
                 </div>
                 <div class="update-time" id="signalHistoryUpdateTime" style="font-size: 14px; color: #718096;">
                     最后更新: --
@@ -554,19 +554,13 @@
                 <table id="signalHistoryTable">
                     <thead>
                         <tr>
-                            <th>时间</th>
-                            <th>24小时顶信号</th>
-                            <th>变化</th>
-                            <th>2小时底信号</th>
-                            <th>变化</th>
-                            <th>情况1</th>
-                            <th>情况2</th>
-                            <th>情况3</th>
-                            <th>情况4</th>
+                            <th style="width: 200px;">时间</th>
+                            <th style="width: 150px;">🔴 24小时顶信号</th>
+                            <th style="width: 150px;">⚡ 2小时底信号</th>
                         </tr>
                     </thead>
                     <tbody id="signalHistoryBody">
-                        <tr><td colspan="9" class="loading">加载中...</td></tr>
+                        <tr><td colspan="3" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -816,7 +810,7 @@
             const tbody = document.getElementById('signalHistoryBody');
             
             if (!history || history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: #718096;">暂无历史记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 30px; color: #718096;">暂无历史记录</td></tr>';
                 return;
             }
             
@@ -827,30 +821,12 @@
             
             for (let i = 0; i < recentHistory.length; i++) {
                 const item = recentHistory[i];
-                const prevItem = recentHistory[i + 1]; // 前一条记录（时间更早）
-                
-                // 计算变化量
-                const topChange = prevItem ? item.top_signal - prevItem.top_signal : 0;
-                const bottomChange = prevItem ? item.bottom_signal - prevItem.bottom_signal : 0;
-                
-                // 变化量的颜色和符号
-                const topChangeColor = topChange > 0 ? '#ef4444' : topChange < 0 ? '#10b981' : '#718096';
-                const topChangeText = topChange > 0 ? `+${topChange}` : topChange < 0 ? `${topChange}` : '0';
-                
-                const bottomChangeColor = bottomChange > 0 ? '#f59e0b' : bottomChange < 0 ? '#10b981' : '#718096';
-                const bottomChangeText = bottomChange > 0 ? `+${bottomChange}` : bottomChange < 0 ? `${bottomChange}` : '0';
                 
                 html += `
                     <tr>
-                        <td style="font-weight: 600; color: #1e293b;">${item.timestamp}</td>
-                        <td style="font-weight: 700; font-size: 16px; color: #dc2626;">${item.top_signal}</td>
-                        <td style="font-weight: 700; color: ${topChangeColor};">${topChangeText}</td>
-                        <td style="font-weight: 700; font-size: 16px; color: #f59e0b;">${item.bottom_signal}</td>
-                        <td style="font-weight: 700; color: ${bottomChangeColor};">${bottomChangeText}</td>
-                        <td style="color: #64748b;">${item.scenario_1}</td>
-                        <td style="color: #64748b;">${item.scenario_2}</td>
-                        <td style="color: #64748b;">${item.scenario_3}</td>
-                        <td style="color: #64748b;">${item.scenario_4}</td>
+                        <td style="font-weight: 600; color: #1e293b; padding: 12px;">${item.timestamp}</td>
+                        <td style="font-weight: 700; font-size: 18px; color: #dc2626; text-align: center; padding: 12px;">${item.top_signal}</td>
+                        <td style="font-weight: 700; font-size: 18px; color: #f59e0b; text-align: center; padding: 12px;">${item.bottom_signal}</td>
                     </tr>
                 `;
             }
