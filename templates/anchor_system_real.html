@@ -638,10 +638,11 @@
                             <th>收益率</th>
                             <th>极值</th>
                             <th>状态</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="currentPositionBody">
-                        <tr><td colspan="10" class="loading">加载中...</td></tr>
+                        <tr><td colspan="13" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1274,9 +1275,86 @@
                             ${item.status}
                         </span>
                     </td>
+                    <td>
+                        <button onclick="manualMaintainPosition('${item.inst_id}', '${item.pos_side}', ${item.pos_size})" 
+                                style="padding: 5px 10px; background: #f97316; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; margin-right: 5px;">
+                            🔧 手动维护
+                        </button>
+                        <button onclick="showPositionDetail('${item.inst_id}', '${item.pos_side}')" 
+                                style="padding: 5px 10px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                            📊 详情
+                        </button>
+                    </td>
                 </tr>
             `;
             }).join('');
+        }
+
+        // 手动维护持仓
+        async function manualMaintainPosition(instId, posSide, posSize) {
+            if (!confirm(`确认手动维护 ${instId} ${posSide === 'short' ? '做空' : '做多'} 持仓？\n\n将执行：\n1. 开10倍底仓数量的新仓（10倍杠杆）\n2. 立即平掉92%\n3. 保留8%作为新的锚点单`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/anchor/maintain-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inst_id: instId,
+                        pos_side: posSide,
+                        pos_size: parseFloat(posSize),
+                        auto_adjust: false
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ 维护成功！\n\n${result.message || '维护完成'}`);
+                    // 刷新持仓数据
+                    loadData();
+                } else {
+                    alert(`❌ 维护失败：${result.message || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('维护失败:', error);
+                alert(`❌ 维护失败：${error.message}`);
+            }
+        }
+        
+        // 显示持仓详情
+        async function showPositionDetail(instId, posSide) {
+            try {
+                // 这里可以调用API获取持仓详细信息
+                // 暂时显示基本信息
+                const positionData = currentRecordsData.find(p => p.inst_id === instId && p.pos_side === posSide);
+                if (!positionData) {
+                    alert('未找到持仓数据');
+                    return;
+                }
+                
+                const message = `📊 持仓详情\n\n` +
+                    `币种: ${positionData.inst_id}\n` +
+                    `方向: ${positionData.pos_side === 'short' ? '做空' : '做多'}\n` +
+                    `持仓量: ${positionData.pos_size?.toFixed(4) || '--'}\n` +
+                    `开仓均价: $${positionData.avg_price?.toFixed(4) || '--'}\n` +
+                    `标记价格: $${positionData.mark_price?.toFixed(4) || '--'}\n` +
+                    `杠杆: ${positionData.lever}x\n` +
+                    `未实现盈亏: ${positionData.upl >= 0 ? '+' : ''}${positionData.upl?.toFixed(4) || '--'} USDT\n` +
+                    `保证金: ${positionData.margin?.toFixed(4) || '--'} USDT\n` +
+                    `收益率: ${positionData.profit_rate >= 0 ? '+' : ''}${positionData.profit_rate?.toFixed(2) || '--'}%\n` +
+                    `\n极值统计:\n` +
+                    `最高盈利率: ${positionData.max_profit_rate?.toFixed(2) || '--'}%\n` +
+                    `最大亏损率: ${positionData.max_loss_rate?.toFixed(2) || '--'}%`;
+                
+                alert(message);
+            } catch (error) {
+                console.error('获取详情失败:', error);
+                alert(`❌ 获取详情失败：${error.message}`);
+            }
         }
 
         // 渲染预警表

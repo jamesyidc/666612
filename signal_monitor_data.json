@@ -521,11 +521,119 @@
       "scenario_3": 1,
       "scenario_4": 1,
       "timestamp": "2026-01-02 09:37:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:38:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:39:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:40:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:41:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:42:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:43:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:44:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:45:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:46:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:47:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:48:26"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:49:26"
     }
   ],
   "latest": {
     "top_signal": 2,
     "bottom_signal": 0,
-    "update_time": "2026-01-02 09:37:25"
+    "update_time": "2026-01-02 09:49:26"
   }
 }
