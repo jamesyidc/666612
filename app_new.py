@@ -12612,12 +12612,18 @@ def check_and_fix_anchor_position():
                 'message': f'获取持仓失败: {positions_data.get("msg")}'
             })
         
-        # 找到对应持仓
+        # 找到对应持仓（必须pos>0）
         target_position = None
         for pos in positions_data.get('data', []):
             if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
-                target_position = pos
-                break
+                # 确保是有效持仓（持仓量>0）
+                try:
+                    pos_value = float(pos.get('pos', 0))
+                    if abs(pos_value) > 0:
+                        target_position = pos
+                        break
+                except (ValueError, TypeError):
+                    continue
         
         if not target_position:
             return jsonify({
@@ -17165,22 +17171,59 @@ def maintain_sub_account_position():
         if positions_data.get('code') != '0':
             return jsonify({'success': False, 'message': f'获取持仓失败: {positions_data.get("msg")}'})
         
-        # 找到对应持仓
+        # 找到对应持仓（必须pos>0）
         target_position = None
         for pos in positions_data.get('data', []):
             if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
-                target_position = pos
-                break
+                # 确保是有效持仓（持仓量>0）
+                try:
+                    pos_value = float(pos.get('pos', 0))
+                    if abs(pos_value) > 0:
+                        target_position = pos
+                        break
+                except (ValueError, TypeError):
+                    continue
         
         if not target_position:
             return jsonify({'success': False, 'message': '未找到对应持仓'})
         
-        pos_size = abs(float(target_position.get('pos', 0)))
-        mark_price = float(target_position.get('markPx', 0))
+        # 安全地获取数值，处理空字符串
+        try:
+            pos_str = target_position.get('pos', '0')
+            pos_size = abs(float(pos_str)) if pos_str and pos_str != '' else 0
+        except (ValueError, TypeError):
+            pos_size = 0
         
-        # 计算维护金额：20U
-        maintenance_amount = 20
-        maintenance_size = int(maintenance_amount / mark_price) if mark_price > 0 else 1
+        try:
+            mark_price_str = target_position.get('markPx', '0')
+            mark_price = float(mark_price_str) if mark_price_str and mark_price_str != '' else 0
+        except (ValueError, TypeError):
+            mark_price = 0
+        
+        if mark_price <= 0:
+            return jsonify({'success': False, 'message': f'无法获取有效的标记价格，markPx: {target_position.get("markPx")}'})
+        
+        if pos_size <= 0:
+            return jsonify({'success': False, 'message': f'持仓数量无效: {pos_size}'})
+        
+        # 计算维护金额：20U，但需要考虑高价币种
+        # 计算杠杆（默认10倍）
+        try:
+            leverage = float(target_position.get('lever', 10))
+        except (ValueError, TypeError):
+            leverage = 10
+        
+        # 维护策略：买入的价值至少是20U，确保至少1张
+        maintenance_amount = 20  # 目标金额
+        maintenance_size_raw = (maintenance_amount * leverage) / mark_price  # 考虑杠杆的数量
+        maintenance_size = max(1, int(maintenance_size_raw))  # 至少1张
+        
+        # 如果价格太高（单张超过200U），调整为至少1张，但警告
+        single_value = mark_price  # 单张合约价值（1倍杠杆）
+        if single_value > 200:
+            print(f"   ⚠️ 警告：币种价格较高({mark_price}U)，单张价值{single_value}U，维护成本较高")
+            # 对于高价币，可以降低维护数量，但至少1张
+            maintenance_size = 1
         
         print(f"   当前持仓: {pos_size} 张")
         print(f"   标记价: {mark_price}")
@@ -17218,8 +17261,13 @@ def maintain_sub_account_position():
         response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
         result = response.json()
         
+        print(f"   步骤1响应: {result}")
+        
         if result.get('code') != '0':
-            return jsonify({'success': False, 'message': f'买入失败: {result.get("msg")}'})
+            error_msg = result.get("msg", "未知错误")
+            error_code = result.get("code", "未知代码")
+            print(f"   ❌ 买入失败: code={error_code}, msg={error_msg}")
+            return jsonify({'success': False, 'message': f'买入失败: {error_msg}', 'error_code': error_code, 'detail': result})
         
         open_order_id = result['data'][0].get('ordId')
         print(f"   ✅ 步骤1完成 - 买入订单ID: {open_order_id}")
@@ -17723,12 +17771,18 @@ def check_and_fix_sub_account_position():
                 'message': f'获取持仓失败: {positions_data.get("msg")}'
             })
         
-        # 找到对应持仓
+        # 找到对应持仓（必须pos>0）
         target_position = None
         for pos in positions_data.get('data', []):
             if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
-                target_position = pos
-                break
+                # 确保是有效持仓（持仓量>0）
+                try:
+                    pos_value = float(pos.get('pos', 0))
+                    if abs(pos_value) > 0:
+                        target_position = pos
+                        break
+                except (ValueError, TypeError):
+                    continue
         
         if not target_position:
             return jsonify({
