@@ -17228,14 +17228,24 @@ def maintain_sub_account_position():
         print(f"   今日已维护: {today_maintenance_count} 次")
         
         # 获取当前保证金
-        # 对于全仓模式（cross），margin字段为空，需要从notionalUsd和lever计算
+        # 对于全仓模式（cross），margin字段为空，优先使用imr（初始保证金率）
         try:
             current_margin_str = target_position.get('margin', '0')
             current_margin = float(current_margin_str) if current_margin_str and current_margin_str != '' else 0
         except (ValueError, TypeError):
             current_margin = 0
         
-        # 如果margin为空，从notionalUsd和lever计算
+        # 如果margin为空（全仓模式），使用imr
+        if current_margin <= 0:
+            try:
+                imr_str = target_position.get('imr', '0')
+                current_margin = float(imr_str) if imr_str and imr_str != '' else 0
+                if current_margin > 0:
+                    print(f"   ℹ️ 全仓模式：使用imr作为保证金: {current_margin}U")
+            except (ValueError, TypeError) as e:
+                print(f"   ⚠️ 获取imr失败: {e}")
+        
+        # 如果imr也没有，从notionalUsd和lever计算（兜底）
         if current_margin <= 0:
             try:
                 notional_usd_str = target_position.get('notionalUsd', '0')
@@ -17246,7 +17256,7 @@ def maintain_sub_account_position():
                 
                 if notional_usd > 0 and leverage > 0:
                     current_margin = notional_usd / leverage
-                    print(f"   ℹ️ 全仓模式：从notionalUsd({notional_usd})和杠杆({leverage})计算保证金: {current_margin}U")
+                    print(f"   ℹ️ 从notionalUsd({notional_usd})和杠杆({leverage})计算保证金: {current_margin}U")
             except (ValueError, TypeError) as e:
                 print(f"   ⚠️ 计算保证金失败: {e}")
         
@@ -17266,16 +17276,8 @@ def maintain_sub_account_position():
         else:  # 3次及以上
             base_target_margin = 30
         
-        # 对于高价币，需要调整目标保证金
-        # 计算1张对应的保证金
-        margin_per_contract = mark_price / leverage
-        
-        # 如果目标保证金小于1张的保证金，调整为1张
-        if base_target_margin < margin_per_contract:
-            target_margin = margin_per_contract
-            print(f"   ℹ️ 高价币调整：1张需{margin_per_contract:.2f}U，目标从{base_target_margin}U调整为{target_margin:.2f}U")
-        else:
-            target_margin = base_target_margin
+        # 对于所有币种，都使用原始目标，不再调整
+        target_margin = base_target_margin
         
         print(f"   今日维护次数: {today_maintenance_count}")
         print(f"   目标保证金: {target_margin}U")
@@ -17286,33 +17288,46 @@ def maintain_sub_account_position():
         except (ValueError, TypeError):
             leverage = 10
         
-        # 维护策略：买入10倍底仓金额，使保证金达到目标值
+        # 维护策略：直接买入对应张数增加保证金，不平仓
         # 计算需要增加的保证金
         margin_needed = target_margin - current_margin
         
-        # 买入金额 = 需要的保证金 × 10
-        maintenance_buy_amount = margin_needed * 10
+        if margin_needed <= 0:
+            return jsonify({
+                'success': True,
+                'message': f'保证金已达到目标({current_margin:.2f}U >= {target_margin}U)，无需维护',
+                'current_margin': current_margin,
+                'target_margin': target_margin,
+                'maintenance_count': today_maintenance_count,
+                'action': 'skip'
+            })
         
-        # 如果需要的金额<20U，至少买20U
-        if maintenance_buy_amount < 20:
-            maintenance_buy_amount = 20
+        # 计算需要买入的张数
+        # 在全仓模式下，imr ≈ 持仓价值 * 初始保证金率
+        # 简化估算：假设imr ≈ 持仓价值 / 杠杆（虽然不完全准确）
+        # 需要增加的持仓价值 ≈ margin_needed * leverage
+        # 需要买入的张数 = 持仓价值增量 / 标记价
+        value_needed = margin_needed * leverage
+        buy_size_raw = value_needed / mark_price
         
-        maintenance_buy_size_raw = (maintenance_buy_amount * leverage) / mark_price
-        maintenance_buy_size = max(1, int(maintenance_buy_size_raw))
+        # 至少买1张
+        buy_size = max(1, round(buy_size_raw))
         
-        # 对于高价币（单张>200U），至少买1张
-        single_value = mark_price
-        if single_value > 200:
-            print(f"   ⚠️ 警告：币种价格较高({mark_price}U)，单张价值{single_value}U")
-            maintenance_buy_size = max(1, maintenance_buy_size)
+        # 预估买入后的保证金增量
+        estimated_value_increase = buy_size * mark_price
+        estimated_margin_increase = estimated_value_increase / leverage
+        estimated_new_margin = current_margin + estimated_margin_increase
         
         print(f"   标记价: {mark_price}U")
         print(f"   杠杆: {leverage}x")
         print(f"   当前持仓: {pos_size} 张")
-        print(f"   维护策略: 需要增加保证金{margin_needed:.2f}U → 买入{maintenance_buy_amount:.2f}U（增量×10）→ 最终保留{target_margin}U")
-        print(f"   买入数量: {maintenance_buy_size} 张")
+        print(f"   当前保证金: {current_margin:.4f}U")
+        print(f"   目标保证金: {target_margin}U")
+        print(f"   需要增加: {margin_needed:.4f}U")
+        print(f"   计划买入: {buy_size} 张")
+        print(f"   预估买入后保证金: {estimated_new_margin:.4f}U")
         
-        # 步骤1: 买入100U（开大仓）
+        # 下单买入
         timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
         method = "POST"
         request_path = "/api/v5/trade/order"
@@ -17322,7 +17337,7 @@ def maintain_sub_account_position():
             "tdMode": "cross",
             "side": "buy" if pos_side == "long" else "sell",
             "ordType": "market",
-            "sz": str(maintenance_buy_size),
+            "sz": str(buy_size),
             "posSide": pos_side
         }
         
@@ -17343,7 +17358,7 @@ def maintain_sub_account_position():
         response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
         result = response.json()
         
-        print(f"   步骤1响应: {result}")
+        print(f"   买入响应: {result}")
         
         if result.get('code') != '0':
             error_msg = result.get("msg", "未知错误")
@@ -17351,79 +17366,10 @@ def maintain_sub_account_position():
             print(f"   ❌ 买入失败: code={error_code}, msg={error_msg}")
             return jsonify({'success': False, 'message': f'买入失败: {error_msg}', 'error_code': error_code, 'detail': result})
         
-        open_order_id = result['data'][0].get('ordId')
-        print(f"   ✅ 步骤1完成 - 买入订单ID: {open_order_id}")
+        order_id = result['data'][0].get('ordId')
+        print(f"   ✅ 维护完成 - 订单ID: {order_id}")
         
-        # 等待1秒
-        import time
-        time.sleep(1)
-        
-        # 步骤2: 平掉多余持仓，保留target_margin对应的数量
-        # 计算总持仓 = 原持仓 + 新买入
-        total_pos_size = pos_size + maintenance_buy_size
-        
-        # 计算应该保留的数量（对应target_margin保证金）
-        target_keep_size_raw = (target_margin * leverage) / mark_price
-        target_keep_size = max(1, round(target_keep_size_raw))
-        
-        # 重新计算实际保证金（考虑取整）
-        actual_target_margin = (target_keep_size * mark_price) / leverage
-        print(f"   ℹ️ 目标保留{target_keep_size}张，实际保证金约{actual_target_margin:.2f}U")
-        
-        # 计算需要平掉的数量
-        close_size = total_pos_size - target_keep_size
-        
-        if close_size <= 0:
-            print(f"   ⚠️ 无需平仓：总持仓{total_pos_size}张，目标保留{target_keep_size}张")
-            close_order_id = 'SKIPPED'
-        else:
-            print(f"   步骤2: 平仓多余持仓")
-            print(f"   总持仓: {total_pos_size} 张")
-            print(f"   目标保留: {target_keep_size} 张 (对应{target_margin}U)")
-            print(f"   需要平掉: {close_size} 张")
-            
-            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
-            method = "POST"
-            request_path = "/api/v5/trade/order"
-            
-            order_data = {
-                "instId": inst_id,
-                "tdMode": "cross",
-                "side": "sell" if pos_side == "long" else "buy",
-                "ordType": "market",
-                "sz": str(int(close_size)),
-                "posSide": pos_side,
-                "reduceOnly": True
-            }
-            
-            body = json_lib.dumps(order_data)
-            prehash = timestamp + method + request_path + body
-            signature = base64.b64encode(
-                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
-            ).decode()
-            
-            headers = {
-                "OK-ACCESS-KEY": api_key,
-                "OK-ACCESS-SIGN": signature,
-                "OK-ACCESS-TIMESTAMP": timestamp,
-                "OK-ACCESS-PASSPHRASE": passphrase,
-                "Content-Type": "application/json"
-            }
-            
-            response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
-            result = response.json()
-            
-            print(f"   步骤2响应: {result}")
-            
-            if result.get('code') != '0':
-                error_msg = result.get("msg", "未知错误")
-                print(f"   ❌ 平仓失败: {error_msg}")
-                return jsonify({'success': False, 'message': f'平仓失败: {error_msg}', 'detail': result})
-            
-            close_order_id = result['data'][0].get('ordId')
-            print(f"   ✅ 步骤2完成 - 平仓订单ID: {close_order_id}")
-        
-        # 更新维护次数（注意：这段代码在前面已经读取过了，这里直接更新）
+        # 更新维护次数
         if key not in maintenance_data or maintenance_data[key].get('date') != today_date:
             maintenance_data[key] = {
                 'count': 1,
@@ -17439,20 +17385,20 @@ def maintain_sub_account_position():
         
         final_maintenance_count = maintenance_data[key]['count']
         print(f"✅ 维护成功: {account_name} - {inst_id} {pos_side}")
-        print(f"   买入: {maintenance_buy_size} 张")
-        print(f"   平仓: {close_size if close_size > 0 else 0} 张")
+        print(f"   买入: {buy_size} 张")
+        print(f"   预估新保证金: {estimated_new_margin:.4f}U")
         print(f"   目标保证金: {target_margin}U")
         print(f"   今日维护次数: {final_maintenance_count}")
         
         return jsonify({
             'success': True,
-            'message': f'维护成功！买入{maintenance_buy_size}张，平掉{int(close_size) if close_size > 0 else 0}张，保留约{target_margin}U，今日第{final_maintenance_count}次维护',
-            'open_order_id': open_order_id,
-            'close_order_id': close_order_id,
+            'message': f'维护成功！买入{buy_size}张，预估保证金从{current_margin:.2f}U增至{estimated_new_margin:.2f}U（目标{target_margin}U），今日第{final_maintenance_count}次维护',
+            'order_id': order_id,
+            'buy_size': buy_size,
             'maintenance_count': final_maintenance_count,
             'target_margin': target_margin,
-            'buy_size': maintenance_buy_size,
-            'close_size': int(close_size) if close_size > 0 else 0
+            'current_margin': current_margin,
+            'estimated_new_margin': estimated_new_margin
         })
     except Exception as e:
         import traceback
@@ -17881,27 +17827,36 @@ def check_and_fix_sub_account_position():
                 'message': '未找到对应持仓'
             })
         
-        # 获取当前保证金（处理全仓模式margin为空的情况）
+        # 获取当前保证金 - 优先使用imr（初始保证金率）
+        # 全仓模式下，imr才是真实的保证金占用
+        current_margin = 0
         try:
-            margin_str = target_position.get('margin', '0')
-            current_margin = float(margin_str) if margin_str and margin_str != '' else 0
-        except (ValueError, TypeError):
-            current_margin = 0
-        
-        # 如果margin为空，从notionalUsd和lever计算
-        if current_margin <= 0:
-            try:
-                notional_usd_str = target_position.get('notionalUsd', '0')
-                leverage_str = target_position.get('lever', '10')
-                
-                notional_usd = float(notional_usd_str) if notional_usd_str and notional_usd_str != '' else 0
-                leverage = float(leverage_str) if leverage_str and leverage_str != '' else 10
-                
-                if notional_usd > 0 and leverage > 0:
-                    current_margin = notional_usd / leverage
-                    print(f"   ℹ️ 全仓模式：从notionalUsd({notional_usd})和杠杆({leverage})计算保证金: {current_margin}U")
-            except (ValueError, TypeError) as e:
-                print(f"   ⚠️ 计算保证金失败: {e}")
+            # 1. 优先使用imr字段（全仓模式的真实保证金）
+            imr_str = target_position.get('imr', '0')
+            imr = float(imr_str) if imr_str and imr_str != '' else 0
+            if imr > 0:
+                current_margin = imr
+                print(f"   ℹ️ 使用imr作为保证金: {current_margin}U")
+            else:
+                # 2. 尝试使用margin字段（逐仓模式）
+                margin_str = target_position.get('margin', '0')
+                margin = float(margin_str) if margin_str and margin_str != '' else 0
+                if margin > 0:
+                    current_margin = margin
+                    print(f"   ℹ️ 使用margin作为保证金: {current_margin}U")
+                else:
+                    # 3. 最后从notionalUsd计算
+                    notional_usd_str = target_position.get('notionalUsd', '0')
+                    leverage_str = target_position.get('lever', '10')
+                    
+                    notional_usd = float(notional_usd_str) if notional_usd_str and notional_usd_str != '' else 0
+                    leverage = float(leverage_str) if leverage_str and leverage_str != '' else 10
+                    
+                    if notional_usd > 0 and leverage > 0:
+                        current_margin = notional_usd / leverage
+                        print(f"   ℹ️ 从notionalUsd({notional_usd})和杠杆({leverage})计算保证金: {current_margin}U")
+        except (ValueError, TypeError) as e:
+            print(f"   ⚠️ 计算保证金失败: {e}")
         
         try:
             pos_str = target_position.get('pos', '0')
