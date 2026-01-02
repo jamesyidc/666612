@@ -305,6 +305,16 @@ def check_and_open_positions():
                 pos_side = main_pos['pos_side']
                 profit_rate = main_pos.get('profit_rate', 0)
                 
+                # 检查跟单开关
+                if pos_side == 'short':
+                    if not config.get('follow_short_loss_enabled', False):
+                        print(f"   ⚠️ 跟空单亏损开单未启用，跳过 {inst_id} {pos_side}")
+                        continue
+                elif pos_side == 'long':
+                    if not config.get('follow_long_loss_enabled', False):
+                        print(f"   ⚠️ 跟多单亏损开单未启用，跳过 {inst_id} {pos_side}")
+                        continue
+                
                 # 如果子账号没有该仓位
                 if inst_id not in sub_inst_ids:
                     # 检查本地记录，避免重复开仓

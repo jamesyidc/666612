@@ -73,5 +73,11 @@
     "inst_id": "STX-USDT-SWAP",
     "pos_side": "long",
     "opened_at": "2025-12-31 18:45:40"
+  },
+  "Wu666666:CFX-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "CFX-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 05:06:52"
   }
 }
