@@ -2031,9 +2031,45 @@
                 
                 // 更新逃顶快照数历史最大值
                 if (escapeResult && escapeResult.success) {
+                    // 更新24小时逃顶快照数 - 当前值
+                    const escape24hCount = escapeResult.stats_24h.escape_snapshot_count || 0;
+                    const escape24hCountEl = document.getElementById('escape24hCount');
+                    if (escape24hCountEl) {
+                        escape24hCountEl.textContent = escape24hCount;
+                        // 根据数量动态调整颜色
+                        if (escape24hCount === 0) {
+                            escape24hCountEl.style.color = '#6b7280';
+                            escape24hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
+                        } else if (escape24hCount >= 10) {
+                            escape24hCountEl.style.color = '#dc2626';
+                            escape24hCountEl.style.textShadow = '0 2px 8px rgba(220, 38, 38, 0.8)';
+                        } else if (escape24hCount >= 5) {
+                            escape24hCountEl.style.color = '#ef4444';
+                            escape24hCountEl.style.textShadow = '0 2px 8px rgba(239, 68, 68, 0.5)';
+                        }
+                    }
+                    
                     // 更新24小时逃顶快照数历史最大值
                     escape24hMaxValue = escapeResult.stats_24h.historical_max_snapshot_count || 0;
                     document.getElementById('escape24hMaxValue').textContent = escape24hMaxValue;
+                    
+                    // 更新2小时逃顶快照数 - 当前值
+                    const escape2hCount = escapeResult.stats_2h.escape_snapshot_count || 0;
+                    const escape2hCountEl = document.getElementById('escape2hCount');
+                    if (escape2hCountEl) {
+                        escape2hCountEl.textContent = escape2hCount;
+                        // 根据数量动态调整颜色（橙色系）
+                        if (escape2hCount === 0) {
+                            escape2hCountEl.style.color = '#6b7280';
+                            escape2hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
+                        } else if (escape2hCount >= 5) {
+                            escape2hCountEl.style.color = '#ea580c';
+                            escape2hCountEl.style.textShadow = '0 2px 8px rgba(234, 88, 12, 0.8)';
+                        } else if (escape2hCount >= 3) {
+                            escape2hCountEl.style.color = '#f97316';
+                            escape2hCountEl.style.textShadow = '0 2px 8px rgba(249, 115, 22, 0.5)';
+                        }
+                    }
                     
                     // 更新2小时逃顶快照数历史最大值
                     escape2hMaxValue = escapeResult.stats_2h.historical_max_snapshot_count || 0;
@@ -2717,47 +2753,8 @@
                 逃顶2h: sellSignals2h.length
             });
             
-            // 更新24小时逃顶统计数字
-            const escape24hCountEl = document.getElementById('escape24hCount');
-            if (escape24hCountEl) {
-                const currentCount = sellSignals.length;
-                escape24hCountEl.textContent = currentCount;
-                
-                // 注意：历史最大值由API从数据库中获取，不在这里更新
-                
-                // 根据数量动态调整颜色
-                if (sellSignals.length === 0) {
-                    escape24hCountEl.style.color = '#6b7280';
-                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
-                } else if (sellSignals.length >= 5) {
-                    escape24hCountEl.style.color = '#dc2626';
-                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(220, 38, 38, 0.8)';
-                } else {
-                    escape24hCountEl.style.color = '#ef4444';
-                    escape24hCountEl.style.textShadow = '0 2px 8px rgba(239, 68, 68, 0.5)';
-                }
-            }
-            
-            // 更新2小时逃顶统计数字
-            const escape2hCountEl = document.getElementById('escape2hCount');
-            if (escape2hCountEl) {
-                const currentCount = sellSignals2h.length;
-                escape2hCountEl.textContent = currentCount;
-                
-                // 注意：历史最大值由API从数据库中获取，不在这里更新
-                
-                // 根据数量动态调整颜色（橙色系）
-                if (sellSignals2h.length === 0) {
-                    escape2hCountEl.style.color = '#6b7280';
-                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(107, 114, 128, 0.5)';
-                } else if (sellSignals2h.length >= 3) {
-                    escape2hCountEl.style.color = '#ea580c';
-                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(234, 88, 12, 0.8)';
-                } else {
-                    escape2hCountEl.style.color = '#f97316';
-                    escape2hCountEl.style.textShadow = '0 2px 8px rgba(249, 115, 22, 0.5)';
-                }
-            }
+            // 注意：逃顶快照数统计已改为从API获取，不再使用信号点数量
+            // 原来的 escape24hCount/escape2hCount 更新逻辑已移至 loadHistoricalMaxStats() 函数中
         }
         
         
