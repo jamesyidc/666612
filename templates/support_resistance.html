@@ -1155,6 +1155,9 @@
                     <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">📍 24小时逃顶快照数统计</div>
                     <div id="escape24hCount" style="font-size: 42px; font-weight: 700; color: #ef4444; text-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); letter-spacing: 2px;">-</div>
                     <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个快照有逃顶信号（最近24小时）</div>
+                    <div style="font-size: 13px; color: rgba(239, 68, 68, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(239, 68, 68, 0.2);">
+                        历史最大值：<span id="escape24hMax" style="font-weight: bold; font-size: 18px;">-</span> 个快照
+                    </div>
                 </div>
                 
                 <!-- 2小时逃顶统计 -->
@@ -1162,6 +1165,9 @@
                     <div style="font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 8px;">⚡ 2小时逃顶快照数统计</div>
                     <div id="escape2hCount" style="font-size: 42px; font-weight: 700; color: #f97316; text-shadow: 0 2px 8px rgba(249, 115, 22, 0.5); letter-spacing: 2px;">-</div>
                     <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 5px;">个快照有逃顶信号（最近2小时）</div>
+                    <div style="font-size: 13px; color: rgba(249, 115, 22, 0.8); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(249, 115, 22, 0.2);">
+                        历史最大值：<span id="escape2hMax" style="font-weight: bold; font-size: 18px;">-</span> 个快照
+                    </div>
                 </div>
             </div>
             
@@ -1778,6 +1784,10 @@
         let pagedSnapshotData = []; // 存储当前页的数据
         let currentPageIndex = 0; // 当前页索引（基于全局数据分页）
         let totalPages = 0; // 总页数
+        
+        // 历史最大值跟踪
+        let escape24hMaxValue = 0;  // 24小时逃顶快照数历史最大值
+        let escape2hMaxValue = 0;   // 2小时逃顶快照数历史最大值
         
         function formatPrice(price) {
             if (price === null || price === undefined) return '--';
@@ -2689,7 +2699,18 @@
             // 更新24小时逃顶统计数字
             const escape24hCountEl = document.getElementById('escape24hCount');
             if (escape24hCountEl) {
-                escape24hCountEl.textContent = sellSignals.length;
+                const currentCount = sellSignals.length;
+                escape24hCountEl.textContent = currentCount;
+                
+                // 更新历史最大值
+                if (currentCount > escape24hMaxValue) {
+                    escape24hMaxValue = currentCount;
+                }
+                const escape24hMaxEl = document.getElementById('escape24hMax');
+                if (escape24hMaxEl) {
+                    escape24hMaxEl.textContent = escape24hMaxValue;
+                }
+                
                 // 根据数量动态调整颜色
                 if (sellSignals.length === 0) {
                     escape24hCountEl.style.color = '#6b7280';
@@ -2706,7 +2727,18 @@
             // 更新2小时逃顶统计数字
             const escape2hCountEl = document.getElementById('escape2hCount');
             if (escape2hCountEl) {
-                escape2hCountEl.textContent = sellSignals2h.length;
+                const currentCount = sellSignals2h.length;
+                escape2hCountEl.textContent = currentCount;
+                
+                // 更新历史最大值
+                if (currentCount > escape2hMaxValue) {
+                    escape2hMaxValue = currentCount;
+                }
+                const escape2hMaxEl = document.getElementById('escape2hMax');
+                if (escape2hMaxEl) {
+                    escape2hMaxEl.textContent = escape2hMaxValue;
+                }
+                
                 // 根据数量动态调整颜色（橙色系）
                 if (sellSignals2h.length === 0) {
                     escape2hCountEl.style.color = '#6b7280';

@@ -97,5 +97,11 @@
     "inst_id": "TAO-USDT-SWAP",
     "pos_side": "short",
     "opened_at": "2026-01-02 05:53:47"
+  },
+  "Wu666666:LDO-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "LDO-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 09:48:14"
   }
 }
