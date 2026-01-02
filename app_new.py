@@ -12548,13 +12548,10 @@ def get_profit_records_hourly_stats():
         SELECT 
             strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
             COUNT(*) as count,
-            SUM(CASE WHEN record_type = 'max_profit' THEN 1 ELSE 0 END) as profit_count,
-            SUM(CASE WHEN record_type = 'max_loss' THEN 1 ELSE 0 END) as loss_count,
-            SUM(CASE WHEN pos_side = 'short' THEN 1 ELSE 0 END) as short_count,
-            SUM(CASE WHEN pos_side = 'long' THEN 1 ELSE 0 END) as long_count,
-            AVG(profit_rate) as avg_profit_rate,
-            MAX(profit_rate) as max_profit_rate,
-            MIN(profit_rate) as min_profit_rate
+            SUM(CASE WHEN record_type = 'max_profit' AND pos_side = 'long' THEN 1 ELSE 0 END) as long_profit_count,
+            SUM(CASE WHEN record_type = 'max_loss' AND pos_side = 'long' THEN 1 ELSE 0 END) as long_loss_count,
+            SUM(CASE WHEN record_type = 'max_profit' AND pos_side = 'short' THEN 1 ELSE 0 END) as short_profit_count,
+            SUM(CASE WHEN record_type = 'max_loss' AND pos_side = 'short' THEN 1 ELSE 0 END) as short_loss_count
         FROM {table_name}
         WHERE datetime(timestamp) >= datetime('now', '-{hours} hours', 'localtime')
         GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp)
@@ -12569,13 +12566,10 @@ def get_profit_records_hourly_stats():
             hourly_stats.append({
                 'hour': row[0],
                 'total_count': row[1],
-                'profit_count': row[2],
-                'loss_count': row[3],
-                'short_count': row[4],
-                'long_count': row[5],
-                'avg_profit_rate': round(row[6], 2) if row[6] else 0,
-                'max_profit_rate': round(row[7], 2) if row[7] else 0,
-                'min_profit_rate': round(row[8], 2) if row[8] else 0
+                'long_profit_count': row[2],
+                'long_loss_count': row[3],
+                'short_profit_count': row[4],
+                'short_loss_count': row[5]
             })
         
         return jsonify({

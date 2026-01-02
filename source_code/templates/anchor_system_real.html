@@ -635,12 +635,13 @@
             <div id="hourlyStatsContainer" style="padding: 20px; background: linear-gradient(135deg, #f6f8fb 0%, #f0f4f8 100%); border-radius: 12px; margin: 0 20px 15px 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="font-size: 16px; font-weight: 700; color: #2d3748;">
-                        📊 每小时数据统计
+                        📊 每小时数据统计（多单/空单 盈亏分布）
                     </div>
                     <div style="display: flex; gap: 10px;">
+                        <button onclick="loadHourlyStats(1)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #4299e1; background: #4299e1; color: white; font-weight: 600; border-radius: 6px; cursor: pointer;">最近1小时</button>
                         <button onclick="loadHourlyStats(6)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #cbd5e0; background: white; border-radius: 6px; cursor: pointer;">最近6小时</button>
                         <button onclick="loadHourlyStats(12)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #cbd5e0; background: white; border-radius: 6px; cursor: pointer;">最近12小时</button>
-                        <button onclick="loadHourlyStats(24)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #4299e1; background: #4299e1; color: white; font-weight: 600; border-radius: 6px; cursor: pointer;">最近24小时</button>
+                        <button onclick="loadHourlyStats(24)" style="padding: 5px 12px; font-size: 12px; border: 1px solid #cbd5e0; background: white; border-radius: 6px; cursor: pointer;">最近24小时</button>
                     </div>
                 </div>
                 <div id="hourlyStatsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
@@ -922,8 +923,8 @@
                     console.error('❌ 历史极值记录加载失败:', recordsData);
                 }
                 
-                // 加载每小时统计数据（默认24小时）
-                await loadHourlyStats(24);
+                // 加载每小时统计数据（默认1小时）
+                await loadHourlyStats(1);
 
                 // 加载当前持仓情况（实盘模式）
                 const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=real');
@@ -1192,7 +1193,7 @@
                     hour12: false
                 });
                 
-                // 确定卡片颜色
+                // 确定卡片颜色 - 基于总数
                 let bgColor = '#f7fafc';
                 let borderColor = '#e2e8f0';
                 if (stat.total_count >= 10) {
@@ -1208,40 +1209,29 @@
                 
                 return `
                 <div style="background: ${bgColor}; border: 2px solid ${borderColor}; border-radius: 8px; padding: 12px;">
-                    <div style="font-size: 13px; color: #4a5568; font-weight: 600; margin-bottom: 8px;">
+                    <div style="font-size: 13px; color: #4a5568; font-weight: 600; margin-bottom: 10px; text-align: center;">
                         ${hourStr}
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                        <div>
-                            <div style="color: #718096; margin-bottom: 2px;">总数</div>
-                            <div style="font-size: 20px; font-weight: 700; color: #2d3748;">${stat.total_count}</div>
-                        </div>
-                        <div>
-                            <div style="color: #718096; margin-bottom: 2px;">平均收益</div>
-                            <div style="font-size: 16px; font-weight: 700; color: ${stat.avg_profit_rate >= 0 ? '#48bb78' : '#f56565'};">
-                                ${stat.avg_profit_rate}%
-                            </div>
-                        </div>
-                        <div>
-                            <div style="color: #48bb78; margin-bottom: 2px;">🏆 盈利</div>
-                            <div style="font-weight: 600; color: #48bb78;">${stat.profit_count}</div>
-                        </div>
-                        <div>
-                            <div style="color: #f56565; margin-bottom: 2px;">📉 亏损</div>
-                            <div style="font-weight: 600; color: #f56565;">${stat.loss_count}</div>
-                        </div>
-                        <div>
-                            <div style="color: #805ad5; margin-bottom: 2px;">做空</div>
-                            <div style="font-weight: 600; color: #805ad5;">${stat.short_count}</div>
-                        </div>
-                        <div>
-                            <div style="color: #38b2ac; margin-bottom: 2px;">做多</div>
-                            <div style="font-weight: 600; color: #38b2ac;">${stat.long_count}</div>
-                        </div>
+                    <div style="font-size: 18px; font-weight: 700; color: #2d3748; text-align: center; margin-bottom: 10px;">
+                        总数 ${stat.total_count}
                     </div>
-                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #718096;">
-                        <div>最高: <span style="color: #48bb78; font-weight: 600;">${stat.max_profit_rate}%</span></div>
-                        <div>最低: <span style="color: #f56565; font-weight: 600;">${stat.min_profit_rate}%</span></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+                        <div style="background: #e6ffed; padding: 8px; border-radius: 6px; text-align: center;">
+                            <div style="color: #38a169; margin-bottom: 3px; font-weight: 600;">🟢 多单盈利</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #38a169;">${stat.long_profit_count}</div>
+                        </div>
+                        <div style="background: #ffe6e6; padding: 8px; border-radius: 6px; text-align: center;">
+                            <div style="color: #e53e3e; margin-bottom: 3px; font-weight: 600;">🔴 多单亏损</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #e53e3e;">${stat.long_loss_count}</div>
+                        </div>
+                        <div style="background: #e6ffed; padding: 8px; border-radius: 6px; text-align: center;">
+                            <div style="color: #38a169; margin-bottom: 3px; font-weight: 600;">🟢 空单盈利</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #38a169;">${stat.short_profit_count}</div>
+                        </div>
+                        <div style="background: #ffe6e6; padding: 8px; border-radius: 6px; text-align: center;">
+                            <div style="color: #e53e3e; margin-bottom: 3px; font-weight: 600;">🔴 空单亏损</div>
+                            <div style="font-size: 20px; font-weight: 700; color: #e53e3e;">${stat.short_loss_count}</div>
+                        </div>
                     </div>
                 </div>
                 `;
