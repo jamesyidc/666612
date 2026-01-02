@@ -17825,19 +17825,6 @@ def check_and_fix_sub_account_position():
             if record.get('date') == today_date:
                 maintenance_count = record.get('count', 0)
         
-        # 计算目标保证金
-        def calculate_target_margin(count):
-            if count == 0:
-                return 10.0
-            elif count == 1:
-                return 20.0
-            elif count == 2:
-                return 20.0
-            else:  # count >= 3
-                return 30.0
-        
-        target_margin = calculate_target_margin(maintenance_count)
-        
         # 获取当前持仓
         timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
         method = "GET"
@@ -17894,9 +17881,77 @@ def check_and_fix_sub_account_position():
                 'message': '未找到对应持仓'
             })
         
-        current_margin = float(target_position.get('margin', 0))
-        pos_size = abs(float(target_position.get('pos', 0)))
-        mark_price = float(target_position.get('markPx', 0))
+        # 获取当前保证金（处理全仓模式margin为空的情况）
+        try:
+            margin_str = target_position.get('margin', '0')
+            current_margin = float(margin_str) if margin_str and margin_str != '' else 0
+        except (ValueError, TypeError):
+            current_margin = 0
+        
+        # 如果margin为空，从notionalUsd和lever计算
+        if current_margin <= 0:
+            try:
+                notional_usd_str = target_position.get('notionalUsd', '0')
+                leverage_str = target_position.get('lever', '10')
+                
+                notional_usd = float(notional_usd_str) if notional_usd_str and notional_usd_str != '' else 0
+                leverage = float(leverage_str) if leverage_str and leverage_str != '' else 10
+                
+                if notional_usd > 0 and leverage > 0:
+                    current_margin = notional_usd / leverage
+                    print(f"   ℹ️ 全仓模式：从notionalUsd({notional_usd})和杠杆({leverage})计算保证金: {current_margin}U")
+            except (ValueError, TypeError) as e:
+                print(f"   ⚠️ 计算保证金失败: {e}")
+        
+        try:
+            pos_str = target_position.get('pos', '0')
+            pos_size = abs(float(pos_str)) if pos_str and pos_str != '' else 0
+        except (ValueError, TypeError):
+            pos_size = 0
+        
+        try:
+            mark_price_str = target_position.get('markPx', '0')
+            mark_price = float(mark_price_str) if mark_price_str and mark_price_str != '' else 0
+        except (ValueError, TypeError):
+            mark_price = 0
+        
+        if current_margin <= 0 or pos_size <= 0 or mark_price <= 0:
+            return jsonify({
+                'success': False,
+                'message': f'持仓数据无效：保证金={current_margin}, 持仓={pos_size}, 标记价={mark_price}'
+            })
+        
+        # 计算目标保证金
+        def calculate_target_margin(count):
+            if count == 0:
+                return 10.0
+            elif count == 1:
+                return 20.0
+            elif count == 2:
+                return 20.0
+            else:  # count >= 3
+                return 30.0
+        
+        base_target_margin = calculate_target_margin(maintenance_count)
+        
+        # 对于高价币，需要调整目标保证金（与维护逻辑一致）
+        # 获取杠杆
+        leverage = 10  # 默认杠杆
+        try:
+            leverage_str = target_position.get('lever', '10')
+            leverage = float(leverage_str) if leverage_str and leverage_str != '' else 10
+        except (ValueError, TypeError):
+            leverage = 10
+        
+        # 计算1张对应的保证金
+        margin_per_contract = mark_price / leverage
+        
+        # 如果目标保证金小于1张的保证金，调整为1张
+        if base_target_margin < margin_per_contract:
+            target_margin = margin_per_contract
+            print(f"   ℹ️ 高价币调整：1张需{margin_per_contract:.2f}U，目标从{base_target_margin}U调整为{target_margin:.2f}U")
+        else:
+            target_margin = base_target_margin
         
         print(f"🔍 纠错检查 - 账户: {account_name}, 币种: {inst_id}, 方向: {pos_side}")
         print(f"   今日维护次数: {maintenance_count}")
@@ -17926,7 +17981,7 @@ def check_and_fix_sub_account_position():
             # 保证金过多，需要平仓
             # 计算需要平掉的比例
             close_percent = (margin_diff / current_margin) * 100
-            close_size = int(pos_size * (margin_diff / current_margin))
+            close_size = round(pos_size * (margin_diff / current_margin))
             
             if close_size < 1:
                 return jsonify({
@@ -17999,79 +18054,19 @@ def check_and_fix_sub_account_position():
                 })
         
         else:
-            # 保证金不足，需要加仓
-            # 计算需要加多少张
-            add_margin = target_margin - current_margin
-            add_size = int((add_margin * pos_size) / current_margin)
+            # 保证金不足，需要维护而不是简单加仓
+            print(f"   ℹ️ 保证金不足（当前: {current_margin:.2f}U，目标: {target_margin:.2f}U）")
+            print(f"   💡 建议：请点击'维护'按钮进行正常维护流程")
             
-            if add_size < 1:
-                return jsonify({
-                    'success': True,
-                    'message': f'保证金略低（当前: {current_margin:.2f}U，目标: {target_margin:.2f}U），但差额过小无需加仓',
-                    'current_margin': current_margin,
-                    'target_margin': target_margin,
-                    'maintenance_count': maintenance_count,
-                    'action': 'none'
-                })
-            
-            print(f"   ⚠️ 需要加仓 {add_size} 张")
-            
-            # 执行加仓
-            timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
-            method = "POST"
-            request_path = "/api/v5/trade/order"
-            
-            order_data = {
-                "instId": inst_id,
-                "tdMode": "cross",
-                "side": "buy" if pos_side == "long" else "sell",
-                "ordType": "market",
-                "sz": str(add_size),
-                "posSide": pos_side
-            }
-            
-            body = json.dumps(order_data)
-            prehash = timestamp + method + request_path + body
-            signature = base64.b64encode(
-                hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
-            ).decode()
-            
-            headers = {
-                "OK-ACCESS-KEY": api_key,
-                "OK-ACCESS-SIGN": signature,
-                "OK-ACCESS-TIMESTAMP": timestamp,
-                "OK-ACCESS-PASSPHRASE": passphrase,
-                "Content-Type": "application/json"
-            }
-            
-            response = requests.post(
-                "https://www.okx.com" + request_path,
-                headers=headers,
-                json=order_data,
-                timeout=10
-            )
-            
-            result = response.json()
-            
-            if result.get('code') == '0':
-                order_id = result['data'][0].get('ordId')
-                print(f"   ✅ 纠错加仓成功，订单ID: {order_id}")
-                return jsonify({
-                    'success': True,
-                    'message': f'纠错成功：加仓 {add_size} 张，保证金从 {current_margin:.2f}U 升至约 {target_margin:.2f}U',
-                    'action': 'increase',
-                    'added_size': add_size,
-                    'order_id': order_id,
-                    'current_margin': current_margin,
-                    'target_margin': target_margin,
-                    'maintenance_count': maintenance_count
-                })
-            else:
-                print(f"   ❌ 加仓失败: {result.get('msg')}")
-                return jsonify({
-                    'success': False,
-                    'message': f'加仓失败: {result.get("msg")}'
-                })
+            return jsonify({
+                'success': True,
+                'message': f'保证金不足（当前: {current_margin:.2f}U，目标: {target_margin:.2f}U），请点击"维护"按钮进行维护',
+                'current_margin': current_margin,
+                'target_margin': target_margin,
+                'maintenance_count': maintenance_count,
+                'action': 'need_maintenance',
+                'suggestion': '点击维护按钮'
+            })
     
     except Exception as e:
         import traceback
