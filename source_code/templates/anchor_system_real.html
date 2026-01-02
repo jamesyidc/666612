@@ -643,31 +643,37 @@
                 </div>
             </div>
             
-            <!-- 统计图例说明 -->
+            <!-- 统计图例说明和1小时内统计 -->
             <div style="padding: 12px 20px; background: linear-gradient(135deg, #f6f8fb 0%, #f0f4f8 100%); border-radius: 12px; margin: 0 20px 15px 20px;">
-                <div style="display: flex; align-items: center; gap: 30px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 30px; flex-wrap: wrap; justify-content: space-between;">
                     <div style="font-size: 16px; font-weight: 700; color: #2d3748;">
                         📊 历史极值记录
                     </div>
-                    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                    
+                    <!-- 1小时内统计卡片 -->
+                    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                             <div style="width: 12px; height: 12px; border-radius: 50%; background: #48bb78;"></div>
                             <span style="font-size: 13px; color: #4a5568;">多单盈利</span>
+                            <span style="font-size: 16px; font-weight: 700; color: #48bb78; margin-left: 5px;" id="hourlyLongProfit">0</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                             <div style="width: 12px; height: 12px; border-radius: 50%; background: #f56565;"></div>
                             <span style="font-size: 13px; color: #4a5568;">多单亏损</span>
+                            <span style="font-size: 16px; font-weight: 700; color: #f56565; margin-left: 5px;" id="hourlyLongLoss">0</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                             <div style="width: 12px; height: 12px; border-radius: 50%; background: #48bb78;"></div>
                             <span style="font-size: 13px; color: #4a5568;">空单盈利</span>
+                            <span style="font-size: 16px; font-weight: 700; color: #48bb78; margin-left: 5px;" id="hourlyShortProfit">0</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                             <div style="width: 12px; height: 12px; border-radius: 50%; background: #f56565;"></div>
                             <span style="font-size: 13px; color: #4a5568;">空单亏损</span>
+                            <span style="font-size: 16px; font-weight: 700; color: #f56565; margin-left: 5px;" id="hourlyShortLoss">0</span>
                         </div>
-                        <div style="font-size: 12px; color: #718096; margin-left: 10px;" id="hourlyStatsLegend">
-                            (最近1小时内的统计)
+                        <div style="font-size: 12px; color: #718096; padding: 8px;" id="hourlyStatsLegend">
+                            (最近1小时内)
                         </div>
                     </div>
                 </div>
@@ -1206,10 +1212,40 @@
             if (!data || data.length === 0) {
                 console.log('⚠️ 历史记录数据为空');
                 tbody.innerHTML = '<tr><td colspan="10" class="empty">暂无历史记录</td></tr>';
+                // 清空统计
+                document.getElementById('hourlyLongProfit').textContent = '0';
+                document.getElementById('hourlyLongLoss').textContent = '0';
+                document.getElementById('hourlyShortProfit').textContent = '0';
+                document.getElementById('hourlyShortLoss').textContent = '0';
                 return;
             }
             
             console.log('✅ 开始渲染历史记录...');
+            
+            // 计算1小时内的统计
+            const oneHourAgo = Date.now() - 60 * 60 * 1000;
+            let longProfit = 0, longLoss = 0, shortProfit = 0, shortLoss = 0;
+            
+            data.forEach(item => {
+                const timestamp = new Date(item.timestamp).getTime();
+                if (timestamp > oneHourAgo) {
+                    const isLong = item.pos_side === 'long';
+                    const isProfit = item.record_type === 'max_profit';
+                    
+                    if (isLong && isProfit) longProfit++;
+                    else if (isLong && !isProfit) longLoss++;
+                    else if (!isLong && isProfit) shortProfit++;
+                    else if (!isLong && !isProfit) shortLoss++;
+                }
+            });
+            
+            // 更新统计显示
+            document.getElementById('hourlyLongProfit').textContent = longProfit;
+            document.getElementById('hourlyLongLoss').textContent = longLoss;
+            document.getElementById('hourlyShortProfit').textContent = shortProfit;
+            document.getElementById('hourlyShortLoss').textContent = shortLoss;
+            
+            console.log(`📊 1小时内统计: 多单盈利${longProfit}, 多单亏损${longLoss}, 空单盈利${shortProfit}, 空单亏损${shortLoss}`);
             
             // 币种编号映射
             const coinNumbers = {
