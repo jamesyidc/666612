@@ -17342,7 +17342,6 @@ def maintain_sub_account_position():
                 "posSide": pos_side,
                 "reduceOnly": True
             }
-            }
             
             body = json_lib.dumps(order_data)
             prehash = timestamp + method + request_path + body
