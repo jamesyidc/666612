@@ -2647,8 +2647,30 @@
             
             // 子账户操作函数
             async function showSubAccountMaintenanceCount(accountName, instId, posSide) {
-                // TODO: 实现子账户维护次数查询
-                alert('子账户维护次数查询功能开发中...');
+                try {
+                    const response = await fetch('/api/sub-account/maintenance-detail', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        const direction = posSide === 'short' ? '做空' : '做多';
+                        alert(`📊 维护详情\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${direction}\n\n今日维护次数: ${data.count}次\n最后维护时间: ${data.last_maintenance}`);
+                    } else {
+                        alert(`❌ 查询失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error('查询维护详情失败:', error);
+                    alert(`❌ 查询失败：${error.message}`);
+                }
             }
             
             async function resetSubAccountMaintenanceCount(accountName, instId, posSide) {
@@ -2821,7 +2843,8 @@
                     
                     const data = await response.json();
                     if (data.success) {
-                        alert(`✅ 加仓成功！\n\n加仓保证金: ${marginAmount} USDT\n开仓价格: $${data.price || '--'}\n持仓数量: ${data.size || '--'}`);
+                        const actualMarginText = data.actual_margin ? `\n实际保证金: ${data.actual_margin} USDT` : '';
+                        alert(`✅ 加仓成功！\n\n目标保证金: ${marginAmount} USDT${actualMarginText}\n开仓价格: $${data.price || '--'}\n持仓数量: ${data.size || '--'} 张`);
                         loadData(); // 刷新数据
                     } else {
                         alert(`❌ 加仓失败：${data.message || '未知错误'}`);

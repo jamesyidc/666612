@@ -18063,16 +18063,43 @@ def add_sub_account_position():
         
         print(f"  当前价格: ${last_price}")
         
-        # 2. 计算开仓数量（杠杆10倍）
+        # 2. 获取合约信息以确定合约面值
+        request_path = '/api/v5/public/instruments'
+        query_string = f'instType=SWAP&instId={inst_id}'
+        
+        response = requests.get(f"{OKEX_REST_URL}{request_path}?{query_string}", timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'获取合约信息失败: HTTP {response.status_code}'})
+        
+        inst_data = response.json()
+        if inst_data.get('code') != '0':
+            return jsonify({'success': False, 'message': f"获取合约信息失败: {inst_data.get('msg', '未知错误')}"})
+        
+        instruments = inst_data.get('data', [])
+        if not instruments:
+            return jsonify({'success': False, 'message': '未获取到合约信息'})
+        
+        # 合约面值（ctVal）：每张合约代表的币数量
+        ct_val = float(instruments[0].get('ctVal', 1))
+        
+        # 3. 计算开仓数量
+        # 公式：保证金 = (张数 * 合约面值 * 价格) / 杠杆
+        # 反推：张数 = (保证金 * 杠杆) / (合约面值 * 价格)
         leverage = 10
-        notional_value = margin_amount * leverage  # 名义价值
-        contract_size = int(notional_value / last_price)  # 合约张数
+        contract_size = int((margin_amount * leverage) / (ct_val * last_price))
         
         if contract_size <= 0:
-            return jsonify({'success': False, 'message': '计算的开仓数量太小'})
+            return jsonify({'success': False, 'message': '计算的开仓数量太小，建议增加保证金金额'})
         
-        print(f"  名义价值: ${notional_value}")
-        print(f"  开仓数量: {contract_size} 张")
+        # 实际使用的保证金（预估）
+        actual_margin = (contract_size * ct_val * last_price) / leverage
+        
+        print(f"  合约面值: {ct_val}")
+        print(f"  杠杆: {leverage}x")
+        print(f"  目标保证金: {margin_amount} USDT")
+        print(f"  计算张数: {contract_size} 张")
+        print(f"  预估实际保证金: {actual_margin:.2f} USDT")
         
         # 3. 执行开仓
         request_path = '/api/v5/trade/order'
@@ -18117,7 +18144,8 @@ def add_sub_account_position():
         
         print(f"✅ 加仓成功!")
         print(f"  订单ID: {order_id}")
-        print(f"  保证金: {margin_amount} USDT")
+        print(f"  目标保证金: {margin_amount} USDT")
+        print(f"  预估实际保证金: {actual_margin:.2f} USDT")
         print(f"  数量: {contract_size} 张")
         print(f"  价格: ${last_price}")
         
@@ -18127,7 +18155,8 @@ def add_sub_account_position():
             'order_id': order_id,
             'price': last_price,
             'size': contract_size,
-            'margin': margin_amount
+            'margin': margin_amount,
+            'actual_margin': round(actual_margin, 2)
         })
         
     except Exception as e:
@@ -18468,6 +18497,44 @@ def check_and_fix_sub_account_position():
         return jsonify({
             'success': False,
             'message': f'纠错异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/sub-account/maintenance-detail', methods=['POST'])
+def get_sub_account_maintenance_detail():
+    """获取子账户维护详情"""
+    try:
+        import json as json_lib
+        
+        data = request.get_json()
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        
+        key = f"{account_name}_{inst_id}_{pos_side}"
+        
+        try:
+            with open('sub_account_maintenance.json', 'r', encoding='utf-8') as f:
+                maintenance_data = json_lib.load(f)
+        except FileNotFoundError:
+            maintenance_data = {}
+        
+        record = maintenance_data.get(key, {})
+        
+        return jsonify({
+            'success': True,
+            'account_name': account_name,
+            'inst_id': inst_id,
+            'pos_side': pos_side,
+            'count': record.get('count', 0),
+            'last_maintenance': record.get('last_maintenance', '从未维护')
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': str(e),
             'traceback': traceback.format_exc()
         })
 
