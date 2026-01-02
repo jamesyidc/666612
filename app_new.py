@@ -5589,6 +5589,15 @@ def support_resistance_page():
     response.headers['Expires'] = '0'
     return response
 
+@app.route('/escape-stats-history')
+def escape_stats_history_page():
+    """逃顶快照数统计历史数据页面"""
+    response = make_response(render_template('escape_stats_history.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 @app.route('/trading-signals')
 def trading_signals_page():
     """决策-交易信号系统页面"""

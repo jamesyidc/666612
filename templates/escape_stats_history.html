@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>逃顶快照数统计 - 历史数据</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        select, input, button {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .chart-container h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            max-width: 100%;
+        }
+
+        .table-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            color: white;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-high {
+            background-color: #fee;
+            color: #c00;
+        }
+
+        .badge-medium {
+            background-color: #ffeaa7;
+            color: #d63031;
+        }
+
+        .badge-normal {
+            background-color: #dfe6e9;
+            color: #2d3436;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(-5px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/support-resistance" class="back-link">
+            ← 返回支撑压力线系统
+        </a>
+
+        <div class="header">
+            <h1>📊 逃顶快照数统计 - 历史数据</h1>
+            <p>每分钟记录一次，显示24小时和2小时逃顶快照数的历史趋势</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>时间范围：</label>
+                <select id="timeRange" onchange="loadData()">
+                    <option value="1">最近1小时</option>
+                    <option value="6">最近6小时</option>
+                    <option value="24" selected>最近24小时</option>
+                    <option value="72">最近3天</option>
+                    <option value="168">最近7天</option>
+                    <option value="0">全部数据</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>显示数量：</label>
+                <select id="limitCount" onchange="loadData()">
+                    <option value="100">100条</option>
+                    <option value="500">500条</option>
+                    <option value="1000" selected>1000条</option>
+                    <option value="5000">5000条</option>
+                </select>
+            </div>
+            <button onclick="loadData()">🔄 刷新数据</button>
+            <button onclick="exportData()">📥 导出CSV</button>
+        </div>
+
+        <div class="stats-summary">
+            <div class="stat-card">
+                <h3>总记录数</h3>
+                <div class="value" id="totalCount">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>24小时最大值</h3>
+                <div class="value" id="max24h">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>2小时最大值</h3>
+                <div class="value" id="max2h">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>24小时平均值</h3>
+                <div class="value" id="avg24h">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>2小时平均值</h3>
+                <div class="value" id="avg2h">-</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>📈 逃顶快照数趋势图</h2>
+            <canvas id="trendChart"></canvas>
+        </div>
+
+        <div class="table-container">
+            <h2 style="margin-bottom: 20px;">📋 历史数据明细</h2>
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p>加载中...</p>
+            </div>
+            <table id="dataTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>记录时间</th>
+                        <th>24小时快照数</th>
+                        <th>2小时快照数</th>
+                        <th>24小时信号最大值</th>
+                        <th>2小时信号最大值</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        let chartInstance = null;
+        let historyData = [];
+
+        // 页面加载时初始化
+        window.onload = function() {
+            loadData();
+            // 每分钟自动刷新
+            setInterval(loadData, 60000);
+        };
+
+        // 加载数据
+        async function loadData() {
+            const hours = document.getElementById('timeRange').value;
+            const limit = document.getElementById('limitCount').value;
+            
+            try {
+                document.getElementById('loadingIndicator').style.display = 'block';
+                document.getElementById('dataTable').style.display = 'none';
+
+                const url = `/api/support-resistance/escape-stats-history?hours=${hours}&limit=${limit}`;
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    historyData = result.data;
+                    renderData(historyData);
+                } else {
+                    alert('加载数据失败: ' + result.message);
+                }
+            } catch (error) {
+                console.error('加载数据出错:', error);
+                alert('加载数据出错: ' + error.message);
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        // 渲染数据
+        function renderData(data) {
+            if (data.length === 0) {
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align: center;">暂无数据</td></tr>';
+                document.getElementById('dataTable').style.display = 'table';
+                return;
+            }
+
+            // 计算统计信息
+            const max24h = Math.max(...data.map(d => d.escape_24h_count));
+            const max2h = Math.max(...data.map(d => d.escape_2h_count));
+            const avg24h = Math.round(data.reduce((sum, d) => sum + d.escape_24h_count, 0) / data.length);
+            const avg2h = Math.round(data.reduce((sum, d) => sum + d.escape_2h_count, 0) / data.length);
+
+            document.getElementById('totalCount').textContent = data.length;
+            document.getElementById('max24h').textContent = max24h;
+            document.getElementById('max2h').textContent = max2h;
+            document.getElementById('avg24h').textContent = avg24h;
+            document.getElementById('avg2h').textContent = avg2h;
+
+            // 渲染表格
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = data.map(row => {
+                const status24h = row.escape_24h_count >= 10 ? 'badge-high' : 
+                                  row.escape_24h_count >= 5 ? 'badge-medium' : 'badge-normal';
+                const status2h = row.escape_2h_count >= 10 ? 'badge-high' : 
+                                 row.escape_2h_count >= 5 ? 'badge-medium' : 'badge-normal';
+                
+                return `
+                    <tr>
+                        <td>${row.stat_time}</td>
+                        <td><strong>${row.escape_24h_count}</strong> 个快照</td>
+                        <td><strong>${row.escape_2h_count}</strong> 个快照</td>
+                        <td>${row.max_escape_24h}</td>
+                        <td>${row.max_escape_2h}</td>
+                        <td>
+                            <span class="badge ${status24h}">24H: ${getStatusText(row.escape_24h_count)}</span>
+                            <span class="badge ${status2h}">2H: ${getStatusText(row.escape_2h_count)}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('dataTable').style.display = 'table';
+
+            // 渲染图表
+            renderChart(data);
+        }
+
+        // 获取状态文本
+        function getStatusText(count) {
+            if (count >= 10) return '极高';
+            if (count >= 5) return '偏高';
+            return '正常';
+        }
+
+        // 渲染图表
+        function renderChart(data) {
+            // 反转数据（最早的在左边）
+            const reversedData = [...data].reverse();
+            
+            const labels = reversedData.map(d => {
+                const time = new Date(d.stat_time);
+                return time.toLocaleString('zh-CN', { 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            });
+
+            const data24h = reversedData.map(d => d.escape_24h_count);
+            const data2h = reversedData.map(d => d.escape_2h_count);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '24小时逃顶快照数',
+                            data: data24h,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '2小时逃顶快照数',
+                            data: data2h,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + ' 个快照';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '快照数量'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '时间'
+                            },
+                            ticks: {
+                                maxTicksLimit: 20
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 导出CSV
+        function exportData() {
+            if (historyData.length === 0) {
+                alert('没有数据可以导出');
+                return;
+            }
+
+            const csv = [
+                ['记录时间', '24小时快照数', '2小时快照数', '24小时信号最大值', '2小时信号最大值', '创建时间'],
+                ...historyData.map(row => [
+                    row.stat_time,
+                    row.escape_24h_count,
+                    row.escape_2h_count,
+                    row.max_escape_24h,
+                    row.max_escape_2h,
+                    row.created_at
+                ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `逃顶快照数统计_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
