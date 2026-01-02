@@ -29,6 +29,7 @@ TIMEOUT_THRESHOLD = 11 * 60  # 超时阈值（秒）= 11分钟
 LOG_FILE = "/home/user/webapp/gdrive_final_detector.log"
 DB_PATH = "/home/user/webapp/databases/crypto_data.db"
 CONFIG_FILE = "/home/user/webapp/daily_folder_config.json"  # 每日文件夹ID配置文件
+STATUS_FILE = "/home/user/webapp/gdrive_detector_status.json"  # 状态文件
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
 def get_root_folder_for_today():
@@ -103,6 +104,41 @@ def log(message):
             f.write(log_msg + '\n')
     except:
         pass
+
+def save_status(check_count, last_check_time, file_timestamp, delay_minutes, folder_id):
+    """保存检测器状态到JSON文件"""
+    import json
+    try:
+        # 读取配置文件获取根文件夹ID
+        root_folder_odd = ROOT_FOLDER_ODD
+        root_folder_even = ROOT_FOLDER_EVEN
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                if 'root_folder_odd' in config:
+                    root_folder_odd = config['root_folder_odd']
+                if 'root_folder_even' in config:
+                    root_folder_even = config['root_folder_even']
+        except:
+            pass
+        
+        status = {
+            'detector_running': True,
+            'check_count': check_count,
+            'last_check_time': last_check_time.strftime('%Y-%m-%d %H:%M:%S') if last_check_time else None,
+            'file_timestamp': file_timestamp.strftime('%Y-%m-%d %H:%M:%S') if file_timestamp else None,
+            'delay_minutes': delay_minutes,
+            'current_time': datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S'),
+            'today_date': datetime.now(BEIJING_TZ).strftime('%Y年%m月%d日'),
+            'folder_id': folder_id,
+            'root_folder_odd': root_folder_odd,
+            'root_folder_even': root_folder_even
+        }
+        
+        with open(STATUS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(status, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        log(f"⚠️  保存状态文件失败: {e}")
 
 def step1_get_today_date():
     """步骤1: 确认当天北京时间日期"""
@@ -815,6 +851,20 @@ def main():
             
             # 步骤4: 获取最新数据（使用真实ID）
             result = step4_get_latest_data(file_info, FIXED_FILE_ID)
+            
+            # 保存状态
+            current_check_time = datetime.now(BEIJING_TZ)
+            if result and result.get('file_timestamp'):
+                try:
+                    file_ts = datetime.strptime(result['file_timestamp'], '%Y-%m-%d %H:%M:%S')
+                    file_ts = BEIJING_TZ.localize(file_ts)  # 添加时区信息
+                    delay = (current_check_time - file_ts).total_seconds() / 60
+                    save_status(check_count, current_check_time, file_ts, round(delay, 1), current_folder_id)
+                except Exception as e:
+                    log(f"⚠️  保存状态时解析时间戳失败: {e}")
+                    save_status(check_count, current_check_time, None, None, current_folder_id)
+            else:
+                save_status(check_count, current_check_time, None, None, current_folder_id)
             
             if not result:
                 log("⏰ 无法获取数据，等待下次检查...")
