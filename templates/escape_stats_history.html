@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>逃顶快照数统计 - 历史数据</title>
+    <title>逃顶信号数统计 - 历史数据</title>
     <style>
         * {
             margin: 0;
@@ -245,7 +245,7 @@
         </a>
 
         <div class="header">
-            <h1>📊 逃顶快照数统计 - 历史数据</h1>
+            <h1>📊 逃顶信号数统计 - 历史数据</h1>
             <p>每分钟记录一次，显示24小时和2小时逃顶快照数的历史趋势</p>
         </div>
 
@@ -280,14 +280,6 @@
                 <div class="value" id="totalCount">-</div>
             </div>
             <div class="stat-card">
-                <h3>24小时最大值</h3>
-                <div class="value" id="max24h">-</div>
-            </div>
-            <div class="stat-card">
-                <h3>2小时最大值</h3>
-                <div class="value" id="max2h">-</div>
-            </div>
-            <div class="stat-card">
                 <h3>24小时平均值</h3>
                 <div class="value" id="avg24h">-</div>
             </div>
@@ -298,7 +290,7 @@
         </div>
 
         <div class="chart-container">
-            <h2>📈 逃顶快照数趋势图</h2>
+            <h2>📈 逃顶信号数趋势图</h2>
             <canvas id="trendChart"></canvas>
         </div>
 
@@ -312,10 +304,8 @@
                 <thead>
                     <tr>
                         <th>记录时间</th>
-                        <th>24小时快照数</th>
-                        <th>2小时快照数</th>
-                        <th>24小时信号最大值</th>
-                        <th>2小时信号最大值</th>
+                        <th>24小时信号数</th>
+                        <th>2小时信号数</th>
                         <th>状态</th>
                     </tr>
                 </thead>
@@ -366,41 +356,35 @@
         // 渲染数据
         function renderData(data) {
             if (data.length === 0) {
-                document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align: center;">暂无数据</td></tr>';
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="4" style="text-align: center;">暂无数据</td></tr>';
                 document.getElementById('dataTable').style.display = 'table';
                 return;
             }
 
             // 计算统计信息
-            const max24h = Math.max(...data.map(d => d.escape_24h_count));
-            const max2h = Math.max(...data.map(d => d.escape_2h_count));
-            const avg24h = Math.round(data.reduce((sum, d) => sum + d.escape_24h_count, 0) / data.length);
-            const avg2h = Math.round(data.reduce((sum, d) => sum + d.escape_2h_count, 0) / data.length);
+            const avg24h = Math.round(data.reduce((sum, d) => sum + d.signal_24h_count, 0) / data.length);
+            const avg2h = Math.round(data.reduce((sum, d) => sum + d.signal_2h_count, 0) / data.length);
 
             document.getElementById('totalCount').textContent = data.length;
-            document.getElementById('max24h').textContent = max24h;
-            document.getElementById('max2h').textContent = max2h;
             document.getElementById('avg24h').textContent = avg24h;
             document.getElementById('avg2h').textContent = avg2h;
 
             // 渲染表格
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = data.map(row => {
-                const status24h = row.escape_24h_count >= 10 ? 'badge-high' : 
-                                  row.escape_24h_count >= 5 ? 'badge-medium' : 'badge-normal';
-                const status2h = row.escape_2h_count >= 10 ? 'badge-high' : 
-                                 row.escape_2h_count >= 5 ? 'badge-medium' : 'badge-normal';
+                const status24h = row.signal_24h_count >= 100 ? 'badge-high' : 
+                                  row.signal_24h_count >= 50 ? 'badge-medium' : 'badge-normal';
+                const status2h = row.signal_2h_count >= 10 ? 'badge-high' : 
+                                 row.signal_2h_count >= 5 ? 'badge-medium' : 'badge-normal';
                 
                 return `
                     <tr>
                         <td>${row.stat_time}</td>
-                        <td><strong>${row.escape_24h_count}</strong> 个快照</td>
-                        <td><strong>${row.escape_2h_count}</strong> 个快照</td>
-                        <td>${row.max_escape_24h}</td>
-                        <td>${row.max_escape_2h}</td>
+                        <td><strong>${row.signal_24h_count}</strong> 个信号</td>
+                        <td><strong>${row.signal_2h_count}</strong> 个信号</td>
                         <td>
-                            <span class="badge ${status24h}">24H: ${getStatusText(row.escape_24h_count)}</span>
-                            <span class="badge ${status2h}">2H: ${getStatusText(row.escape_2h_count)}</span>
+                            <span class="badge ${status24h}">24H: ${getStatusText(row.signal_24h_count)}</span>
+                            <span class="badge ${status2h}">2H: ${getStatusText(row.signal_2h_count)}</span>
                         </td>
                     </tr>
                 `;
@@ -414,8 +398,8 @@
 
         // 获取状态文本
         function getStatusText(count) {
-            if (count >= 10) return '极高';
-            if (count >= 5) return '偏高';
+            if (count >= 100) return '极高';
+            if (count >= 50) return '偏高';
             return '正常';
         }
 
@@ -434,8 +418,8 @@
                 });
             });
 
-            const data24h = reversedData.map(d => d.escape_24h_count);
-            const data2h = reversedData.map(d => d.escape_2h_count);
+            const data24h = reversedData.map(d => d.signal_24h_count);
+            const data2h = reversedData.map(d => d.signal_2h_count);
 
             if (chartInstance) {
                 chartInstance.destroy();
@@ -448,7 +432,7 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: '24小时逃顶快照数',
+                            label: '24小时逃顶信号数',
                             data: data24h,
                             borderColor: 'rgb(255, 99, 132)',
                             backgroundColor: 'rgba(255, 99, 132, 0.1)',
@@ -456,7 +440,7 @@
                             fill: true
                         },
                         {
-                            label: '2小时逃顶快照数',
+                            label: '2小时逃顶信号数',
                             data: data2h,
                             borderColor: 'rgb(54, 162, 235)',
                             backgroundColor: 'rgba(54, 162, 235, 0.1)',
@@ -480,7 +464,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y + ' 个快照';
+                                    return context.dataset.label + ': ' + context.parsed.y + ' 个信号';
                                 }
                             }
                         }
@@ -490,7 +474,7 @@
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: '快照数量'
+                                text: '信号数量'
                             }
                         },
                         x: {
@@ -515,13 +499,11 @@
             }
 
             const csv = [
-                ['记录时间', '24小时快照数', '2小时快照数', '24小时信号最大值', '2小时信号最大值', '创建时间'],
+                ['记录时间', '24小时信号数', '2小时信号数', '创建时间'],
                 ...historyData.map(row => [
                     row.stat_time,
-                    row.escape_24h_count,
-                    row.escape_2h_count,
-                    row.max_escape_24h,
-                    row.max_escape_2h,
+                    row.signal_24h_count,
+                    row.signal_2h_count,
                     row.created_at
                 ])
             ].map(row => row.join(',')).join('\n');
@@ -529,7 +511,7 @@
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `逃顶快照数统计_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.download = `逃顶信号数统计_${new Date().toISOString().slice(0, 10)}.csv`;
             link.click();
         }
     </script>

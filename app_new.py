@@ -7192,12 +7192,10 @@ def api_support_resistance_escape_stats_history():
                 SELECT 
                     id,
                     stat_time,
-                    escape_24h_count,
-                    escape_2h_count,
-                    max_escape_24h,
-                    max_escape_2h,
+                    signal_24h_count,
+                    signal_2h_count,
                     created_at
-                FROM escape_snapshot_stats
+                FROM escape_signal_stats
                 WHERE stat_time >= ?
                 ORDER BY stat_time DESC
                 LIMIT ?
@@ -7207,12 +7205,10 @@ def api_support_resistance_escape_stats_history():
                 SELECT 
                     id,
                     stat_time,
-                    escape_24h_count,
-                    escape_2h_count,
-                    max_escape_24h,
-                    max_escape_2h,
+                    signal_24h_count,
+                    signal_2h_count,
                     created_at
-                FROM escape_snapshot_stats
+                FROM escape_signal_stats
                 ORDER BY stat_time DESC
                 LIMIT ?
             ''', (limit,))
@@ -7225,10 +7221,8 @@ def api_support_resistance_escape_stats_history():
             history.append({
                 'id': row['id'],
                 'stat_time': row['stat_time'],
-                'escape_24h_count': row['escape_24h_count'],
-                'escape_2h_count': row['escape_2h_count'],
-                'max_escape_24h': row['max_escape_24h'],
-                'max_escape_2h': row['max_escape_2h'],
+                'signal_24h_count': row['signal_24h_count'],
+                'signal_2h_count': row['signal_2h_count'],
                 'created_at': row['created_at']
             })
         
