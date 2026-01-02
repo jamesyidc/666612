@@ -133,5 +133,11 @@
     "inst_id": "DOT-USDT-SWAP",
     "pos_side": "short",
     "opened_at": "2026-01-02 12:39:01"
+  },
+  "Wu666666:SOL-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "SOL-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 14:03:21"
   }
 }
