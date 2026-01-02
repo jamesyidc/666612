@@ -871,6 +871,24 @@
                     console.error('加载子账户配置失败:', error);
                 }
                 
+                // 加载主账户自动维护配置
+                try {
+                    const mainConfigRes = await fetch('/api/anchor-system/auto-maintenance-config');
+                    const mainConfigData = await mainConfigRes.json();
+                    
+                    if (mainConfigData.success) {
+                        const config = mainConfigData.config;
+                        // 设置主账户自动维护开关状态
+                        document.getElementById('autoMaintainLong').checked = config.auto_maintain_long_enabled || false;
+                        document.getElementById('autoMaintainShort').checked = config.auto_maintain_short_enabled || false;
+                        document.getElementById('superMaintainLong').checked = config.super_maintain_long_enabled || false;
+                        document.getElementById('superMaintainShort').checked = config.super_maintain_short_enabled || false;
+                        console.log('✅ 主账户自动维护配置已加载:', config);
+                    }
+                } catch (error) {
+                    console.error('加载主账户自动维护配置失败:', error);
+                }
+                
                 // 加载状态
                 const statusRes = await fetch('/api/anchor-system/status');
                 const statusData = await statusRes.json();
@@ -2133,7 +2151,7 @@
                 console.log(`🟢 自动维护多单-10%: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                    const response = await fetch('/api/anchor-system/auto-maintenance-config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -2162,7 +2180,7 @@
                 console.log(`🔴 自动维护空单-10%: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                    const response = await fetch('/api/anchor-system/auto-maintenance-config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -2192,7 +2210,7 @@
                 console.log(`🚀 超级维护多单-10%: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                    const response = await fetch('/api/anchor-system/auto-maintenance-config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -2221,7 +2239,7 @@
                 console.log(`🚀 超级维护空单-10%: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/anchor/auto-maintenance-config', {
+                    const response = await fetch('/api/anchor-system/auto-maintenance-config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'

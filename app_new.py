@@ -12455,6 +12455,87 @@ def get_anchor_status():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/auto-maintenance-config', methods=['GET', 'POST'])
+def anchor_auto_maintenance_config():
+    """获取或设置主账户自动维护配置"""
+    try:
+        import json as json_lib
+        
+        config_file = 'auto_maintenance_config.json'
+        
+        if request.method == 'GET':
+            # 读取配置
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+                return jsonify({
+                    'success': True,
+                    'config': config
+                })
+            except FileNotFoundError:
+                # 返回默认配置
+                default_config = {
+                    'auto_maintain_long_enabled': False,
+                    'auto_maintain_short_enabled': False,
+                    'super_maintain_long_enabled': False,
+                    'super_maintain_short_enabled': False,
+                    'loss_threshold': -10,
+                    'margin_min': 0.6,
+                    'margin_max': 1.0
+                }
+                return jsonify({
+                    'success': True,
+                    'config': default_config
+                })
+        
+        elif request.method == 'POST':
+            # 更新配置
+            data = request.get_json()
+            
+            # 读取现有配置
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            except FileNotFoundError:
+                config = {
+                    'auto_maintain_long_enabled': False,
+                    'auto_maintain_short_enabled': False,
+                    'super_maintain_long_enabled': False,
+                    'super_maintain_short_enabled': False,
+                    'loss_threshold': -10,
+                    'margin_min': 0.6,
+                    'margin_max': 1.0
+                }
+            
+            # 更新字段
+            if 'auto_maintain_long_enabled' in data:
+                config['auto_maintain_long_enabled'] = data['auto_maintain_long_enabled']
+            if 'auto_maintain_short_enabled' in data:
+                config['auto_maintain_short_enabled'] = data['auto_maintain_short_enabled']
+            if 'super_maintain_long_enabled' in data:
+                config['super_maintain_long_enabled'] = data['super_maintain_long_enabled']
+            if 'super_maintain_short_enabled' in data:
+                config['super_maintain_short_enabled'] = data['super_maintain_short_enabled']
+            
+            # 保存配置
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(config, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 主账户自动维护配置已更新: {config}")
+            
+            return jsonify({
+                'success': True,
+                'message': '配置已更新',
+                'config': config
+            })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/anchor-system/profit-records')
 def get_anchor_profit_records():
     """获取历史极值记录 - 实盘和模拟盘使用不同的表"""
