@@ -17854,6 +17854,148 @@ def close_sub_account_position_to_amount():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/sub-account/add-position', methods=['POST'])
+def add_sub_account_position():
+    """以市价加仓子账户持仓"""
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        
+        data = request.get_json()
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        margin_amount = data.get('margin_amount', 10)  # 加仓保证金金额
+        
+        print(f"➕ 加仓: {account_name} - {inst_id} {pos_side} - 保证金: {margin_amount}U")
+        
+        # 读取子账户配置
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config_data = json_lib.load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'message': '子账户配置文件不存在'})
+        
+        # 找到对应的子账户
+        sub_account = None
+        for acc in config_data.get('sub_accounts', []):
+            if acc.get('account_name') == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({'success': False, 'message': f'未找到子账户: {account_name}'})
+        
+        api_key = sub_account.get('api_key', '')
+        secret_key = sub_account.get('secret_key', '')
+        passphrase = sub_account.get('passphrase', '')
+        
+        OKEX_REST_URL = 'https://www.okx.com'
+        
+        # 1. 获取当前价格
+        request_path = '/api/v5/market/ticker'
+        query_string = f'instId={inst_id}'
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        
+        response = requests.get(f"{OKEX_REST_URL}{request_path}?{query_string}", timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'获取价格失败: HTTP {response.status_code}'})
+        
+        ticker_data = response.json()
+        if ticker_data.get('code') != '0':
+            return jsonify({'success': False, 'message': f"获取价格失败: {ticker_data.get('msg', '未知错误')}"})
+        
+        tickers = ticker_data.get('data', [])
+        if not tickers:
+            return jsonify({'success': False, 'message': '未获取到价格数据'})
+        
+        last_price = float(tickers[0].get('last', 0))
+        if last_price <= 0:
+            return jsonify({'success': False, 'message': '价格数据无效'})
+        
+        print(f"  当前价格: ${last_price}")
+        
+        # 2. 计算开仓数量（杠杆10倍）
+        leverage = 10
+        notional_value = margin_amount * leverage  # 名义价值
+        contract_size = int(notional_value / last_price)  # 合约张数
+        
+        if contract_size <= 0:
+            return jsonify({'success': False, 'message': '计算的开仓数量太小'})
+        
+        print(f"  名义价值: ${notional_value}")
+        print(f"  开仓数量: {contract_size} 张")
+        
+        # 3. 执行开仓
+        request_path = '/api/v5/trade/order'
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        
+        order_data = {
+            'instId': inst_id,
+            'tdMode': 'isolated',  # 逐仓
+            'side': 'buy' if pos_side == 'long' else 'sell',  # 做多用buy，做空用sell
+            'ordType': 'market',
+            'sz': str(contract_size),
+            'posSide': pos_side,
+        }
+        
+        body = json_lib.dumps(order_data)
+        message = timestamp + 'POST' + request_path + body
+        mac = hmac.new(bytes(secret_key, encoding='utf-8'), bytes(message, encoding='utf-8'), hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode()
+        
+        headers = {
+            'OK-ACCESS-KEY': api_key,
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-TIMESTAMP': timestamp,
+            'OK-ACCESS-PASSPHRASE': passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(f"{OKEX_REST_URL}{request_path}", headers=headers, data=body, timeout=10)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f'开仓请求失败: HTTP {response.status_code}'})
+        
+        result = response.json()
+        
+        if result.get('code') != '0':
+            error_msg = result.get('msg', '未知错误')
+            print(f"❌ 开仓失败: {error_msg}")
+            return jsonify({'success': False, 'message': f'开仓失败: {error_msg}'})
+        
+        order_result = result.get('data', [{}])[0]
+        order_id = order_result.get('ordId', '')
+        
+        print(f"✅ 加仓成功!")
+        print(f"  订单ID: {order_id}")
+        print(f"  保证金: {margin_amount} USDT")
+        print(f"  数量: {contract_size} 张")
+        print(f"  价格: ${last_price}")
+        
+        return jsonify({
+            'success': True,
+            'message': '加仓成功',
+            'order_id': order_id,
+            'price': last_price,
+            'size': contract_size,
+            'margin': margin_amount
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"❌ 加仓异常: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'加仓异常: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/sub-account/check-and-fix-position', methods=['POST'])
 def check_and_fix_sub_account_position():
     """检查并纠正子账户持仓"""
