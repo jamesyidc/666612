@@ -503,11 +503,29 @@
       "scenario_3": 2,
       "scenario_4": 1,
       "timestamp": "2026-01-02 09:35:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:36:25"
+    },
+    {
+      "top_signal": 2,
+      "bottom_signal": 0,
+      "scenario_1": 0,
+      "scenario_2": 0,
+      "scenario_3": 1,
+      "scenario_4": 1,
+      "timestamp": "2026-01-02 09:37:25"
     }
   ],
   "latest": {
-    "top_signal": 3,
+    "top_signal": 2,
     "bottom_signal": 0,
-    "update_time": "2026-01-02 09:35:25"
+    "update_time": "2026-01-02 09:37:25"
   }
 }
