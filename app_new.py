@@ -6967,6 +6967,7 @@ def api_support_resistance_escape_max_stats():
     """获取逃顶快照数的历史最大值统计"""
     try:
         from datetime import datetime, timedelta
+        import pytz
         
         conn = sqlite3.connect('support_resistance.db')
         cursor = conn.cursor()
@@ -7011,6 +7012,27 @@ def api_support_resistance_escape_max_stats():
         
         conn.close()
         
+        # 保存统计数据到crypto_data.db的escape_snapshot_stats表
+        try:
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            stat_time = datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')
+            
+            crypto_conn = sqlite3.connect('databases/crypto_data.db')
+            crypto_cursor = crypto_conn.cursor()
+            
+            # 插入或更新统计数据（使用REPLACE确保同一时间只有一条记录）
+            crypto_cursor.execute('''
+                INSERT OR REPLACE INTO escape_snapshot_stats 
+                (stat_time, escape_24h_count, escape_2h_count, max_escape_24h, max_escape_2h)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (stat_time, escape_snapshot_count_24h, escape_snapshot_count_2h, 
+                  max_escape_count_24h, max_escape_count_2h))
+            
+            crypto_conn.commit()
+            crypto_conn.close()
+        except Exception as save_error:
+            print(f"⚠️  保存逃顶统计数据失败: {save_error}")
+        
         return jsonify({
             'success': True,
             'stats_24h': {
@@ -7021,6 +7043,81 @@ def api_support_resistance_escape_max_stats():
                 'escape_snapshot_count': escape_snapshot_count_2h,
                 'max_escape_count': max_escape_count_2h
             }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        })
+
+@app.route('/api/support-resistance/escape-stats-history')
+def api_support_resistance_escape_stats_history():
+    """获取逃顶快照统计的历史数据"""
+    try:
+        from datetime import datetime, timedelta
+        
+        # 获取查询参数
+        hours = request.args.get('hours', 24, type=int)  # 默认24小时
+        limit = request.args.get('limit', 1000, type=int)  # 默认最多1000条
+        
+        conn = sqlite3.connect('databases/crypto_data.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 查询历史统计数据
+        if hours > 0:
+            time_ago = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute('''
+                SELECT 
+                    id,
+                    stat_time,
+                    escape_24h_count,
+                    escape_2h_count,
+                    max_escape_24h,
+                    max_escape_2h,
+                    created_at
+                FROM escape_snapshot_stats
+                WHERE stat_time >= ?
+                ORDER BY stat_time DESC
+                LIMIT ?
+            ''', (time_ago, limit))
+        else:
+            cursor.execute('''
+                SELECT 
+                    id,
+                    stat_time,
+                    escape_24h_count,
+                    escape_2h_count,
+                    max_escape_24h,
+                    max_escape_2h,
+                    created_at
+                FROM escape_snapshot_stats
+                ORDER BY stat_time DESC
+                LIMIT ?
+            ''', (limit,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        history = []
+        for row in rows:
+            history.append({
+                'id': row['id'],
+                'stat_time': row['stat_time'],
+                'escape_24h_count': row['escape_24h_count'],
+                'escape_2h_count': row['escape_2h_count'],
+                'max_escape_24h': row['max_escape_24h'],
+                'max_escape_2h': row['max_escape_2h'],
+                'created_at': row['created_at']
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': history,
+            'count': len(history)
         })
         
     except Exception as e:
