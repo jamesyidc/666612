@@ -91,5 +91,11 @@
     "inst_id": "LINK-USDT-SWAP",
     "pos_side": "short",
     "opened_at": "2026-01-02 05:32:36"
+  },
+  "Wu666666:TAO-USDT-SWAP:short": {
+    "account_name": "Wu666666",
+    "inst_id": "TAO-USDT-SWAP",
+    "pos_side": "short",
+    "opened_at": "2026-01-02 05:53:47"
   }
 }

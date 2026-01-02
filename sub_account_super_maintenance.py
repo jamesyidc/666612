@@ -262,6 +262,22 @@ def main_loop():
                 
                 log(f"  检查 {inst_id} {pos_side}: 收益率 {profit_rate:.2f}%")
                 
+                # 检查超级维护开关
+                try:
+                    with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                    
+                    if pos_side == 'short':
+                        if not config.get('super_maintain_short_enabled', False):
+                            log(f"    ⏭️  空单超级维护未启用，跳过")
+                            continue
+                    elif pos_side == 'long':
+                        if not config.get('super_maintain_long_enabled', False):
+                            log(f"    ⏭️  多单超级维护未启用，跳过")
+                            continue
+                except Exception as e:
+                    log(f"    ⚠️  检查超级维护开关失败: {e}")
+                
                 # 跳过黑名单中的币种
                 if inst_id in SKIP_INSTRUMENTS:
                     log(f"    ⏭️  已跳过（在黑名单中）")
