@@ -25,65 +25,27 @@ def log(message):
 def get_market_strength():
     """从API获取市场强度等级"""
     try:
-        # 获取下跌强度等级
-        response = requests.get('http://localhost:5000/api/anchor/decline-strength', timeout=5)
+        # 使用新的综合市场强度API
+        response = requests.get('http://localhost:5000/api/anchor/market-strength', timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                decline_level = data.get('level', 0)
-                log(f"📊 下跌强度等级: {decline_level}")
+                strength_data = data.get('data', {})
+                decline_level = strength_data.get('decline_strength', {}).get('level', 0)
+                rise_level = strength_data.get('rise_strength', {}).get('level', 0)
+                
+                log(f"📊 市场强度 - 下跌等级: {decline_level}, 上涨强度: {rise_level}")
+                
+                return {
+                    'decline_level': decline_level,
+                    'rise_level': rise_level
+                }
             else:
-                decline_level = 0
-                log("⚠️ 获取下跌强度失败，使用默认值0")
+                log("⚠️ 获取市场强度失败，使用默认值0")
+                return {'decline_level': 0, 'rise_level': 0}
         else:
-            decline_level = 0
-            log(f"⚠️ 下跌强度API返回异常状态码: {response.status_code}")
-        
-        # 获取上涨强度等级（通过多单盈利计算）
-        # 我们需要从持仓数据中获取多单盈利情况来计算上涨强度
-        # 这里调用锚点系统的持仓API
-        response = requests.get('http://localhost:5000/api/anchor-system/current-positions?trade_mode=real', timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('success'):
-                positions = data.get('positions', [])
-                # 统计多单盈利情况
-                long_positions = [p for p in positions if p.get('pos_side') == 'long']
-                
-                # 计算上涨强度等级（基于多单盈利数量和收益率）
-                profit_100_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 100)
-                profit_90_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 90)
-                profit_80_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 80)
-                profit_70_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 70)
-                profit_60_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 60)
-                profit_40_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 40)
-                
-                # 上涨强度等级判定逻辑（与下跌强度相同，但基于多单盈利）
-                if profit_100_plus >= 1 and profit_40_plus > 10:
-                    rise_level = 5  # 极端上涨
-                elif profit_100_plus == 0 and profit_90_plus >= 1 and profit_80_plus >= 1 and profit_40_plus > 10:
-                    rise_level = 4  # 超高强度上涨
-                elif profit_100_plus == 0 and profit_90_plus == 0 and profit_80_plus == 0 and profit_70_plus >= 1 and profit_60_plus >= 2 and profit_40_plus > 8:
-                    rise_level = 3  # 高强度上涨
-                elif profit_100_plus == 0 and profit_90_plus == 0 and profit_80_plus == 0 and profit_70_plus == 0 and profit_60_plus >= 2 and profit_40_plus > 5:
-                    rise_level = 2  # 中等强度上涨
-                elif profit_100_plus == 0 and profit_90_plus == 0 and profit_80_plus == 0 and profit_70_plus == 0 and profit_60_plus == 0 and profit_40_plus >= 3:
-                    rise_level = 1  # 轻度上涨
-                else:
-                    rise_level = 0  # 正常
-                
-                log(f"📈 上涨强度等级: {rise_level} (多单盈利≥40%: {profit_40_plus})")
-            else:
-                rise_level = 0
-                log("⚠️ 获取持仓数据失败，上涨强度使用默认值0")
-        else:
-            rise_level = 0
-            log(f"⚠️ 持仓API返回异常状态码: {response.status_code}")
-        
-        return {
-            'decline_level': decline_level,
-            'rise_level': rise_level
-        }
+            log(f"⚠️ 市场强度API返回异常状态码: {response.status_code}")
+            return {'decline_level': 0, 'rise_level': 0}
         
     except requests.Timeout:
         log("⚠️ 获取市场强度超时，使用默认值0")

@@ -19066,6 +19066,135 @@ def get_decline_strength():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor/market-strength', methods=['GET'])
+def get_market_strength():
+    """
+    获取市场强度（包括下跌等级和上涨强度）
+    """
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from anchor_system import get_positions_from_okex
+        
+        # 获取实盘持仓
+        raw_positions = get_positions_from_okex()
+        
+        # 统计空单盈利情况（用于计算下跌强度）
+        short_profits = []
+        # 统计多单亏损情况（用于计算上涨强度）
+        long_losses = []
+        
+        for pos in raw_positions:
+            pos_side = pos.get('posSide')
+            profit_rate = float(pos.get('uplRatio', 0)) * 100  # 转换为百分比
+            
+            if pos_side == 'short':
+                short_profits.append({
+                    'inst_id': pos.get('instId'),
+                    'profit_rate': profit_rate,
+                    'margin': float(pos.get('margin', 0)),
+                    'upl': float(pos.get('upl', 0))
+                })
+            elif pos_side == 'long' and profit_rate < -10:  # 多单亏损超过10%
+                long_losses.append({
+                    'inst_id': pos.get('instId'),
+                    'profit_rate': profit_rate,
+                    'margin': float(pos.get('margin', 0)),
+                    'upl': float(pos.get('upl', 0))
+                })
+        
+        # ========== 计算下跌强度等级 ==========
+        count_100 = len([p for p in short_profits if p['profit_rate'] >= 100])
+        count_90 = len([p for p in short_profits if p['profit_rate'] >= 90])
+        count_80 = len([p for p in short_profits if p['profit_rate'] >= 80])
+        count_70 = len([p for p in short_profits if p['profit_rate'] >= 70])
+        count_60 = len([p for p in short_profits if p['profit_rate'] >= 60])
+        count_50 = len([p for p in short_profits if p['profit_rate'] >= 50])
+        count_40 = len([p for p in short_profits if p['profit_rate'] >= 40])
+        
+        decline_level = 0
+        decline_name = '市场正常'
+        
+        if len(short_profits) == 0:
+            decline_level = 0
+            decline_name = '市场正常'
+        elif count_100 >= 1:
+            decline_level = 5
+            decline_name = '下跌等级5 - 极端下跌'
+        elif count_100 == 0 and count_90 >= 1 and count_80 >= 1:
+            decline_level = 4
+            decline_name = '下跌等级4 - 超高强度下跌'
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 >= 1 and count_60 >= 2:
+            decline_level = 3
+            decline_name = '下跌等级3 - 高强度下跌'
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 >= 2:
+            decline_level = 2
+            decline_name = '下跌等级2 - 中等强度下跌'
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 >= 3:
+            decline_level = 1
+            decline_name = '下跌等级1 - 轻微下跌'
+        else:
+            decline_level = 0
+            decline_name = '市场正常'
+        
+        # ========== 计算上涨强度等级（基于空单亏损数量）==========
+        short_loss_count = len([p for p in raw_positions if p.get('posSide') == 'short' and float(p.get('uplRatio', 0)) * 100 < -10])
+        
+        rise_level = 0
+        rise_name = '市场正常'
+        
+        if short_loss_count >= 10:
+            rise_level = 5
+            rise_name = '上涨强度5级 - 极端逼空阶段'
+        elif short_loss_count >= 8:
+            rise_level = 4
+            rise_name = '上涨强度4级 - 加速赶顶'
+        elif short_loss_count >= 5:
+            rise_level = 3
+            rise_name = '上涨强度3级 - 阶段性加速'
+        elif short_loss_count >= 4:
+            rise_level = 2
+            rise_name = '上涨强度2级 - 加速阶段'
+        elif short_loss_count >= 2:
+            rise_level = 1
+            rise_name = '上涨强度1级 - 起涨阶段'
+        else:
+            rise_level = 0
+            rise_name = '市场正常'
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'decline_strength': {
+                    'level': decline_level,
+                    'name': decline_name,
+                    'statistics': {
+                        'total_shorts': len(short_profits),
+                        'profit_100': count_100,
+                        'profit_90': count_90,
+                        'profit_80': count_80,
+                        'profit_70': count_70,
+                        'profit_60': count_60,
+                        'profit_50': count_50,
+                        'profit_40': count_40
+                    }
+                },
+                'rise_strength': {
+                    'level': rise_level,
+                    'name': rise_name,
+                    'short_loss_count': short_loss_count
+                }
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'message': f'获取市场强度失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/test-positions')
 def test_positions_page():
     """持仓数据测试页面"""
