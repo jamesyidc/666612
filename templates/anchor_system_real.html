@@ -892,6 +892,10 @@
                             <span>📊 跟多单亏损开单</span>
                         </label>
                         <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="protectPairs" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🛡️ 保护交易对</span>
+                        </label>
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
                             <input type="checkbox" id="subSuperMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>🚀 超级维护多单-10%</span>
                         </label>
@@ -989,6 +993,7 @@
                         // 设置开关状态
                         document.getElementById('followShortLoss').checked = config.follow_short_loss_enabled || false;
                         document.getElementById('followLongLoss').checked = config.follow_long_loss_enabled || false;
+                        document.getElementById('protectPairs').checked = config.protect_pairs_enabled || false;
                         document.getElementById('subSuperMaintainLong').checked = config.super_maintain_long_enabled || false;
                         document.getElementById('subSuperMaintainShort').checked = config.super_maintain_short_enabled || false;
                         console.log('✅ 子账户配置已加载:', config);
@@ -2637,6 +2642,36 @@
                     const data = await response.json();
                     if (data.success) {
                         alert(enabled ? '📊 跟多单亏损开单已开启' : '❌ 跟多单亏损开单已关闭');
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                }
+            });
+            
+            // 保护交易对开关
+            document.getElementById('protectPairs').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`🛡️ 保护交易对: ${enabled ? '开启' : '关闭'}`);
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            protect_pairs_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '🛡️ 交易对保护已开启\n\n系统将每分钟检查主账户交易对数量，如发现交易对减少，将自动补1U保证金仓位' : '❌ 交易对保护已关闭');
                     } else {
                         alert('⚠️ 配置保存失败');
                         e.target.checked = !enabled;

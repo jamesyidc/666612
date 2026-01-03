@@ -18,50 +18,18 @@ def get_china_time():
 def get_market_strength():
     """从API获取市场强度等级"""
     try:
-        # 获取下跌强度等级
-        response = requests.get('http://localhost:5000/api/anchor/decline-strength', timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            decline_level = data.get('level', 0) if data.get('success') else 0
-        else:
-            decline_level = 0
-        
-        # 获取上涨强度等级（基于多单盈利）
-        response = requests.get('http://localhost:5000/api/anchor-system/current-positions?trade_mode=real', timeout=5)
+        # 使用新的综合市场强度API
+        response = requests.get('http://localhost:5000/api/anchor/market-strength', timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                positions = data.get('positions', [])
-                long_positions = [p for p in positions if p.get('pos_side') == 'long']
-                
-                # 计算上涨强度等级
-                profit_100_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 100)
-                profit_90_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 90)
-                profit_80_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 80)
-                profit_70_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 70)
-                profit_60_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 60)
-                profit_40_plus = sum(1 for p in long_positions if p.get('profit_rate', 0) >= 40)
-                
-                if profit_100_plus >= 1 and profit_40_plus > 10:
-                    rise_level = 5
-                elif profit_100_plus == 0 and profit_90_plus >= 1 and profit_80_plus >= 1 and profit_40_plus > 10:
-                    rise_level = 4
-                elif profit_100_plus == 0 and profit_90_plus == 0 and profit_80_plus == 0 and profit_70_plus >= 1 and profit_60_plus >= 2 and profit_40_plus > 8:
-                    rise_level = 3
-                elif profit_100_plus == 0 and profit_90_plus == 0 and profit_80_plus == 0 and profit_70_plus == 0 and profit_60_plus >= 2 and profit_40_plus > 5:
-                    rise_level = 2
-                elif profit_100_plus == 0 and profit_90_plus == 0 and profit_80_plus == 0 and profit_70_plus == 0 and profit_60_plus == 0 and profit_40_plus >= 3:
-                    rise_level = 1
-                else:
-                    rise_level = 0
-            else:
-                rise_level = 0
-        else:
-            rise_level = 0
-        
-        return decline_level, rise_level
-        
-    except:
+                strength_data = data.get('data', {})
+                decline_level = strength_data.get('decline_strength', {}).get('level', 0)
+                rise_level = strength_data.get('rise_strength', {}).get('level', 0)
+                return decline_level, rise_level
+        return 0, 0
+    except Exception as e:
+        print(f"⚠️ 获取市场强度失败: {e}")
         return 0, 0
 
 def record_escape_signal_stats():
