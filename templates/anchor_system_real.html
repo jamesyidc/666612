@@ -356,6 +356,15 @@
     </style>
 </head>
 <body>
+    <!-- 加载提示 -->
+    <div id="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+        <div style="text-align: center; color: white;">
+            <div style="font-size: 48px; margin-bottom: 20px;">⚡</div>
+            <div style="font-size: 24px; font-weight: bold;">加载中...</div>
+            <div style="font-size: 14px; margin-top: 10px; color: #999;">正在并行加载11个API</div>
+        </div>
+    </div>
+    
     <div class="container">
         <!-- 版本检测标记 -->
         <div id="page-version" data-version="2025-12-29-v2" style="display: none;"></div>
@@ -991,70 +1000,74 @@
         // 加载数据
         async function loadData() {
             try {
-                // 加载子账户配置（读取开关状态）
-                try {
-                    const configRes = await fetch('/api/sub-account/config');
-                    const configData = await configRes.json();
-                    
-                    if (configData.success) {
-                        const config = configData.config;
-                        // 设置开关状态
-                        document.getElementById('followShortLoss').checked = config.follow_short_loss_enabled || false;
-                        document.getElementById('followLongLoss').checked = config.follow_long_loss_enabled || false;
-                        document.getElementById('subSuperMaintainLong').checked = config.super_maintain_long_enabled || false;
-                        document.getElementById('subSuperMaintainShort').checked = config.super_maintain_short_enabled || false;
-                        
-                        // 设置极端维护开关状态
-                        document.getElementById('extremeMaintainShortEnabled').checked = config.extreme_maintain_short_enabled || false;
-                        document.getElementById('extremeMaintainLongEnabled').checked = config.extreme_maintain_long_enabled || false;
-                        
-                        // 更新全局变量
-                        window.extremeMaintainShortEnabled = config.extreme_maintain_short_enabled || false;
-                        window.extremeMaintainLongEnabled = config.extreme_maintain_long_enabled || false;
-                        
-                        console.log('✅ 子账户配置已加载:', config);
-                    }
-                } catch (error) {
-                    console.error('加载子账户配置失败:', error);
+                console.time('⚡ 数据加载总耗时');
+                
+                // 🚀 并行加载所有API数据
+                const [
+                    configData,
+                    mainConfigData,
+                    protectConfigData,
+                    statusData,
+                    countData,
+                    monitorsData,
+                    alertsData,
+                    recordsData,
+                    positionsData,
+                    subPositionsData,
+                    warningsData
+                ] = await Promise.all([
+                    fetch('/api/sub-account/config').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/auto-maintenance-config').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/protect-pairs-config').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/status').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/latest').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/monitors?limit=50').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/alerts?limit=10').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/profit-records?trade_mode=real').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/current-positions?trade_mode=real').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/sub-account-positions?trade_mode=real').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/anchor-system/warnings?trade_mode=real').then(r => r.json()).catch(e => ({ success: false, error: e }))
+                ]);
+                
+                console.timeEnd('⚡ 数据加载总耗时');
+                
+                // 处理子账户配置
+                if (configData.success) {
+                    const config = configData.config;
+                    document.getElementById('followShortLoss').checked = config.follow_short_loss_enabled || false;
+                    document.getElementById('followLongLoss').checked = config.follow_long_loss_enabled || false;
+                    document.getElementById('subSuperMaintainLong').checked = config.super_maintain_long_enabled || false;
+                    document.getElementById('subSuperMaintainShort').checked = config.super_maintain_short_enabled || false;
+                    document.getElementById('extremeMaintainShortEnabled').checked = config.extreme_maintain_short_enabled || false;
+                    document.getElementById('extremeMaintainLongEnabled').checked = config.extreme_maintain_long_enabled || false;
+                    window.extremeMaintainShortEnabled = config.extreme_maintain_short_enabled || false;
+                    window.extremeMaintainLongEnabled = config.extreme_maintain_long_enabled || false;
+                    console.log('✅ 子账户配置已加载');
+                } else {
+                    console.error('❌ 加载子账户配置失败:', configData.error);
                 }
                 
-                // 加载主账户自动维护配置
-                try {
-                    const mainConfigRes = await fetch('/api/anchor-system/auto-maintenance-config');
-                    const mainConfigData = await mainConfigRes.json();
-                    
-                    if (mainConfigData.success) {
-                        const config = mainConfigData.config;
-                        // 设置主账户自动维护开关状态
-                        document.getElementById('autoMaintainLong').checked = config.auto_maintain_long_enabled || false;
-                        document.getElementById('autoMaintainShort').checked = config.auto_maintain_short_enabled || false;
-                        document.getElementById('superMaintainLong').checked = config.super_maintain_long_enabled || false;
-                        document.getElementById('superMaintainShort').checked = config.super_maintain_short_enabled || false;
-                        console.log('✅ 主账户自动维护配置已加载:', config);
-                    }
-                } catch (error) {
-                    console.error('加载主账户自动维护配置失败:', error);
+                // 处理主账户自动维护配置
+                if (mainConfigData.success) {
+                    const config = mainConfigData.config;
+                    document.getElementById('autoMaintainLong').checked = config.auto_maintain_long_enabled || false;
+                    document.getElementById('autoMaintainShort').checked = config.auto_maintain_short_enabled || false;
+                    document.getElementById('superMaintainLong').checked = config.super_maintain_long_enabled || false;
+                    document.getElementById('superMaintainShort').checked = config.super_maintain_short_enabled || false;
+                    console.log('✅ 主账户配置已加载');
+                } else {
+                    console.error('❌ 加载主账户配置失败:', mainConfigData.error);
                 }
                 
-                // 加载主账户保护交易对配置
-                try {
-                    const protectConfigRes = await fetch('/api/anchor-system/protect-pairs-config');
-                    const protectConfigData = await protectConfigRes.json();
-                    
-                    if (protectConfigData.success) {
-                        const config = protectConfigData.config;
-                        // 设置保护交易对开关状态
-                        document.getElementById('protectPairsMain').checked = config.enabled || false;
-                        console.log('✅ 保护交易对配置已加载:', config);
-                    }
-                } catch (error) {
-                    console.error('加载保护交易对配置失败:', error);
+                // 处理保护交易对配置
+                if (protectConfigData.success) {
+                    document.getElementById('protectPairsMain').checked = protectConfigData.config.enabled || false;
+                    console.log('✅ 保护交易对配置已加载');
+                } else {
+                    console.error('❌ 加载保护交易对配置失败:', protectConfigData.error);
                 }
                 
-                // 加载状态
-                const statusRes = await fetch('/api/anchor-system/status');
-                const statusData = await statusRes.json();
-                
+                // 处理状态数据
                 if (statusData.success) {
                     document.getElementById('totalMonitors').textContent = statusData.status.total_monitors;
                     document.getElementById('totalAlerts').textContent = statusData.status.total_alerts;
@@ -1062,55 +1075,35 @@
                     document.getElementById('lossLimit').textContent = statusData.status.config.loss_limit + '%';
                 }
 
-                // 加载最新计次数据
-                const countRes = await fetch('/api/latest');
-                const countData = await countRes.json();
-                
+                // 处理计次数据
                 if (countData && countData.count !== undefined) {
                     document.getElementById('currentCount').textContent = countData.count;
-                    console.log('✅ 计次数据加载:', countData.count);
                 } else {
                     document.getElementById('currentCount').textContent = '0';
                 }
 
-                // 加载监控记录
-                const monitorsRes = await fetch('/api/anchor-system/monitors?limit=50');
-                const monitorsData = await monitorsRes.json();
-                
+                // 处理监控记录
                 if (monitorsData.success) {
                     renderMonitorTable(monitorsData.data);
                     renderProfitChart(monitorsData.data);
                 }
 
-                // 加载告警记录
-                const alertsRes = await fetch('/api/anchor-system/alerts?limit=10');
-                const alertsData = await alertsRes.json();
-                
+                // 处理告警记录
                 if (alertsData.success) {
                     renderAlerts(alertsData.data);
                 }
 
-                // 加载历史极值记录（实盘）
-                const recordsRes = await fetch('/api/anchor-system/profit-records?trade_mode=real');
-                const recordsData = await recordsRes.json();
-                
-                console.log('📊 历史极值记录数据:', recordsData);
-                console.log('📊 记录数量:', recordsData.records ? recordsData.records.length : 0);
-                
+                // 处理历史极值记录
                 if (recordsData.success) {
                     renderRecordsTable(recordsData.records);
                 } else {
                     console.error('❌ 历史极值记录加载失败:', recordsData);
                 }
 
-                // 加载当前持仓情况（实盘模式）
-                const positionsRes = await fetch('/api/anchor-system/current-positions?trade_mode=real');
-                const positionsData = await positionsRes.json();
-                
+                // 处理主账户持仓
                 if (positionsData.success) {
                     renderCurrentPositions(positionsData.positions);
                     
-                    // 更新主账户持仓摘要
                     const mainPositions = positionsData.positions || [];
                     const longCount = mainPositions.filter(p => p.pos_side === 'long').length;
                     const shortCount = mainPositions.filter(p => p.pos_side === 'short').length;
@@ -1119,7 +1112,6 @@
                     document.getElementById('mainLongCount').textContent = longCount;
                     document.getElementById('mainShortCount').textContent = shortCount;
                     
-                    // 计算主账户盈亏
                     const mainUpl = mainPositions.reduce((sum, p) => sum + (parseFloat(p.upl) || 0), 0);
                     const mainTotalProfitRate = mainPositions.reduce((sum, p) => sum + (parseFloat(p.profit_rate) || 0), 0);
                     const mainAvgRate = mainPositions.length > 0 ? (mainTotalProfitRate / mainPositions.length) : 0;
@@ -1132,16 +1124,10 @@
                         (mainAvgRate >= 0 ? '+' : '') + mainAvgRate.toFixed(2) + '%';
                 }
 
-                // 加载子账户持仓情况（实盘模式）
-                const subPositionsRes = await fetch('/api/anchor-system/sub-account-positions?trade_mode=real');
-                const subPositionsData = await subPositionsRes.json();
-                
-                console.log('👥 子账户持仓数据:', subPositionsData);
-                
+                // 处理子账户持仓
                 if (subPositionsData.success) {
                     renderSubAccountPositions(subPositionsData.positions);
                     
-                    // 更新子账户持仓摘要
                     const subPositions = subPositionsData.positions || [];
                     const subAccounts = [...new Set(subPositions.map(p => p.account_name))];
                     
@@ -1151,7 +1137,6 @@
                     document.getElementById('subAccountPositionTime').textContent = 
                         `最后更新: ${new Date().toLocaleString('zh-CN')}`;
                     
-                    // 计算子账户盈亏
                     const subUpl = subPositions.reduce((sum, p) => sum + (parseFloat(p.upl) || 0), 0);
                     const subTotalProfitRate = subPositions.reduce((sum, p) => sum + (parseFloat(p.profit_rate) || 0), 0);
                     const subAvgRate = subPositions.length > 0 ? (subTotalProfitRate / subPositions.length) : 0;
@@ -1164,12 +1149,7 @@
                         (subAvgRate >= 0 ? '+' : '') + subAvgRate.toFixed(2) + '%';
                 }
 
-                // 加载当前预警（实盘模式）
-                const warningsRes = await fetch('/api/anchor-system/warnings?trade_mode=real');
-                const warningsData = await warningsRes.json();
-                
-                console.log('🚨 预警数据加载:', warningsData);
-                
+                // 处理预警数据
                 if (warningsData.success) {
                     renderWarnings(warningsData.warnings);
                 }
@@ -1180,9 +1160,20 @@
                     `最后更新: ${now.toLocaleString('zh-CN')}`;
                 document.getElementById('currentPositionTime').textContent = 
                     `最后更新: ${now.toLocaleString('zh-CN')}`;
+                
+                // 隐藏加载提示
+                const loadingOverlay = document.getElementById('loading-overlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
 
             } catch (error) {
-                console.error('加载数据失败:', error);
+                console.error('❌ 加载数据失败:', error);
+                // 即使出错也隐藏加载提示
+                const loadingOverlay = document.getElementById('loading-overlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
             }
         }
 
