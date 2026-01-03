@@ -19140,7 +19140,8 @@ def get_market_strength():
             decline_name = '市场正常'
         
         # ========== 计算上涨强度等级（基于空单亏损数量）==========
-        short_loss_count = len([p for p in raw_positions if p.get('posSide') == 'short' and float(p.get('uplRatio', 0)) * 100 < -10])
+        # 注意：这里统计所有亏损的空单（profit_rate < 0），与前端逻辑保持一致
+        short_loss_count = len([p for p in raw_positions if p.get('posSide') == 'short' and float(p.get('uplRatio', 0)) * 100 < 0])
         
         rise_level = 0
         rise_name = '市场正常'
