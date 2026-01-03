@@ -24,7 +24,7 @@
     "enabled": true
   },
   "super_maintain_long_enabled": false,
-  "super_maintain_short_enabled": true,
-  "follow_short_loss_enabled": true,
-  "follow_long_loss_enabled": true
+  "super_maintain_short_enabled": false,
+  "follow_short_loss_enabled": false,
+  "follow_long_loss_enabled": false
 }

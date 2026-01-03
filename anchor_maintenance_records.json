@@ -19,9 +19,9 @@
     "inst_id": "FIL-USDT-SWAP",
     "pos_side": "short",
     "today_count": 1,
-    "total_count": 7,
-    "last_maintenance": "2026-01-02 00:16:02",
-    "date": "2026-01-02",
+    "total_count": 8,
+    "last_maintenance": "2026-01-03 10:01:02",
+    "date": "2026-01-03",
     "last_reset": "2026-01-01 15:54:58"
   },
   "BCH-USDT-SWAP_long": {

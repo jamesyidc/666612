@@ -1,6 +1,6 @@
 {
-  "auto_maintain_long_enabled": true,
-  "auto_maintain_short_enabled": true,
+  "auto_maintain_long_enabled": false,
+  "auto_maintain_short_enabled": false,
   "super_maintain_long_enabled": false,
   "super_maintain_short_enabled": false,
   "loss_threshold": -10,

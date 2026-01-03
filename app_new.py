@@ -7206,6 +7206,8 @@ def api_support_resistance_escape_stats_history():
                     stat_time,
                     signal_24h_count,
                     signal_2h_count,
+                    decline_strength_level,
+                    rise_strength_level,
                     created_at
                 FROM escape_signal_stats
                 WHERE stat_time >= ?
@@ -7219,6 +7221,8 @@ def api_support_resistance_escape_stats_history():
                     stat_time,
                     signal_24h_count,
                     signal_2h_count,
+                    decline_strength_level,
+                    rise_strength_level,
                     created_at
                 FROM escape_signal_stats
                 ORDER BY stat_time DESC
@@ -7235,6 +7239,8 @@ def api_support_resistance_escape_stats_history():
                 'stat_time': row['stat_time'],
                 'signal_24h_count': row['signal_24h_count'],
                 'signal_2h_count': row['signal_2h_count'],
+                'decline_strength_level': row['decline_strength_level'],
+                'rise_strength_level': row['rise_strength_level'],
                 'created_at': row['created_at']
             })
         

@@ -346,6 +346,8 @@
                         <th>记录时间</th>
                         <th>24小时信号数</th>
                         <th>2小时信号数</th>
+                        <th>下跌强度</th>
+                        <th>上涨强度</th>
                         <th>状态</th>
                     </tr>
                 </thead>
@@ -396,7 +398,7 @@
         // 渲染数据
         function renderData(data) {
             if (data.length === 0) {
-                document.getElementById('tableBody').innerHTML = '<tr><td colspan="4" style="text-align: center;">暂无数据</td></tr>';
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align: center;">暂无数据</td></tr>';
                 document.getElementById('dataTable').style.display = 'table';
                 return;
             }
@@ -421,11 +423,41 @@
                 const status2h = row.signal_2h_count >= 10 ? 'badge-high' : 
                                  row.signal_2h_count >= 5 ? 'badge-medium' : 'badge-normal';
                 
+                // 市场强度等级显示
+                const declineLevel = row.decline_strength_level || 0;
+                const riseLevel = row.rise_strength_level || 0;
+                
+                // 下跌强度颜色和文字
+                const declineColor = declineLevel >= 5 ? '#dc2626' : 
+                                    declineLevel >= 3 ? '#f97316' : 
+                                    declineLevel >= 1 ? '#fbbf24' : '#9ca3af';
+                const declineText = declineLevel >= 5 ? '极端' : 
+                                   declineLevel >= 4 ? '超高' : 
+                                   declineLevel >= 3 ? '高' : 
+                                   declineLevel >= 2 ? '中' : 
+                                   declineLevel >= 1 ? '低' : '正常';
+                
+                // 上涨强度颜色和文字
+                const riseColor = riseLevel >= 5 ? '#dc2626' : 
+                                 riseLevel >= 3 ? '#f97316' : 
+                                 riseLevel >= 1 ? '#fbbf24' : '#9ca3af';
+                const riseText = riseLevel >= 5 ? '极端' : 
+                                riseLevel >= 4 ? '超高' : 
+                                riseLevel >= 3 ? '高' : 
+                                riseLevel >= 2 ? '中' : 
+                                riseLevel >= 1 ? '低' : '正常';
+                
                 return `
                     <tr>
                         <td>${row.stat_time}</td>
                         <td><strong>${row.signal_24h_count}</strong> 个信号</td>
                         <td><strong>${row.signal_2h_count}</strong> 个信号</td>
+                        <td style="color: ${declineColor}; font-weight: 700; font-size: 16px;">
+                            ${declineLevel >= 1 ? '📉 ' : ''}${declineLevel}级 ${declineText}
+                        </td>
+                        <td style="color: ${riseColor}; font-weight: 700; font-size: 16px;">
+                            ${riseLevel >= 1 ? '📈 ' : ''}${riseLevel}级 ${riseText}
+                        </td>
                         <td>
                             <span class="badge ${status24h}">24H: ${getStatusText(row.signal_24h_count)}</span>
                             <span class="badge ${status2h}">2H: ${getStatusText(row.signal_2h_count)}</span>

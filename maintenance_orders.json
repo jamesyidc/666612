@@ -1554,5 +1554,15 @@
     "date": "2026-01-02",
     "type": "auto_maintenance",
     "success": true
+  },
+  {
+    "id": 32,
+    "account_name": "AUTO_DAEMON",
+    "inst_id": "FIL-USDT-SWAP",
+    "pos_side": "short",
+    "timestamp": "2026-01-03 10:01:02",
+    "date": "2026-01-03",
+    "type": "auto_maintenance",
+    "success": true
   }
 ]
