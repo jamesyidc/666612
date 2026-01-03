@@ -19353,5 +19353,251 @@ def api_signal_monitor_history():
             'message': str(e)
         })
 
+@app.route('/api/sub-account/extreme-maintain', methods=['POST'])
+def extreme_maintain_sub_account():
+    """极端行情维护：见顶/见底维护
+    - 做空见顶维护：亏损≥60%加10U（第1次），亏损≥80%再加10U（第2次）
+    - 做多见底维护：亏损≥60%加10U（第1次），亏损≥80%再加10U（第2次）
+    - 最多维护2次
+    """
+    try:
+        import requests
+        import hmac
+        import base64
+        import hashlib
+        import json as json_lib
+        from datetime import datetime, timezone
+        import sqlite3
+        
+        data = request.get_json()
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        profit_rate = float(data.get('profit_rate', 0))
+        maintain_amount = float(data.get('maintain_amount', 10))
+        
+        extreme_type = '见顶' if pos_side == 'short' else '见底'
+        print(f"📉 {extreme_type}维护: {account_name} - {inst_id} {pos_side}, 亏损率={profit_rate:.2f}%, 维护金额={maintain_amount}U")
+        
+        # 检查是否满足维护条件
+        if profit_rate > -60:
+            return jsonify({
+                'success': False,
+                'message': f'不满足{extreme_type}维护条件：当前亏损{profit_rate:.2f}%，需≤-60%'
+            })
+        
+        # 读取子账户配置
+        try:
+            with open('sub_account_config.json', 'r', encoding='utf-8') as f:
+                config_data = json_lib.load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'message': '子账户配置文件不存在'})
+        
+        # 找到对应的子账户
+        sub_account = None
+        for acc in config_data.get('sub_accounts', []):
+            if acc.get('account_name') == account_name:
+                sub_account = acc
+                break
+        
+        if not sub_account:
+            return jsonify({'success': False, 'message': f'未找到子账户: {account_name}'})
+        
+        api_key = sub_account.get('api_key', '')
+        secret_key = sub_account.get('secret_key', '')
+        passphrase = sub_account.get('passphrase', '')
+        
+        OKEX_REST_URL = 'https://www.okx.com'
+        
+        # 查询数据库，获取该持仓的极端维护次数
+        try:
+            conn = sqlite3.connect('trading_decision.db')
+            cursor = conn.cursor()
+            
+            # 创建表（如果不存在）
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sub_account_extreme_maintenance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_name TEXT NOT NULL,
+                    inst_id TEXT NOT NULL,
+                    pos_side TEXT NOT NULL,
+                    maintain_times INTEGER DEFAULT 0,
+                    total_amount REAL DEFAULT 0,
+                    last_maintain_time TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(account_name, inst_id, pos_side)
+                )
+            ''')
+            
+            # 查询当前维护次数
+            cursor.execute('''
+                SELECT maintain_times, total_amount FROM sub_account_extreme_maintenance
+                WHERE account_name = ? AND inst_id = ? AND pos_side = ?
+            ''', (account_name, inst_id, pos_side))
+            
+            row = cursor.fetchone()
+            current_maintain_times = row[0] if row else 0
+            total_maintained = row[1] if row else 0
+            
+            # 检查是否已达到最大维护次数
+            if current_maintain_times >= 2:
+                conn.close()
+                return jsonify({
+                    'success': False,
+                    'message': f'已达到最大维护次数（2次），当前已维护{current_maintain_times}次，共{total_maintained}U'
+                })
+            
+            conn.close()
+            
+        except Exception as e:
+            print(f"❌ 数据库查询失败: {e}")
+            return jsonify({'success': False, 'message': f'数据库查询失败: {str(e)}'})
+        
+        # 获取当前持仓信息
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "GET"
+        request_path = f"/api/v5/account/positions?instType=SWAP&instId={inst_id}"
+        
+        prehash = timestamp + method + request_path
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(OKEX_REST_URL + request_path, headers=headers, timeout=10)
+        positions_data = response.json()
+        
+        if positions_data.get('code') != '0':
+            return jsonify({'success': False, 'message': f'获取持仓失败: {positions_data.get("msg")}'})
+        
+        # 找到对应持仓
+        target_position = None
+        for pos in positions_data.get('data', []):
+            if pos.get('instId') == inst_id and pos.get('posSide') == pos_side:
+                pos_value = float(pos.get('pos', 0))
+                if abs(pos_value) > 0:
+                    target_position = pos
+                    break
+        
+        if not target_position:
+            return jsonify({'success': False, 'message': '未找到对应持仓'})
+        
+        mark_price = float(target_position.get('markPx', 0))
+        if mark_price <= 0:
+            return jsonify({'success': False, 'message': '无法获取有效的标记价格'})
+        
+        # 计算需要加仓的张数
+        # 每张合约价值 = 标记价格 / 杠杆
+        leverage = int(target_position.get('lever', 10))
+        contract_value = mark_price / leverage
+        add_size = int(maintain_amount / contract_value)
+        
+        if add_size <= 0:
+            return jsonify({'success': False, 'message': '计算加仓数量失败'})
+        
+        print(f"   计算加仓: 标记价格={mark_price}, 杠杆={leverage}, 合约价值={contract_value:.4f}, 加仓数量={add_size}张")
+        
+        # 执行加仓操作
+        timestamp = datetime.utcnow().isoformat("T", "milliseconds") + "Z"
+        method = "POST"
+        request_path = "/api/v5/trade/order"
+        
+        # 决定订单方向
+        if pos_side == 'short':
+            side = 'sell'  # 做空加仓=卖出
+        else:
+            side = 'buy'  # 做多加仓=买入
+        
+        order_data = {
+            "instId": inst_id,
+            "tdMode": "isolated",  # 逐仓
+            "side": side,
+            "posSide": pos_side,
+            "ordType": "market",  # 市价单
+            "sz": str(add_size)
+        }
+        
+        body = json_lib.dumps(order_data)
+        prehash = timestamp + method + request_path + body
+        signature = base64.b64encode(
+            hmac.new(secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
+        ).decode()
+        
+        headers = {
+            "OK-ACCESS-KEY": api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": timestamp,
+            "OK-ACCESS-PASSPHRASE": passphrase,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(OKEX_REST_URL + request_path, headers=headers, json=order_data, timeout=10)
+        order_result = response.json()
+        
+        if order_result.get('code') != '0':
+            return jsonify({'success': False, 'message': f'加仓失败: {order_result.get("msg")}'})
+        
+        order_id = order_result.get('data', [{}])[0].get('ordId', '')
+        
+        # 更新数据库维护记录
+        try:
+            conn = sqlite3.connect('trading_decision.db')
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT OR REPLACE INTO sub_account_extreme_maintenance
+                (account_name, inst_id, pos_side, maintain_times, total_amount, last_maintain_time)
+                VALUES (?, ?, ?, 
+                    COALESCE((SELECT maintain_times FROM sub_account_extreme_maintenance 
+                              WHERE account_name = ? AND inst_id = ? AND pos_side = ?), 0) + 1,
+                    COALESCE((SELECT total_amount FROM sub_account_extreme_maintenance 
+                              WHERE account_name = ? AND inst_id = ? AND pos_side = ?), 0) + ?,
+                    datetime('now', 'localtime')
+                )
+            ''', (account_name, inst_id, pos_side,
+                  account_name, inst_id, pos_side,
+                  account_name, inst_id, pos_side, maintain_amount))
+            
+            conn.commit()
+            new_maintain_times = current_maintain_times + 1
+            conn.close()
+            
+            print(f"   ✅ {extreme_type}维护成功：加仓{add_size}张，维护次数{new_maintain_times}/2")
+            
+            return jsonify({
+                'success': True,
+                'message': f'{extreme_type}维护成功',
+                'order_id': order_id,
+                'add_size': add_size,
+                'maintain_times': new_maintain_times,
+                'maintain_amount': maintain_amount
+            })
+            
+        except Exception as e:
+            print(f"❌ 更新维护记录失败: {e}")
+            return jsonify({
+                'success': True,
+                'message': f'加仓成功但更新记录失败: {str(e)}',
+                'order_id': order_id,
+                'add_size': add_size
+            })
+        
+    except Exception as e:
+        import traceback
+        print(f"❌ 极端维护失败: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

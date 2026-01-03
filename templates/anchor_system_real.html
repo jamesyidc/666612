@@ -2174,6 +2174,18 @@
                                     style="padding: 5px 10px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
                                 🔧 维护
                             </button>
+                            ${item.pos_side === 'short' ? `
+                            <button onclick="extremeMaintainSubAccount('${item.account_name}', '${item.inst_id}', 'short', ${item.profit_rate || 0})" 
+                                    style="padding: 5px 10px; background: #dc2626; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                📉 见顶维护
+                            </button>
+                            ` : ''}
+                            ${item.pos_side === 'long' ? `
+                            <button onclick="extremeMaintainSubAccount('${item.account_name}', '${item.inst_id}', 'long', ${item.profit_rate || 0})" 
+                                    style="padding: 5px 10px; background: #059669; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                                📈 见底维护
+                            </button>
+                            ` : ''}
                             <button onclick="showAddPositionDialog('${item.account_name}', '${item.inst_id}', '${item.pos_side}')" 
                                     style="padding: 5px 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
                                 ➕ 加仓
@@ -2790,6 +2802,76 @@
                 } catch (error) {
                     console.error('维护失败:', error);
                     alert(`❌ 维护失败：${error.message}`);
+                }
+            }
+            
+            // 极端行情维护：见顶/见底维护
+            async function extremeMaintainSubAccount(accountName, instId, posSide, profitRate) {
+                const direction = posSide === 'short' ? '做空' : '做多';
+                const extremeType = posSide === 'short' ? '见顶' : '见底';
+                
+                // 判断是否满足维护条件
+                if (posSide === 'short' && profitRate >= -60) {
+                    alert(`❌ ${extremeType}维护条件不满足\n\n当前亏损: ${profitRate.toFixed(2)}%\n需要亏损 ≤ -60% 才能触发维护`);
+                    return;
+                }
+                if (posSide === 'long' && profitRate >= -60) {
+                    alert(`❌ ${extremeType}维护条件不满足\n\n当前亏损: ${profitRate.toFixed(2)}%\n需要亏损 ≤ -60% 才能触发维护`);
+                    return;
+                }
+                
+                // 确定维护次数和金额
+                let maintainTimes = 0;
+                let maintainAmount = 10;
+                
+                if (profitRate <= -60 && profitRate > -80) {
+                    maintainTimes = 1;
+                    maintainAmount = 10;
+                } else if (profitRate <= -80) {
+                    maintainTimes = 2; // 已经触发过-60%，现在再触发-80%
+                    maintainAmount = 10;
+                }
+                
+                if (!confirm(`确认要执行 ${extremeType}维护吗？\n\n账户: ${accountName}\n币种: ${instId}\n方向: ${direction}\n当前亏损: ${profitRate.toFixed(2)}%\n\n维护规则:\n- 亏损超过60%: 加10U保证金（第1次）\n- 亏损超过80%: 再加10U保证金（第2次）\n- 最多维护2次\n\n本次操作: 加仓 ${maintainAmount}U`)) {
+                    return;
+                }
+                
+                alert('🔄 正在执行' + extremeType + '维护...');
+                
+                try {
+                    const response = await fetch('/api/sub-account/extreme-maintain', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            account_name: accountName,
+                            inst_id: instId,
+                            pos_side: posSide,
+                            profit_rate: profitRate,
+                            maintain_amount: maintainAmount
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        let msg = `✅ ${extremeType}维护成功！\n\n`;
+                        msg += `维护次数: ${data.maintain_times}\n`;
+                        msg += `加仓金额: ${maintainAmount}U\n`;
+                        if (data.order_id) {
+                            msg += `订单ID: ${data.order_id}\n`;
+                        }
+                        if (data.message) {
+                            msg += `\n${data.message}`;
+                        }
+                        alert(msg);
+                        loadData(); // 刷新数据
+                    } else {
+                        alert(`❌ ${extremeType}维护失败：${data.message || '未知错误'}`);
+                    }
+                } catch (error) {
+                    console.error(extremeType + '维护失败:', error);
+                    alert(`❌ ${extremeType}维护失败：${error.message}`);
                 }
             }
             
