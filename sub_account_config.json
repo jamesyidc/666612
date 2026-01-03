@@ -16,7 +16,8 @@
         "buy_amount_usdt": 100,
         "keep_margin_usdt": 10,
         "initial_position_usdt": 10
-      }
+      },
+      "max_positions": 10
     }
   ],
   "main_account": {
@@ -26,5 +27,6 @@
   "super_maintain_long_enabled": false,
   "super_maintain_short_enabled": false,
   "follow_short_loss_enabled": false,
-  "follow_long_loss_enabled": false
+  "follow_long_loss_enabled": false,
+  "default_max_positions": 10
 }

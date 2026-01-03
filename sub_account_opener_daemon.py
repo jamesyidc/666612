@@ -354,6 +354,15 @@ def check_and_open_positions():
             
             print(f"   子账号已有持仓: {len(sub_inst_ids)}个 ({', '.join(sub_inst_ids) if sub_inst_ids else '无'})")
             
+            # 🔥 新增：检查最大持仓数限制
+            max_positions = sub_account.get('max_positions', 10)
+            current_position_count = len(sub_inst_ids)
+            print(f"   持仓限制: {current_position_count}/{max_positions} 个交易对")
+            
+            if current_position_count >= max_positions:
+                print(f"   ⚠️ 子账号 {account_name} 已达到最大持仓限制 ({max_positions}个)，跳过开仓")
+                continue
+            
             # 找出需要开仓的币种
             for main_pos in loss_positions:
                 inst_id = main_pos['inst_id']
@@ -390,6 +399,11 @@ def check_and_open_positions():
                 
                 # 如果子账号没有该仓位
                 if inst_id not in sub_inst_ids:
+                    # 🔥 再次检查是否会超过最大持仓限制
+                    if current_position_count >= max_positions:
+                        print(f"   ⚠️ 持仓已满 ({current_position_count}/{max_positions})，跳过 {inst_id} {pos_side}")
+                        continue
+                    
                     # 检查本地记录，避免重复开仓
                     if is_position_opened(account_name, inst_id, pos_side):
                         print(f"   ✓ {inst_id} {pos_side} 已记录开仓，跳过")
@@ -407,6 +421,10 @@ def check_and_open_positions():
                         print(f"   ✅ 开仓成功: {inst_id} {pos_side} {initial_size}U")
                         # 记录已开仓
                         mark_position_opened(account_name, inst_id, pos_side)
+                        # 更新持仓数统计
+                        sub_inst_ids.add(inst_id)
+                        current_position_count = len(sub_inst_ids)
+                        print(f"   📊 更新后持仓: {current_position_count}/{max_positions} 个交易对")
                     else:
                         print(f"   ❌ 开仓失败: {inst_id} {pos_side}")
                     

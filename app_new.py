@@ -17389,6 +17389,54 @@ def open_sub_account_position():
         secret_key = sub_account['secret_key']
         passphrase = sub_account['passphrase']
         
+        # 检查最大持仓数限制
+        max_positions = sub_account.get('max_positions', 10)  # 默认10个
+        
+        # 获取当前子账户的持仓数（统计不同的inst_id）
+        try:
+            # 使用API获取当前持仓
+            timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            request_path = '/api/v5/account/positions?instType=SWAP'
+            message = timestamp + 'GET' + request_path
+            mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+            signature = base64.b64encode(mac.digest()).decode()
+            
+            headers = {
+                'OK-ACCESS-KEY': api_key,
+                'OK-ACCESS-SIGN': signature,
+                'OK-ACCESS-TIMESTAMP': timestamp,
+                'OK-ACCESS-PASSPHRASE': passphrase,
+                'Content-Type': 'application/json'
+            }
+            
+            positions_url = f'https://www.okx.com{request_path}'
+            positions_response = requests.get(positions_url, headers=headers, timeout=10)
+            positions_result = positions_response.json()
+            
+            if positions_result['code'] == '0':
+                # 统计不同交易对的数量（一个交易对可能有多空两个方向）
+                unique_inst_ids = set()
+                for pos in positions_result.get('data', []):
+                    pos_size = float(pos.get('pos', 0))
+                    if pos_size > 0:  # 只统计有持仓的
+                        unique_inst_ids.add(pos['instId'])
+                
+                current_position_count = len(unique_inst_ids)
+                
+                # 如果当前交易对不在持仓列表中，且已达到上限，则拒绝开仓
+                if inst_id not in unique_inst_ids and current_position_count >= max_positions:
+                    print(f"⚠️ 子账户 {account_name} 已持有 {current_position_count} 个交易对，达到最大限制 {max_positions}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'已达到最大持仓限制（{max_positions}个交易对），当前持有：{current_position_count}个'
+                    })
+                
+                print(f"✅ 持仓检查通过: 当前 {current_position_count}/{max_positions} 个交易对")
+            
+        except Exception as e:
+            print(f"⚠️ 检查持仓数失败: {str(e)}")
+            # 持仓检查失败时继续开仓，避免因检查失败而影响正常交易
+        
         print(f"\n{'='*80}")
         print(f"🚀 子账户开仓")
         print(f"账户: {account_name}")
