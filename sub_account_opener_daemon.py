@@ -106,6 +106,61 @@ def get_main_account_positions():
         print(f"❌ 获取主账号持仓异常: {e}")
         return []
 
+def get_market_strength():
+    """获取市场强度等级（上涨和下跌）"""
+    try:
+        # 获取下跌强度
+        decline_url = f"{MAIN_API_URL}/api/anchor/decline-strength"
+        decline_response = requests.get(decline_url, timeout=10)
+        decline_level = 0
+        
+        if decline_response.status_code == 200:
+            decline_data = decline_response.json()
+            if decline_data.get('success'):
+                decline_level = decline_data.get('data', {}).get('strength_level', 0)
+        
+        # 计算上涨强度（基于多单盈利情况）
+        positions_url = f"{MAIN_API_URL}/api/anchor-system/current-positions"
+        positions_response = requests.get(positions_url, params={'trade_mode': 'real'}, timeout=10)
+        rise_level = 0
+        
+        if positions_response.status_code == 200:
+            pos_data = positions_response.json()
+            if pos_data.get('success'):
+                positions = pos_data.get('positions', [])
+                
+                # 统计多单盈利情况
+                long_profits = [p['profit_rate'] for p in positions if p.get('pos_side') == 'long']
+                
+                if long_profits:
+                    count_100 = len([p for p in long_profits if p >= 100])
+                    count_90 = len([p for p in long_profits if p >= 90])
+                    count_80 = len([p for p in long_profits if p >= 80])
+                    count_70 = len([p for p in long_profits if p >= 70])
+                    count_60 = len([p for p in long_profits if p >= 60])
+                    count_50 = len([p for p in long_profits if p >= 50])
+                    count_40 = len([p for p in long_profits if p >= 40])
+                    
+                    # 判断上涨等级（与下跌等级规则一致）
+                    if count_100 >= 1:
+                        rise_level = 5
+                    elif count_100 == 0 and count_90 >= 1 and count_80 >= 1:
+                        rise_level = 4
+                    elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 >= 1 and count_60 >= 2:
+                        rise_level = 3
+                    elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 >= 2:
+                        rise_level = 2
+                    elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 >= 3:
+                        rise_level = 1
+        
+        return {
+            'decline_level': decline_level,
+            'rise_level': rise_level
+        }
+    except Exception as e:
+        print(f"❌ 获取市场强度异常: {e}")
+        return {'decline_level': 0, 'rise_level': 0}
+
 def get_sub_account_positions(sub_account):
     """获取子账号持仓"""
     try:
@@ -314,6 +369,24 @@ def check_and_open_positions():
                     if not config.get('follow_long_loss_enabled', False):
                         print(f"   ⚠️ 跟多单亏损开单未启用，跳过 {inst_id} {pos_side}")
                         continue
+                
+                # 🔥 新增：检查市场强度等级（需要达到5级才允许开单）
+                market_strength = get_market_strength()
+                
+                if pos_side == 'short':
+                    # 空单亏损需要下跌强度>=5
+                    if market_strength['decline_level'] < 5:
+                        print(f"   ⚠️ 下跌强度等级{market_strength['decline_level']}不足（需要>=5），跳过 {inst_id} {pos_side}")
+                        continue
+                    else:
+                        print(f"   ✅ 下跌强度等级{market_strength['decline_level']}满足条件（>=5）")
+                elif pos_side == 'long':
+                    # 多单亏损需要上涨强度>=5
+                    if market_strength['rise_level'] < 5:
+                        print(f"   ⚠️ 上涨强度等级{market_strength['rise_level']}不足（需要>=5），跳过 {inst_id} {pos_side}")
+                        continue
+                    else:
+                        print(f"   ✅ 上涨强度等级{market_strength['rise_level']}满足条件（>=5）")
                 
                 # 如果子账号没有该仓位
                 if inst_id not in sub_inst_ids:
