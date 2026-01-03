@@ -53,20 +53,23 @@ def record_escape_signal_stats():
         time_24h_ago_str = time_24h_ago.strftime('%Y-%m-%d %H:%M:%S')
         time_2h_ago_str = time_2h_ago.strftime('%Y-%m-%d %H:%M:%S')
         
-        # 统计24小时内的逃顶信号数（scenario_3 + scenario_4的总和）
+        # 统计24小时内的逃顶信号数（满足条件的快照数量）
+        # 条件：scenario_3_count + scenario_4_count >= 5
         sr_cursor.execute('''
-            SELECT COALESCE(SUM(scenario_3_count + scenario_4_count), 0)
+            SELECT COUNT(*)
             FROM support_resistance_snapshots
             WHERE snapshot_time >= ?
+              AND (scenario_3_count + scenario_4_count) >= 5
         ''', (time_24h_ago_str,))
         
         signal_24h = sr_cursor.fetchone()[0]
         
-        # 统计2小时内的逃顶信号数（scenario_3 + scenario_4的总和）
+        # 统计2小时内的逃顶信号数（满足条件的快照数量）
         sr_cursor.execute('''
-            SELECT COALESCE(SUM(scenario_3_count + scenario_4_count), 0)
+            SELECT COUNT(*)
             FROM support_resistance_snapshots
             WHERE snapshot_time >= ?
+              AND (scenario_3_count + scenario_4_count) >= 5
         ''', (time_2h_ago_str,))
         
         signal_2h = sr_cursor.fetchone()[0]

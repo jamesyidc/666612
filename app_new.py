@@ -12924,6 +12924,81 @@ def anchor_auto_maintenance_config():
             'traceback': traceback.format_exc()
         })
 
+@app.route('/api/anchor-system/protect-pairs-config', methods=['GET', 'POST'])
+def anchor_protect_pairs_config():
+    """获取或设置主账户保护交易对配置"""
+    try:
+        import json as json_lib
+        
+        config_file = 'anchor_config.json'
+        
+        if request.method == 'GET':
+            # 读取配置
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+                protect_config = config.get('protect_pairs', {
+                    'enabled': False,
+                    'check_interval': 60,
+                    'min_margin_usdt': 1,
+                    'protected_pairs': []
+                })
+                return jsonify({
+                    'success': True,
+                    'config': protect_config
+                })
+            except FileNotFoundError:
+                return jsonify({
+                    'success': False,
+                    'message': '配置文件不存在'
+                })
+        
+        elif request.method == 'POST':
+            # 更新配置
+            data = request.get_json()
+            
+            # 读取现有配置
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json_lib.load(f)
+            except FileNotFoundError:
+                return jsonify({
+                    'success': False,
+                    'message': '配置文件不存在'
+                })
+            
+            # 获取或创建protect_pairs配置
+            if 'protect_pairs' not in config:
+                config['protect_pairs'] = {
+                    'enabled': False,
+                    'check_interval': 60,
+                    'min_margin_usdt': 1,
+                    'protected_pairs': []
+                }
+            
+            # 更新enabled字段
+            if 'enabled' in data:
+                config['protect_pairs']['enabled'] = data['enabled']
+            
+            # 保存配置
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json_lib.dump(config, f, ensure_ascii=False, indent=2)
+            
+            print(f"✅ 保护交易对配置已更新: {config['protect_pairs']}")
+            
+            return jsonify({
+                'success': True,
+                'message': '配置已更新',
+                'config': config['protect_pairs']
+            })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/anchor-system/check-and-fix-position', methods=['POST'])
 def check_and_fix_anchor_position():
     """检查并纠正主账户（锚点账号）持仓
@@ -15694,8 +15769,6 @@ def sub_account_config_v2():
                 config['follow_short_loss_enabled'] = data['follow_short_loss_enabled']
             if 'follow_long_loss_enabled' in data:
                 config['follow_long_loss_enabled'] = data['follow_long_loss_enabled']
-            if 'protect_pairs_enabled' in data:
-                config['protect_pairs_enabled'] = data['protect_pairs_enabled']
             
             # 保存配置
             with open(config_file, 'w', encoding='utf-8') as f:

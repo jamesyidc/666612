@@ -29,31 +29,31 @@ def log(msg):
     print(f"[{now}] {msg}", flush=True)
 
 def load_config():
-    """加载配置"""
+    """加载主账户配置"""
     try:
-        with open('/home/user/webapp/sub_account_config.json', 'r', encoding='utf-8') as f:
+        with open('/home/user/webapp/anchor_config.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         log(f"❌ 加载配置失败: {e}")
         return None
 
 def save_config(config):
-    """保存配置"""
+    """保存主账户配置"""
     try:
-        with open('/home/user/webapp/sub_account_config.json', 'w', encoding='utf-8') as f:
+        with open('/home/user/webapp/anchor_config.json', 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
         return True
     except Exception as e:
         log(f"❌ 保存配置失败: {e}")
         return False
 
-def load_anchor_config():
-    """加载主账户配置"""
+def load_anchor_credentials():
+    """加载主账户API凭证"""
     try:
-        with open('/home/user/webapp/anchor_config.json', 'r', encoding='utf-8') as f:
+        with open('/home/user/webapp/credentials.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        log(f"❌ 加载主账户配置失败: {e}")
+        log(f"❌ 加载API凭证失败: {e}")
         return None
 
 def sign_request(timestamp, method, request_path, body, secret_key):
@@ -180,18 +180,19 @@ def check_and_protect():
             return
         
         # 检查是否启用
-        if not config.get('protect_pairs_enabled', False):
+        protect_config = config.get('protect_pairs', {})
+        if not protect_config.get('enabled', False):
             return
         
-        # 加载主账户配置
-        anchor_config = load_anchor_config()
-        if not anchor_config:
-            log("❌ 无法加载主账户配置")
+        # 加载主账户API凭证
+        credentials = load_anchor_credentials()
+        if not credentials:
+            log("❌ 无法加载主账户API凭证")
             return
         
-        api_key = anchor_config.get('api_key')
-        secret_key = anchor_config.get('secret_key')
-        passphrase = anchor_config.get('passphrase')
+        api_key = credentials.get('api_key')
+        secret_key = credentials.get('secret_key')
+        passphrase = credentials.get('passphrase')
         
         if not all([api_key, secret_key, passphrase]):
             log("❌ 主账户API配置不完整")
@@ -210,14 +211,13 @@ def check_and_protect():
         
         log(f"📊 当前持仓交易对数量: {len(current_pairs)}")
         
-        # 获取保护配置
-        protect_config = config.get('protect_pairs_config', {})
+        # 获取保护列表
         protected_pairs = set(protect_config.get('protected_pairs', []))
         
         # 如果是第一次运行或保护列表为空，初始化保护列表
         if not protected_pairs:
             protect_config['protected_pairs'] = list(current_pairs)
-            config['protect_pairs_config'] = protect_config
+            config['protect_pairs'] = protect_config
             save_config(config)
             log(f"✅ 初始化保护交易对列表: {len(current_pairs)}个交易对")
             return
@@ -249,7 +249,7 @@ def check_and_protect():
         if new_pairs:
             log(f"📝 发现新交易对，添加到保护列表: {new_pairs}")
             protect_config['protected_pairs'] = list(current_pairs)
-            config['protect_pairs_config'] = protect_config
+            config['protect_pairs'] = protect_config
             save_config(config)
         
     except Exception as e:

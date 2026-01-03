@@ -36,6 +36,13 @@
     "only_short_positions": false,
     "trade_mode": "real"
   },
+  "protect_pairs": {
+    "enabled": false,
+    "check_interval": 60,
+    "min_margin_usdt": 1,
+    "protected_pairs": [],
+    "description": "保护交易对功能：监控主账户交易对数量，自动补仓丢失的交易对"
+  },
   "telegram": {
     "bot_token": "8437045462:AAFePnwdC21cqeWhZISMQHGGgjmroVqE2H0",
     "chat_id": "-1003227444260"

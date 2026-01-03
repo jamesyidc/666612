@@ -837,6 +837,10 @@
                             <input type="checkbox" id="superMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>🚀 超级维护空单-10%</span>
                         </label>
+                        <label style="font-size: 13px; color: #3b82f6; display: flex; align-items: center; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="protectPairsMain" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>🛡️ 保护交易对</span>
+                        </label>
                     </div>
                     <div class="update-time" id="currentPositionTime" style="font-size: 14px; color: #718096;">
                         最后更新: --
@@ -890,10 +894,6 @@
                         <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
                             <input type="checkbox" id="followLongLoss" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>📊 跟多单亏损开单</span>
-                        </label>
-                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
-                            <input type="checkbox" id="protectPairs" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
-                            <span>🛡️ 保护交易对</span>
                         </label>
                         <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
                             <input type="checkbox" id="subSuperMaintainLong" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
@@ -993,7 +993,6 @@
                         // 设置开关状态
                         document.getElementById('followShortLoss').checked = config.follow_short_loss_enabled || false;
                         document.getElementById('followLongLoss').checked = config.follow_long_loss_enabled || false;
-                        document.getElementById('protectPairs').checked = config.protect_pairs_enabled || false;
                         document.getElementById('subSuperMaintainLong').checked = config.super_maintain_long_enabled || false;
                         document.getElementById('subSuperMaintainShort').checked = config.super_maintain_short_enabled || false;
                         console.log('✅ 子账户配置已加载:', config);
@@ -1018,6 +1017,21 @@
                     }
                 } catch (error) {
                     console.error('加载主账户自动维护配置失败:', error);
+                }
+                
+                // 加载主账户保护交易对配置
+                try {
+                    const protectConfigRes = await fetch('/api/anchor-system/protect-pairs-config');
+                    const protectConfigData = await protectConfigRes.json();
+                    
+                    if (protectConfigData.success) {
+                        const config = protectConfigData.config;
+                        // 设置保护交易对开关状态
+                        document.getElementById('protectPairsMain').checked = config.enabled || false;
+                        console.log('✅ 保护交易对配置已加载:', config);
+                    }
+                } catch (error) {
+                    console.error('加载保护交易对配置失败:', error);
                 }
                 
                 // 加载状态
@@ -2654,18 +2668,19 @@
             });
             
             // 保护交易对开关
-            document.getElementById('protectPairs').addEventListener('change', async function(e) {
+            // 保护交易对开关（主账户）
+            document.getElementById('protectPairsMain').addEventListener('change', async function(e) {
                 const enabled = e.target.checked;
                 console.log(`🛡️ 保护交易对: ${enabled ? '开启' : '关闭'}`);
                 
                 try {
-                    const response = await fetch('/api/sub-account/config', {
+                    const response = await fetch('/api/anchor-system/protect-pairs-config', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            protect_pairs_enabled: enabled
+                            enabled: enabled
                         })
                     });
                     
