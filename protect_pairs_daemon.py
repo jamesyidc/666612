@@ -50,8 +50,16 @@ def save_config(config):
 def load_anchor_credentials():
     """加载主账户API凭证"""
     try:
-        with open('/home/user/webapp/credentials.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
+        # 从 okex_api_config.py 导入凭证
+        import sys
+        sys.path.append('/home/user/webapp')
+        from okex_api_config import OKEX_API_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE
+        
+        return {
+            'api_key': OKEX_API_KEY,
+            'secret_key': OKEX_SECRET_KEY,
+            'passphrase': OKEX_PASSPHRASE
+        }
     except Exception as e:
         log(f"❌ 加载API凭证失败: {e}")
         return None
