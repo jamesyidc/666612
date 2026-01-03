@@ -370,6 +370,9 @@
 
         // 加载数据
         async function loadData() {
+            console.log('🔄 开始加载数据...');
+            const startTime = performance.now();
+            
             const hours = document.getElementById('timeRange').value;
             const limit = document.getElementById('limitCount').value;
             
@@ -378,17 +381,32 @@
                 document.getElementById('dataTable').style.display = 'none';
 
                 const url = `/api/support-resistance/escape-stats-history?hours=${hours}&limit=${limit}`;
+                console.log('📡 请求URL:', url);
+                
+                const fetchStart = performance.now();
                 const response = await fetch(url);
+                console.log(`✅ 请求完成，耗时: ${(performance.now() - fetchStart).toFixed(2)}ms`);
+                
+                const parseStart = performance.now();
                 const result = await response.json();
+                console.log(`✅ JSON解析完成，耗时: ${(performance.now() - parseStart).toFixed(2)}ms`);
 
                 if (result.success) {
+                    console.log(`✅ 获取到 ${result.data.length} 条记录`);
                     historyData = result.data;
+                    
+                    const renderStart = performance.now();
                     renderData(historyData);
+                    console.log(`✅ 渲染完成，耗时: ${(performance.now() - renderStart).toFixed(2)}ms`);
+                    
+                    const totalTime = performance.now() - startTime;
+                    console.log(`🎉 总耗时: ${totalTime.toFixed(2)}ms`);
                 } else {
+                    console.error('❌ 加载失败:', result.message);
                     alert('加载数据失败: ' + result.message);
                 }
             } catch (error) {
-                console.error('加载数据出错:', error);
+                console.error('❌ 加载数据出错:', error);
                 alert('加载数据出错: ' + error.message);
             } finally {
                 document.getElementById('loadingIndicator').style.display = 'none';
@@ -397,6 +415,9 @@
 
         // 渲染数据
         function renderData(data) {
+            console.log('🎨 开始渲染数据...', data.length, '条');
+            const startTime = performance.now();
+            
             if (data.length === 0) {
                 document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align: center;">暂无数据</td></tr>';
                 document.getElementById('dataTable').style.display = 'table';
@@ -404,10 +425,13 @@
             }
 
             // 计算统计信息
+            console.log('📊 计算统计信息...');
+            const calcStart = performance.now();
             const max24h = Math.max(...data.map(d => d.signal_24h_count));
             const max2h = Math.max(...data.map(d => d.signal_2h_count));
             const avg24h = Math.round(data.reduce((sum, d) => sum + d.signal_24h_count, 0) / data.length);
             const avg2h = Math.round(data.reduce((sum, d) => sum + d.signal_2h_count, 0) / data.length);
+            console.log(`✅ 统计计算完成，耗时: ${(performance.now() - calcStart).toFixed(2)}ms`);
 
             document.getElementById('totalCount').textContent = data.length;
             document.getElementById('max24h').textContent = max24h;
@@ -416,6 +440,8 @@
             document.getElementById('avg2h').textContent = avg2h;
 
             // 渲染表格
+            console.log('📋 生成HTML...');
+            const htmlStart = performance.now();
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = data.map(row => {
                 const status24h = row.signal_24h_count >= 100 ? 'badge-high' : 
@@ -465,11 +491,21 @@
                     </tr>
                 `;
             }).join('');
+            console.log(`✅ HTML生成完成，耗时: ${(performance.now() - htmlStart).toFixed(2)}ms`);
 
+            console.log('🖼️ 更新DOM...');
+            const domStart = performance.now();
             document.getElementById('dataTable').style.display = 'table';
+            console.log(`✅ DOM更新完成，耗时: ${(performance.now() - domStart).toFixed(2)}ms`);
 
             // 渲染图表
+            console.log('📈 渲染图表...');
+            const chartStart = performance.now();
             renderChart(data);
+            console.log(`✅ 图表渲染完成，耗时: ${(performance.now() - chartStart).toFixed(2)}ms`);
+            
+            const totalTime = performance.now() - startTime;
+            console.log(`🎉 renderData总耗时: ${totalTime.toFixed(2)}ms`);
         }
 
         // 获取状态文本

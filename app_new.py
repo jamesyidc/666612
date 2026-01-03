@@ -5598,6 +5598,15 @@ def escape_stats_history_page():
     response.headers['Expires'] = '0'
     return response
 
+@app.route('/escape-stats-debug')
+def escape_stats_debug_page():
+    """逃顶快照数统计诊断页面"""
+    response = make_response(render_template('escape_stats_debug.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 @app.route('/trading-signals')
 def trading_signals_page():
     """决策-交易信号系统页面"""
@@ -19245,18 +19254,23 @@ def get_market_strength():
         if len(short_profits) == 0:
             decline_level = 0
             decline_name = '市场正常'
-        elif count_100 >= 1:
+        # 等级5: p100≥1 且 p40>10
+        elif count_100 >= 1 and count_40 > 10:
             decline_level = 5
             decline_name = '下跌等级5 - 极端下跌'
-        elif count_100 == 0 and count_90 >= 1 and count_80 >= 1:
+        # 等级4: p100=0, p90≥1, p80≥1, p40≥8
+        elif count_100 == 0 and count_90 >= 1 and count_80 >= 1 and count_40 >= 8:
             decline_level = 4
             decline_name = '下跌等级4 - 超高强度下跌'
-        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 >= 1 and count_60 >= 2:
+        # 等级3: p100=0, p90=0, p80=0, p70≥1, p60≥1, p40>6
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 >= 1 and count_60 >= 1 and count_40 > 6:
             decline_level = 3
             decline_name = '下跌等级3 - 高强度下跌'
-        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 >= 2:
+        # 等级2: p100=0, p90=0, p80=0, p70≤1, p60≥1, p40≥5
+        elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 <= 1 and count_60 >= 1 and count_40 >= 5:
             decline_level = 2
             decline_name = '下跌等级2 - 中等强度下跌'
+        # 等级1: p100=0, p90=0, p80=0, p70=0, p60=0, p50=0, p40≥3
         elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 >= 3:
             decline_level = 1
             decline_name = '下跌等级1 - 轻微下跌'

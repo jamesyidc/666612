@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>逃顶信号数统计 - 诊断页面</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .log {
+            background: #2a2a2a;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #4ade80;
+        }
+        .error {
+            border-left-color: #ef4444;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 逃顶信号数统计 - 诊断页面</h1>
+    
+    <div>
+        <button onclick="testAPI()">测试 API</button>
+        <button onclick="testRender()">测试渲染</button>
+        <button onclick="clearLogs()">清除日志</button>
+    </div>
+    
+    <div id="logs"></div>
+    
+    <script>
+        function log(message, isError = false) {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log' + (isError ? ' error' : '');
+            logDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        async function testAPI() {
+            log('开始测试 API...');
+            
+            try {
+                const startTime = performance.now();
+                log('发送请求: /api/support-resistance/escape-stats-history?hours=24&limit=1000');
+                
+                const response = await fetch('/api/support-resistance/escape-stats-history?hours=24&limit=1000');
+                const fetchTime = performance.now() - startTime;
+                log(`✅ 请求完成，耗时: ${fetchTime.toFixed(2)}ms`);
+                
+                const parseStart = performance.now();
+                const result = await response.json();
+                const parseTime = performance.now() - parseStart;
+                log(`✅ JSON解析完成，耗时: ${parseTime.toFixed(2)}ms`);
+                
+                if (result.success) {
+                    log(`✅ API返回成功，记录数: ${result.data.length}`);
+                    log(`  - 第一条: ${result.data[0].stat_time}`);
+                    log(`  - 最后一条: ${result.data[result.data.length - 1].stat_time}`);
+                    
+                    // 测试数据处理
+                    const calcStart = performance.now();
+                    const max24h = Math.max(...result.data.map(d => d.signal_24h_count));
+                    const max2h = Math.max(...result.data.map(d => d.signal_2h_count));
+                    const calcTime = performance.now() - calcStart;
+                    log(`✅ 统计计算完成，耗时: ${calcTime.toFixed(2)}ms`);
+                    log(`  - 24h最大: ${max24h}`);
+                    log(`  - 2h最大: ${max2h}`);
+                } else {
+                    log(`❌ API返回失败: ${result.message}`, true);
+                }
+                
+                const totalTime = performance.now() - startTime;
+                log(`🎉 总耗时: ${totalTime.toFixed(2)}ms`);
+                
+            } catch (error) {
+                log(`❌ 测试失败: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+        
+        async function testRender() {
+            log('开始测试渲染...');
+            
+            try {
+                const response = await fetch('/api/support-resistance/escape-stats-history?hours=24&limit=100');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    log(`❌ API返回失败: ${result.message}`, true);
+                    return;
+                }
+                
+                log(`✅ 获取到 ${result.data.length} 条记录`);
+                
+                const renderStart = performance.now();
+                const html = result.data.map((row, index) => {
+                    return `<div>${index + 1}. ${row.stat_time} | 24h: ${row.signal_24h_count} | 2h: ${row.signal_2h_count}</div>`;
+                }).join('');
+                const renderTime = performance.now() - renderStart;
+                
+                log(`✅ HTML生成完成，耗时: ${renderTime.toFixed(2)}ms`);
+                log(`  - HTML大小: ${html.length} 字符`);
+                
+                // 测试DOM插入
+                const insertStart = performance.now();
+                const testDiv = document.createElement('div');
+                testDiv.innerHTML = html;
+                const insertTime = performance.now() - insertStart;
+                
+                log(`✅ DOM插入完成，耗时: ${insertTime.toFixed(2)}ms`);
+                
+                const totalTime = performance.now() - renderStart;
+                log(`🎉 渲染总耗时: ${totalTime.toFixed(2)}ms`);
+                
+            } catch (error) {
+                log(`❌ 测试失败: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+        
+        // 页面加载时自动测试
+        window.addEventListener('load', () => {
+            log('页面加载完成');
+            log('点击按钮开始测试');
+        });
+    </script>
+</body>
+</html>
