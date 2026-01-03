@@ -903,6 +903,14 @@
                             <input type="checkbox" id="subSuperMaintainShort" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
                             <span>🚀 超级维护空单-10%</span>
                         </label>
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="extremeMaintainShortEnabled" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>📉 做空见顶维护</span>
+                        </label>
+                        <label style="font-size: 13px; color: white; display: flex; align-items: center; cursor: pointer; user-select: none; opacity: 0.9;">
+                            <input type="checkbox" id="extremeMaintainLongEnabled" style="margin-right: 5px; cursor: pointer; width: 16px; height: 16px;">
+                            <span>📈 做多见底维护</span>
+                        </label>
                     </div>
                     <button id="closeAllSubAccountPositions" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'">
                         🚨 一键全部平仓
@@ -995,6 +1003,15 @@
                         document.getElementById('followLongLoss').checked = config.follow_long_loss_enabled || false;
                         document.getElementById('subSuperMaintainLong').checked = config.super_maintain_long_enabled || false;
                         document.getElementById('subSuperMaintainShort').checked = config.super_maintain_short_enabled || false;
+                        
+                        // 设置极端维护开关状态
+                        document.getElementById('extremeMaintainShortEnabled').checked = config.extreme_maintain_short_enabled || false;
+                        document.getElementById('extremeMaintainLongEnabled').checked = config.extreme_maintain_long_enabled || false;
+                        
+                        // 更新全局变量
+                        window.extremeMaintainShortEnabled = config.extreme_maintain_short_enabled || false;
+                        window.extremeMaintainLongEnabled = config.extreme_maintain_long_enabled || false;
+                        
                         console.log('✅ 子账户配置已加载:', config);
                     }
                 } catch (error) {
@@ -2174,13 +2191,13 @@
                                     style="padding: 5px 10px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
                                 🔧 维护
                             </button>
-                            ${item.pos_side === 'short' ? `
+                            ${item.pos_side === 'short' && window.extremeMaintainShortEnabled ? `
                             <button onclick="extremeMaintainSubAccount('${item.account_name}', '${item.inst_id}', 'short', ${item.profit_rate || 0})" 
                                     style="padding: 5px 10px; background: #dc2626; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
                                 📉 见顶维护
                             </button>
                             ` : ''}
-                            ${item.pos_side === 'long' ? `
+                            ${item.pos_side === 'long' && window.extremeMaintainLongEnabled ? `
                             <button onclick="extremeMaintainSubAccount('${item.account_name}', '${item.inst_id}', 'long', ${item.profit_rate || 0})" 
                                     style="padding: 5px 10px; background: #059669; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap;">
                                 📈 见底维护
@@ -2707,6 +2724,80 @@
                     console.error('保存配置失败:', error);
                     alert('⚠️ 配置保存失败');
                     e.target.checked = !enabled;
+                }
+            });
+            
+            // 做空见顶维护开关
+            document.getElementById('extremeMaintainShortEnabled').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`📉 做空见顶维护: ${enabled ? '开启' : '关闭'}`);
+                
+                // 更新全局变量
+                window.extremeMaintainShortEnabled = enabled;
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            extreme_maintain_short_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '📉 做空见顶维护已开启\n\n规则：\n- 亏损≥60%：第1次加10U\n- 亏损≥80%：第2次加10U\n- 最多维护2次' : '❌ 做空见顶维护已关闭');
+                        // 重新渲染表格以显示/隐藏按钮
+                        loadData();
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                        window.extremeMaintainShortEnabled = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                    window.extremeMaintainShortEnabled = !enabled;
+                }
+            });
+            
+            // 做多见底维护开关
+            document.getElementById('extremeMaintainLongEnabled').addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+                console.log(`📈 做多见底维护: ${enabled ? '开启' : '关闭'}`);
+                
+                // 更新全局变量
+                window.extremeMaintainLongEnabled = enabled;
+                
+                try {
+                    const response = await fetch('/api/sub-account/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            extreme_maintain_long_enabled: enabled
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(enabled ? '📈 做多见底维护已开启\n\n规则：\n- 亏损≥60%：第1次加10U\n- 亏损≥80%：第2次加10U\n- 最多维护2次' : '❌ 做多见底维护已关闭');
+                        // 重新渲染表格以显示/隐藏按钮
+                        loadData();
+                    } else {
+                        alert('⚠️ 配置保存失败');
+                        e.target.checked = !enabled;
+                        window.extremeMaintainLongEnabled = !enabled;
+                    }
+                } catch (error) {
+                    console.error('保存配置失败:', error);
+                    alert('⚠️ 配置保存失败');
+                    e.target.checked = !enabled;
+                    window.extremeMaintainLongEnabled = !enabled;
                 }
             });
             

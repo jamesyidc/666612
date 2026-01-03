@@ -15769,6 +15769,10 @@ def sub_account_config_v2():
                 config['follow_short_loss_enabled'] = data['follow_short_loss_enabled']
             if 'follow_long_loss_enabled' in data:
                 config['follow_long_loss_enabled'] = data['follow_long_loss_enabled']
+            if 'extreme_maintain_short_enabled' in data:
+                config['extreme_maintain_short_enabled'] = data['extreme_maintain_short_enabled']
+            if 'extreme_maintain_long_enabled' in data:
+                config['extreme_maintain_long_enabled'] = data['extreme_maintain_long_enabled']
             
             # 保存配置
             with open(config_file, 'w', encoding='utf-8') as f:
