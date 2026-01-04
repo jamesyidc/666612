@@ -153,9 +153,21 @@ def get_market_strength():
                     elif count_100 == 0 and count_90 == 0 and count_80 == 0 and count_70 == 0 and count_60 == 0 and count_50 == 0 and count_40 >= 3:
                         rise_level = 1
         
+        # 获取计次数据
+        count = 0
+        try:
+            count_url = f"{MAIN_API_URL}/api/latest"
+            count_response = requests.get(count_url, timeout=10)
+            if count_response.status_code == 200:
+                count_data = count_response.json()
+                count = count_data.get('count', 0)
+        except Exception as e:
+            print(f"   ⚠️ 获取计次失败: {e}")
+        
         return {
             'decline_level': decline_level,
-            'rise_level': rise_level
+            'rise_level': rise_level,
+            'count': count
         }
     except Exception as e:
         print(f"❌ 获取市场强度异常: {e}")
@@ -383,12 +395,15 @@ def check_and_open_positions():
                 market_strength = get_market_strength()
                 
                 if pos_side == 'short':
-                    # 空单亏损需要下跌强度>=5
+                    # 空单亏损需要下跌强度>=5 且 计次>=3
                     if market_strength['decline_level'] < 5:
                         print(f"   ⚠️ 下跌强度等级{market_strength['decline_level']}不足（需要>=5），跳过 {inst_id} {pos_side}")
                         continue
+                    elif market_strength['count'] < 3:
+                        print(f"   ⚠️ 计次{market_strength['count']}不足（需要>=3），跳过 {inst_id} {pos_side}")
+                        continue
                     else:
-                        print(f"   ✅ 下跌强度等级{market_strength['decline_level']}满足条件（>=5）")
+                        print(f"   ✅ 下跌强度等级{market_strength['decline_level']}满足条件（>=5），计次{market_strength['count']}满足条件（>=3）")
                 elif pos_side == 'long':
                     # 多单亏损需要上涨强度>=5
                     if market_strength['rise_level'] < 5:
