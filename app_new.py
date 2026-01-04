@@ -7213,7 +7213,7 @@ def api_support_resistance_escape_stats_history():
         
         # 获取查询参数
         hours = request.args.get('hours', 24, type=int)  # 默认24小时
-        limit = request.args.get('limit', 1000, type=int)  # 默认最多1000条
+        limit = request.args.get('limit', 1000, type=int)  # 默认最多1000条，0表示全部
         
         conn = sqlite3.connect('databases/crypto_data.db')
         conn.row_factory = sqlite3.Row
@@ -7222,34 +7222,65 @@ def api_support_resistance_escape_stats_history():
         # 查询历史统计数据
         if hours > 0:
             time_ago = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
-            cursor.execute('''
-                SELECT 
-                    id,
-                    stat_time,
-                    signal_24h_count,
-                    signal_2h_count,
-                    decline_strength_level,
-                    rise_strength_level,
-                    created_at
-                FROM escape_signal_stats
-                WHERE stat_time >= ?
-                ORDER BY stat_time DESC
-                LIMIT ?
-            ''', (time_ago, limit))
+            if limit > 0:
+                cursor.execute('''
+                    SELECT 
+                        id,
+                        stat_time,
+                        signal_24h_count,
+                        signal_2h_count,
+                        decline_strength_level,
+                        rise_strength_level,
+                        created_at
+                    FROM escape_signal_stats
+                    WHERE stat_time >= ?
+                    ORDER BY stat_time DESC
+                    LIMIT ?
+                ''', (time_ago, limit))
+            else:
+                # limit=0 表示不限制，返回所有数据
+                cursor.execute('''
+                    SELECT 
+                        id,
+                        stat_time,
+                        signal_24h_count,
+                        signal_2h_count,
+                        decline_strength_level,
+                        rise_strength_level,
+                        created_at
+                    FROM escape_signal_stats
+                    WHERE stat_time >= ?
+                    ORDER BY stat_time DESC
+                ''', (time_ago,))
         else:
-            cursor.execute('''
-                SELECT 
-                    id,
-                    stat_time,
-                    signal_24h_count,
-                    signal_2h_count,
-                    decline_strength_level,
-                    rise_strength_level,
-                    created_at
-                FROM escape_signal_stats
-                ORDER BY stat_time DESC
-                LIMIT ?
-            ''', (limit,))
+            if limit > 0:
+                cursor.execute('''
+                    SELECT 
+                        id,
+                        stat_time,
+                        signal_24h_count,
+                        signal_2h_count,
+                        decline_strength_level,
+                        rise_strength_level,
+                        created_at
+                    FROM escape_signal_stats
+                    ORDER BY stat_time DESC
+                    LIMIT ?
+                ''', (limit,))
+            else:
+                # limit=0 表示不限制，返回所有数据
+                cursor.execute('''
+                    SELECT 
+                        id,
+                        stat_time,
+                        signal_24h_count,
+                        signal_2h_count,
+                        decline_strength_level,
+                        rise_strength_level,
+                        created_at
+                    FROM escape_signal_stats
+                    ORDER BY stat_time DESC
+                ''')
         
         rows = cursor.fetchall()
         conn.close()
