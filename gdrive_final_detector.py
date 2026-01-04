@@ -695,6 +695,36 @@ def get_root_folder_id_and_create_today_folder():
         log(f"错误详情: {traceback.format_exc()}")
         return None
 
+def get_last_reset_date_from_config():
+    """从配置文件读取上次重置日期"""
+    try:
+        import json
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            last_reset = config.get('last_reset_date')
+            if last_reset:
+                return datetime.strptime(last_reset, '%Y-%m-%d').date()
+    except:
+        pass
+    # 如果读取失败，返回当前日期
+    return datetime.now(BEIJING_TZ).date()
+
+def save_last_reset_date_to_config(reset_date):
+    """保存重置日期到配置文件"""
+    try:
+        import json
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        config['last_reset_date'] = reset_date.strftime('%Y-%m-%d')
+        
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        
+        log(f"   💾 已保存重置日期到配置文件: {reset_date}")
+    except Exception as e:
+        log(f"   ⚠️  保存重置日期失败: {e}")
+
 def main():
     """主函数"""
     log("=" * 80)
@@ -709,6 +739,7 @@ def main():
     log(f"   • 0:00-0:10 之间：继续使用昨天的文件夹ID（等待新文件夹生成）")
     log(f"   • 0:10 之后：自动切换到新日期，从配置文件读取新文件夹ID")
     log(f"   • 确保新日期文件夹已经生成后才开始检测")
+    log(f"   • 重置日期持久化保存，进程重启后仍然有效")
     log(f"")
     log(f"🛡️  超时恢复机制:")
     log(f"   • 超过11分钟未找到TXT文件 → 自动重新获取父文件夹ID")
@@ -718,7 +749,8 @@ def main():
     
     last_data_timestamp = None
     check_count = 0
-    last_reset_date = datetime.now(BEIJING_TZ).date()
+    last_reset_date = get_last_reset_date_from_config()  # 🆕 从配置文件读取
+    log(f"📅 从配置文件读取上次重置日期: {last_reset_date}")
     date_already_reset = False  # 标记当天是否已经重置过
     last_file_found_time = datetime.now(BEIJING_TZ)  # 记录最后一次找到文件的时间
     timeout_recovery_triggered = False  # 标记是否已触发过超时恢复
@@ -741,6 +773,7 @@ def main():
                     log("🔄 重新读取配置文件中的新文件夹ID...")
                     log("🔄" * 40 + "\n")
                     last_reset_date = current_date
+                    save_last_reset_date_to_config(last_reset_date)  # 🆕 保存到配置
                     check_count = 0
                     last_data_timestamp = None
                     date_already_reset = True
@@ -765,6 +798,7 @@ def main():
                     log("🔄 重新读取配置文件中的新文件夹ID...")
                     log("🔄" * 40 + "\n")
                     last_reset_date = current_date
+                    save_last_reset_date_to_config(last_reset_date)  # 🆕 保存到配置
                     check_count = 0
                     last_data_timestamp = None
                     date_already_reset = True

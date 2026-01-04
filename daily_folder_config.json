@@ -1,17 +1,13 @@
 {
   "root_folder_odd": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
   "root_folder_even": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "current_date": "2026-01-03",
-  "folder_id": "1euzRzLjPDl08ZTvdDM_H_6hJzVNFldfQ",
+  "current_date": "2026-01-04",
+  "folder_id": "136_RXEYRmaHs7z5fZYTOkG1xGkm6Np4x",
   "parent_folder_id": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "updated_at": "2025-12-26 00:41:06",
-  "update_reason": "手动更新到2026-01-03文件夹",
-  "folder_name": "2026-01-03",
+  "updated_at": "2026-01-04 11:05:09",
+  "update_reason": "手动跨日期更新到新文件夹",
+  "folder_name": "2026-01-04",
   "auto_updated": true,
-  "auto_update_time": "2026-01-02 17:19:44",
-  "last_updated": "2026-01-03 11:54:58",
-  "parent_folder_url": "https://drive.google.com/drive/folders/1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV?usp=sharing",
-  "auto_update_status": "manual_update",
-  "txt_count": 104,
-  "latest_txt": "2026-01-02_1717.txt"
+  "auto_update_time": "2026-01-04 11:05:09",
+  "last_reset_date": "2026-01-04"
 }
