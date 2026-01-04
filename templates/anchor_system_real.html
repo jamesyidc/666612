@@ -481,6 +481,15 @@
                     <div id="currentCountTime" style="font-size: 11px; margin-top: 4px; color: #78350f;">更新时间: --</div>
                 </div>
             </div>
+            <div class="stat-card" style="border: 2px solid #3b82f6; background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                <div class="stat-icon">🕐</div>
+                <div class="stat-label" style="color: #1e40af;">当天2点钟计次</div>
+                <div class="stat-value" id="count2am" style="color: #2563eb; font-size: 48px; font-weight: 800;">--</div>
+                <div class="stat-subvalue" style="color: #1e40af;">
+                    <div>凌晨2:00数据</div>
+                    <div id="count2amTime" style="font-size: 11px; margin-top: 4px; color: #1e3a8a;">更新时间: --</div>
+                </div>
+            </div>
         </div>
 
         <!-- 空单超高盈利统计 -->
@@ -1012,6 +1021,7 @@
                     protectConfigData,
                     statusData,
                     countData,
+                    count2amData,
                     monitorsData,
                     alertsData,
                     recordsData,
@@ -1024,6 +1034,7 @@
                     fetch('/api/anchor-system/protect-pairs-config').then(r => r.json()).catch(e => ({ success: false, error: e })),
                     fetch('/api/anchor-system/status').then(r => r.json()).catch(e => ({ success: false, error: e })),
                     fetch('/api/latest').then(r => r.json()).catch(e => ({ success: false, error: e })),
+                    fetch('/api/count-at-2am').then(r => r.json()).catch(e => ({ success: false, error: e })),
                     fetch('/api/anchor-system/monitors?limit=50').then(r => r.json()).catch(e => ({ success: false, error: e })),
                     fetch('/api/anchor-system/alerts?limit=10').then(r => r.json()).catch(e => ({ success: false, error: e })),
                     fetch('/api/anchor-system/profit-records?trade_mode=real').then(r => r.json()).catch(e => ({ success: false, error: e })),
@@ -1111,6 +1122,27 @@
                     countElement.style.color = '#b45309';
                     countElement.style.fontSize = '48px';
                     countTimeElement.textContent = '更新时间: --';
+                }
+
+                // 处理凌晨2点计次数据
+                if (count2amData && count2amData.success) {
+                    const count2amElement = document.getElementById('count2am');
+                    const count2amTimeElement = document.getElementById('count2amTime');
+                    
+                    count2amElement.textContent = count2amData.count;
+                    count2amElement.style.color = '#2563eb';
+                    count2amElement.style.fontSize = '48px';
+                    count2amTimeElement.textContent = `更新时间: ${count2amData.snapshot_time || '--'}`;
+                    count2amTimeElement.style.color = '#1e3a8a';
+                    console.log(`✅ 凌晨2点计次: ${count2amData.count}, 时间: ${count2amData.snapshot_time}`);
+                } else {
+                    const count2amElement = document.getElementById('count2am');
+                    const count2amTimeElement = document.getElementById('count2amTime');
+                    count2amElement.textContent = '0';
+                    count2amElement.style.color = '#2563eb';
+                    count2amElement.style.fontSize = '48px';
+                    count2amTimeElement.textContent = '更新时间: --';
+                    console.warn('⚠️ 凌晨2点计次数据不可用');
                 }
 
                 // 处理监控记录

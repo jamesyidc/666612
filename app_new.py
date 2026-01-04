@@ -2047,6 +2047,67 @@ def api_latest():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/api/count-at-2am')
+def api_count_at_2am():
+    """获取当天凌晨2点钟的计次数据"""
+    try:
+        from datetime import datetime
+        conn = sqlite3.connect('databases/crypto_data.db')
+        cursor = conn.cursor()
+        
+        # 获取当前日期
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # 查询当天凌晨2点的数据（2:00-2:59之间的任意一条）
+        cursor.execute("""
+            SELECT 
+                snapshot_date, snapshot_time, count
+            FROM crypto_snapshots
+            WHERE snapshot_date = ?
+            AND snapshot_time LIKE ? || ' 02:%'
+            ORDER BY snapshot_time ASC
+            LIMIT 1
+        """, (today, today))
+        
+        snapshot = cursor.fetchone()
+        
+        if not snapshot:
+            # 如果当天没有数据，查询最近一天凌晨2点的数据
+            cursor.execute("""
+                SELECT 
+                    snapshot_date, snapshot_time, count
+                FROM crypto_snapshots
+                WHERE snapshot_time LIKE '%' || ' 02:%'
+                ORDER BY snapshot_date DESC, snapshot_time DESC
+                LIMIT 1
+            """)
+            snapshot = cursor.fetchone()
+        
+        conn.close()
+        
+        if not snapshot:
+            return jsonify({
+                'success': False,
+                'count': 0,
+                'snapshot_time': None,
+                'message': '暂无凌晨2点数据'
+            })
+        
+        snapshot_date, snapshot_time, count = snapshot
+        
+        return jsonify({
+            'success': True,
+            'count': count,
+            'snapshot_time': snapshot_time,
+            'snapshot_date': snapshot_date
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 @app.route('/api/chart')
 def api_chart():
     """图表数据API - 支持分页的12小时趋势图数据（显示所有数据点）"""
