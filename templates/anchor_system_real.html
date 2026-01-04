@@ -1174,12 +1174,17 @@
                     renderWarnings(warningsData.warnings);
                 }
 
-                // 更新时间
-                const now = new Date();
-                document.getElementById('updateTime').textContent = 
-                    `最后更新: ${now.toLocaleString('zh-CN')}`;
+                // 更新时间（使用数据的时间戳）
+                if (countData && countData.snapshot_time) {
+                    document.getElementById('updateTime').textContent = 
+                        `最后更新: ${countData.snapshot_time}`;
+                } else {
+                    const now = new Date();
+                    document.getElementById('updateTime').textContent = 
+                        `最后更新: ${now.toLocaleString('zh-CN')}`;
+                }
                 document.getElementById('currentPositionTime').textContent = 
-                    `最后更新: ${now.toLocaleString('zh-CN')}`;
+                    `最后更新: ${new Date().toLocaleString('zh-CN')}`;
                 
                 // 隐藏加载提示
                 const loadingOverlay = document.getElementById('loading-overlay');
