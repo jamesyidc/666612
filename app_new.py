@@ -9695,11 +9695,11 @@ def api_query_latest():
         conn = sqlite3.connect('databases/crypto_data.db')
         cursor = conn.cursor()
         
+        # 只查询表中实际存在的字段
         cursor.execute("""
             SELECT 
-                snapshot_time, rush_up, rush_down, diff, count, ratio, status,
-                round_rush_up, round_rush_down, price_lowest, price_newhigh,
-                count_score_display, rise_24h_count, fall_24h_count
+                snapshot_time, rush_up, rush_down, diff, count, status,
+                count_score_display, count_score_type
             FROM crypto_snapshots
             ORDER BY snapshot_date DESC, snapshot_time DESC
             LIMIT 1
@@ -9711,6 +9711,11 @@ def api_query_latest():
         if not snapshot:
             return jsonify({'success': False, 'error': '暂无数据'})
         
+        # 计算比值
+        ratio = 0
+        if snapshot[2] > 0:  # rush_down > 0
+            ratio = round(snapshot[1] / snapshot[2], 2)  # rush_up / rush_down
+        
         return jsonify({
             'success': True,
             'data': {
@@ -9719,15 +9724,15 @@ def api_query_latest():
                 '急跌': snapshot[2],
                 '差值': snapshot[3],
                 '计次': snapshot[4],
-                '比值': snapshot[5],
-                '状态': snapshot[6],
-                '本轮急涨': snapshot[7],
-                '本轮急跌': snapshot[8],
-                '比价最低': snapshot[9],
-                '比价创新高': snapshot[10],
-                '计次得分': snapshot[11],
-                '24h涨≥10%': snapshot[12],
-                '24h跌≤-10%': snapshot[13]
+                '比值': ratio,  # 计算得出
+                '状态': snapshot[5],
+                '本轮急涨': snapshot[1],  # 使用 rush_up
+                '本轮急跌': snapshot[2],  # 使用 rush_down
+                '比价最低': 0,  # 默认值
+                '比价创新高': 0,  # 默认值
+                '计次得分': snapshot[6],  # count_score_display
+                '24h涨≥10%': 0,  # 默认值
+                '24h跌≤-10%': 0  # 默认值
             }
         })
         
