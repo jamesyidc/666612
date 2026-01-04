@@ -520,18 +520,30 @@
             // 反转数据（最早的在左边）
             const reversedData = [...data].reverse();
             
+            // 根据数据量动态调整标签格式和显示数量
+            const dataCount = reversedData.length;
+            let maxTicksLimit, labelFormat;
+            
+            if (dataCount > 1440) {  // 超过1天的数据
+                maxTicksLimit = 100;
+                labelFormat = { month: '2-digit', day: '2-digit', hour: '2-digit' };
+            } else if (dataCount > 360) {  // 6小时到1天
+                maxTicksLimit = 60;
+                labelFormat = { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+            } else {  // 少于6小时
+                maxTicksLimit = 40;
+                labelFormat = { hour: '2-digit', minute: '2-digit' };
+            }
+            
             const labels = reversedData.map(d => {
                 const time = new Date(d.stat_time);
-                return time.toLocaleString('zh-CN', { 
-                    month: '2-digit', 
-                    day: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
+                return time.toLocaleString('zh-CN', labelFormat);
             });
 
             const data24h = reversedData.map(d => d.signal_24h_count);
             const data2h = reversedData.map(d => d.signal_2h_count);
+            
+            console.log(`📊 图表数据: ${dataCount} 条, maxTicksLimit: ${maxTicksLimit}`);
 
             if (chartInstance) {
                 chartInstance.destroy();
@@ -595,7 +607,10 @@
                                 text: '时间'
                             },
                             ticks: {
-                                maxTicksLimit: 20
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: maxTicksLimit
                             }
                         }
                     }
