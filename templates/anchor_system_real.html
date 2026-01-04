@@ -476,7 +476,10 @@
                 <div class="stat-icon">🔢</div>
                 <div class="stat-label" style="color: #92400e;">当前计次</div>
                 <div class="stat-value" id="currentCount" style="color: #b45309; font-size: 48px; font-weight: 800;">--</div>
-                <div class="stat-subvalue" style="color: #92400e;">最新15分钟数据</div>
+                <div class="stat-subvalue" style="color: #92400e;">
+                    <div>最新15分钟数据</div>
+                    <div id="currentCountTime" style="font-size: 11px; margin-top: 4px; color: #78350f;">更新时间: --</div>
+                </div>
             </div>
         </div>
 
@@ -1083,23 +1086,31 @@
                     const timeDiffMinutes = (currentTime - snapshotTime) / (1000 * 60);
                     
                     const countElement = document.getElementById('currentCount');
+                    const countTimeElement = document.getElementById('currentCountTime');
+                    
                     if (timeDiffMinutes > 20) {
                         // 超过20分钟，显示超时提示
                         countElement.textContent = '超时';
                         countElement.style.color = '#dc2626'; // 红色
                         countElement.style.fontSize = '36px';
+                        countTimeElement.textContent = `更新时间: ${countData.snapshot_time}`;
+                        countTimeElement.style.color = '#dc2626';
                         console.warn(`⚠️ 计次数据已超时 ${Math.floor(timeDiffMinutes)} 分钟`);
                     } else {
                         // 正常显示计次
                         countElement.textContent = countData.count;
                         countElement.style.color = '#b45309'; // 原来的橙色
                         countElement.style.fontSize = '48px';
+                        countTimeElement.textContent = `更新时间: ${countData.snapshot_time}`;
+                        countTimeElement.style.color = '#78350f';
                     }
                 } else {
                     const countElement = document.getElementById('currentCount');
+                    const countTimeElement = document.getElementById('currentCountTime');
                     countElement.textContent = '0';
                     countElement.style.color = '#b45309';
                     countElement.style.fontSize = '48px';
+                    countTimeElement.textContent = '更新时间: --';
                 }
 
                 // 处理监控记录
