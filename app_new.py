@@ -19697,6 +19697,118 @@ def extreme_maintain_sub_account():
             'message': str(e),
             'traceback': traceback.format_exc()
         })
+# ==================== 子账号爆仓记录与统计 API ====================
+
+@app.route('/api/liquidation/record', methods=['POST'])
+def record_liquidation_api():
+    """记录爆仓事件"""
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from sub_account_liquidation_tracker import record_liquidation
+        
+        data = request.get_json()
+        
+        account_name = data.get('account_name')
+        inst_id = data.get('inst_id')
+        pos_side = data.get('pos_side')
+        liquidation_price = float(data.get('liquidation_price', 0))
+        avg_price = float(data.get('avg_price', 0))
+        size = float(data.get('size', 0))
+        margin = float(data.get('margin', 0))
+        loss_amount = float(data.get('loss_amount', 0))
+        liquidation_type = data.get('liquidation_type', '自动强平')
+        remarks = data.get('remarks', '')
+        
+        if not all([account_name, inst_id, pos_side]):
+            return jsonify({'success': False, 'message': '缺少必要参数'})
+        
+        result = record_liquidation(
+            account_name, inst_id, pos_side, liquidation_price,
+            avg_price, size, margin, loss_amount, liquidation_type, remarks
+        )
+        
+        if result:
+            return jsonify({'success': True, 'message': '爆仓记录已保存'})
+        else:
+            return jsonify({'success': False, 'message': '记录保存失败'})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/liquidation/records', methods=['GET'])
+def get_liquidation_records_api():
+    """获取爆仓记录"""
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from sub_account_liquidation_tracker import get_liquidation_records
+        
+        account_name = request.args.get('account_name')
+        inst_id = request.args.get('inst_id')
+        limit = int(request.args.get('limit', 100))
+        
+        records = get_liquidation_records(account_name, inst_id, limit)
+        
+        return jsonify({'success': True, 'data': records})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/liquidation/account-stats', methods=['GET'])
+def get_account_liquidation_stats_api():
+    """获取账号爆仓统计"""
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from sub_account_liquidation_tracker import get_account_stats
+        
+        account_name = request.args.get('account_name')
+        stats = get_account_stats(account_name)
+        
+        return jsonify({'success': True, 'data': stats})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/liquidation/coin-stats', methods=['GET'])
+def get_coin_liquidation_stats_api():
+    """获取币种爆仓统计"""
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from sub_account_liquidation_tracker import get_coin_stats
+        
+        inst_id = request.args.get('inst_id')
+        stats = get_coin_stats(inst_id)
+        
+        return jsonify({'success': True, 'data': stats})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/liquidation/summary', methods=['GET'])
+def get_liquidation_summary_api():
+    """获取总体统计"""
+    try:
+        import sys
+        sys.path.append('/home/user/webapp')
+        from sub_account_liquidation_tracker import get_summary_stats
+        
+        summary = get_summary_stats()
+        
+        if summary:
+            return jsonify({'success': True, 'data': summary})
+        else:
+            return jsonify({'success': False, 'message': '获取统计失败'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/liquidation-stats')
+def liquidation_stats_page():
+    """爆仓统计页面"""
+    return render_template('liquidation_stats.html')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
