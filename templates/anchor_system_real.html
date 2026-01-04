@@ -1075,11 +1075,31 @@
                     document.getElementById('lossLimit').textContent = statusData.status.config.loss_limit + '%';
                 }
 
-                // 处理计次数据
+                // 处理计次数据 - 增加超时判断
                 if (countData && countData.count !== undefined) {
-                    document.getElementById('currentCount').textContent = countData.count;
+                    // 检查数据时间是否超过20分钟
+                    const currentTime = new Date();
+                    const snapshotTime = new Date(countData.snapshot_time);
+                    const timeDiffMinutes = (currentTime - snapshotTime) / (1000 * 60);
+                    
+                    const countElement = document.getElementById('currentCount');
+                    if (timeDiffMinutes > 20) {
+                        // 超过20分钟，显示超时提示
+                        countElement.textContent = '超时';
+                        countElement.style.color = '#dc2626'; // 红色
+                        countElement.style.fontSize = '36px';
+                        console.warn(`⚠️ 计次数据已超时 ${Math.floor(timeDiffMinutes)} 分钟`);
+                    } else {
+                        // 正常显示计次
+                        countElement.textContent = countData.count;
+                        countElement.style.color = '#b45309'; // 原来的橙色
+                        countElement.style.fontSize = '48px';
+                    }
                 } else {
-                    document.getElementById('currentCount').textContent = '0';
+                    const countElement = document.getElementById('currentCount');
+                    countElement.textContent = '0';
+                    countElement.style.color = '#b45309';
+                    countElement.style.fontSize = '48px';
                 }
 
                 // 处理监控记录
