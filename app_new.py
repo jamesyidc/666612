@@ -2002,9 +2002,8 @@ def api_latest():
         
         cursor.execute("""
             SELECT 
-                snapshot_date, snapshot_time, rush_up, rush_down, diff, count, ratio, status,
-                round_rush_up, round_rush_down, price_lowest, price_newhigh,
-                count_score_display, count_score_type, rise_24h_count, fall_24h_count
+                snapshot_date, snapshot_time, rush_up, rush_down, diff, count, status,
+                count_score_display, count_score_type
             FROM crypto_snapshots
             ORDER BY snapshot_date DESC, snapshot_time DESC
             LIMIT 1
@@ -2016,9 +2015,17 @@ def api_latest():
             conn.close()
             return jsonify({'error': '数据库中暂无数据'})
         
-        (snapshot_date, snapshot_time, rush_up, rush_down, diff, count, ratio, status,
-         round_rush_up, round_rush_down, price_lowest, price_newhigh,
-         count_score_display, count_score_type, rise_24h_count, fall_24h_count) = snapshot
+        (snapshot_date, snapshot_time, rush_up, rush_down, diff, count, status,
+         count_score_display, count_score_type) = snapshot
+        
+        # 计算派生字段
+        ratio = rush_up / rush_down if rush_down > 0 else 0
+        round_rush_up = rush_up  # 使用当前值
+        round_rush_down = rush_down  # 使用当前值
+        price_lowest = 0  # 默认值
+        price_newhigh = 0  # 默认值
+        rise_24h_count = 0  # 默认值
+        fall_24h_count = 0  # 默认值
         
         # snapshot_time已经是完整的日期时间，无需拼接
         # 格式: '2025-12-09 22:40:00'
