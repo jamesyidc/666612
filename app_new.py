@@ -5724,6 +5724,9 @@ def check_no_new_low_5min(symbol):
                 return False
         
         return True
+    except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+        # 数据库错误时返回默认值
+        return False
     finally:
         conn.close()
 
@@ -5748,6 +5751,9 @@ def get_1h_rsi(symbol):
         
         result = cursor.fetchone()
         return result[0] if result else None
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        # 数据库错误时返回None
+        return None
     finally:
         conn.close()
 
@@ -5794,7 +5800,11 @@ def check_consecutive_oscillation_5min(symbol):
                 return False
         
         return True
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        # 数据库错误时返回False
+        return False
     finally:
+        conn.close()
         conn.close()
 
 def deactivate_missing_signals(active_signal_keys):
@@ -5842,6 +5852,9 @@ def api_trading_signals_analyze():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
+        # 附加 support_resistance.db 数据库
+        cursor.execute("ATTACH DATABASE 'databases/support_resistance.db' AS sr_db")
+        
         beijing_tz = pytz.timezone('Asia/Shanghai')
         now = datetime.now(beijing_tz)
         
@@ -5861,10 +5874,10 @@ def api_trading_signals_analyze():
             SELECT symbol, current_price, support_line_1, support_line_2, resistance_line_1,
                    distance_to_support_1, distance_to_support_2, distance_to_resistance_1,
                    position_s2_r1, record_time
-            FROM support_resistance_levels
+            FROM sr_db.support_resistance_levels
             WHERE id IN (
                 SELECT MAX(id) 
-                FROM support_resistance_levels 
+                FROM sr_db.support_resistance_levels 
                 GROUP BY symbol
             )
         ''')
