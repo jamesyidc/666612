@@ -3,6 +3,7 @@
 加密货币数据分析系统 - 完全仿照参考页面风格
 """
 from flask import Flask, render_template_string, render_template, request, jsonify, send_from_directory, make_response, redirect
+from flask_cors import CORS
 import sqlite3
 from datetime import datetime, timedelta
 import json
@@ -17,6 +18,18 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
+
+# 配置CORS，允许所有来源访问
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type"],
+        "supports_credentials": False,
+        "max_age": 3600
+    }
+})
 
 def get_china_today():
     """获取中国时区的今日日期字符串 (YYYY-MM-DD)"""
