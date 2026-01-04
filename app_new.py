@@ -695,6 +695,10 @@ MAIN_HTML = """
                     <span>📊</span> 数据回看
                 </div>
                 <div class="nav-title">加密货币数据历史回看</div>
+                <div style="margin-left: 20px; color: #8b92b8; font-size: 13px;">
+                    <span>📅 最后更新: </span>
+                    <span id="lastUpdateTime" style="color: #00d4ff; font-weight: 500;">--</span>
+                </div>
             </div>
             <div class="nav-right">
                 <button class="home-btn" onclick="window.location.href='/'">
@@ -1256,6 +1260,17 @@ MAIN_HTML = """
         // 更新UI
         function updateUI(data) {
             document.getElementById('calcTime').textContent = data.snapshot_time;
+            
+            // 更新最后更新时间（使用当前时间）
+            const now = new Date();
+            const timeStr = now.getFullYear() + '-' + 
+                          String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                          String(now.getDate()).padStart(2, '0') + ' ' + 
+                          String(now.getHours()).padStart(2, '0') + ':' + 
+                          String(now.getMinutes()).padStart(2, '0') + ':' + 
+                          String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('lastUpdateTime').textContent = timeStr;
+            
             document.getElementById('rushUp').textContent = data.rush_up;
             document.getElementById('rushDown').textContent = data.rush_down;
             document.getElementById('roundRushUp').textContent = data.round_rush_up || data.rush_up;
