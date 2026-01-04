@@ -1918,9 +1918,8 @@ def api_query():
         
         cursor.execute("""
             SELECT 
-                snapshot_date, snapshot_time, rush_up, rush_down, diff, count, ratio, status,
-                round_rush_up, round_rush_down, price_lowest, price_newhigh,
-                count_score_display, count_score_type, rise_24h_count, fall_24h_count
+                snapshot_date, snapshot_time, rush_up, rush_down, diff, count, status,
+                count_score_display, count_score_type
             FROM crypto_snapshots
             WHERE snapshot_time LIKE ?
             ORDER BY snapshot_date DESC, snapshot_time DESC
@@ -1933,41 +1932,20 @@ def api_query():
             conn.close()
             return jsonify({'error': f'未找到 {query_time} 的数据'})
         
-        (snapshot_date, snapshot_time, rush_up, rush_down, diff, count, ratio, status,
-         round_rush_up, round_rush_down, price_lowest, price_newhigh,
-         count_score_display, count_score_type, rise_24h_count, fall_24h_count) = snapshot
+        (snapshot_date, snapshot_time, rush_up, rush_down, diff, count, status,
+         count_score_display, count_score_type) = snapshot
         
-        # snapshot_time已经是完整的日期时间，无需拼接
-        # 格式: '2025-12-09 22:40:00'
+        # 计算派生字段
+        ratio = rush_up / rush_down if rush_down > 0 else 0
+        round_rush_up = rush_up
+        round_rush_down = rush_down
+        price_lowest = 0
+        price_newhigh = 0
+        rise_24h_count = 0
+        fall_24h_count = 0
         
-        cursor.execute("""
-            SELECT 
-                symbol, change, rush_up, rush_down, update_time,
-                high_price, high_time, decline, change_24h, rank,
-                current_price, priority_level, ratio1, ratio2
-            FROM crypto_coin_data
-            WHERE snapshot_time = ?
-            ORDER BY index_order ASC
-        """, (snapshot_time,))
-        
+        # crypto_coin_data 表为空，暂不查询
         coins = []
-        for row in cursor.fetchall():
-            coins.append({
-                'symbol': row[0],
-                'change': row[1],
-                'rush_up': row[2],
-                'rush_down': row[3],
-                'update_time': row[4],
-                'high_price': row[5],
-                'high_time': row[6],
-                'decline': row[7],
-                'change_24h': row[8],
-                'rank': row[9],
-                'current_price': row[10],
-                'priority': row[11],
-                'ratio1': row[12],
-                'ratio2': row[13]
-            })
         
         conn.close()
         
@@ -2027,37 +2005,8 @@ def api_latest():
         rise_24h_count = 0  # 默认值
         fall_24h_count = 0  # 默认值
         
-        # snapshot_time已经是完整的日期时间，无需拼接
-        # 格式: '2025-12-09 22:40:00'
-        
-        cursor.execute("""
-            SELECT 
-                symbol, change, rush_up, rush_down, update_time,
-                high_price, high_time, decline, change_24h, rank,
-                current_price, priority_level, ratio1, ratio2
-            FROM crypto_coin_data
-            WHERE snapshot_time = ?
-            ORDER BY index_order ASC
-        """, (snapshot_time,))
-        
+        # crypto_coin_data 表为空，暂不查询
         coins = []
-        for row in cursor.fetchall():
-            coins.append({
-                'symbol': row[0],
-                'change': row[1],
-                'rush_up': row[2],
-                'rush_down': row[3],
-                'update_time': row[4],
-                'high_price': row[5],
-                'high_time': row[6],
-                'decline': row[7],
-                'change_24h': row[8],
-                'rank': row[9],
-                'current_price': row[10],
-                'priority': row[11],
-                'ratio1': row[12],
-                'ratio2': row[13]
-            })
         
         conn.close()
         
