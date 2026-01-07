@@ -176,6 +176,7 @@ def register_sar_routes(app):
             return jsonify({
                 'success': True,
                 'sequences': [],
+                'bias_statistics': {'slope_30m': 0, 'slope_1h': 0, 'slope_4h': 0},
                 'current_status': {
                     'position_cn': '多头' if item.get('sar_position') == 'bullish' else '空头',
                     'cycle_info': item.get('datetime_beijing', ''),
