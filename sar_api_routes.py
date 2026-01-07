@@ -6,6 +6,7 @@ from flask import jsonify, request
 from sar_slope_jsonl_system import SARSlopeJSONLSystem, MONITORED_SYMBOLS
 from datetime import datetime, timedelta
 import pytz
+from calculate_sequences import calculate_sequences
 
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
 
@@ -162,7 +163,8 @@ def register_sar_routes(app):
         try:
             symbol_full = f"{symbol.upper()}-USDT-SWAP"
             
-            data_points = sar_system.read_latest(symbol_full, limit=1)
+            # 读取更多历史数据用于序列计算
+            data_points = sar_system.read_latest(symbol_full, limit=500)
             
             if not data_points:
                 return jsonify({
@@ -172,11 +174,13 @@ def register_sar_routes(app):
             
             item = data_points[0]
             
-            item = data_points[0]
+            # 计算序列
+            sequences = calculate_sequences(data_points[::-1])  # 反转为时间正序
+            
             return jsonify({
                 'success': True,
-                'sequences': [],
-                'total_sequences': 0,
+                'sequences': sequences,
+                'total_sequences': len(sequences),
                 'bias_statistics': {'slope_30m': 0, 'slope_1h': 0, 'slope_4h': 0},
                 'current_status': {
                     'position': 'long' if item.get('sar_position') == 'bullish' else 'short',
