@@ -176,6 +176,7 @@ def register_sar_routes(app):
             
             # 计算序列
             sequences = calculate_sequences(data_points[::-1])  # 反转为时间正序
+            sequences = sequences[::-1]  # 再反转，最新序列在前
             
             return jsonify({
                 'success': True,
