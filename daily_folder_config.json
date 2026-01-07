@@ -1,13 +1,10 @@
 {
   "root_folder_odd": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
   "root_folder_even": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "current_date": "2026-01-04",
-  "folder_id": "136_RXEYRmaHs7z5fZYTOkG1xGkm6Np4x",
+  "current_date": "2026-01-07",
+  "folder_id": "1jFGGlGP5KEVhAxpCNxFIYEFI5-cDOBjM",
   "parent_folder_id": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "updated_at": "2026-01-04 11:05:09",
-  "update_reason": "手动跨日期更新到新文件夹",
-  "folder_name": "2026-01-04",
-  "auto_updated": true,
-  "auto_update_time": "2026-01-04 11:05:09",
-  "last_reset_date": "2026-01-04"
+  "updated_at": "2026-01-07 13:50:00",
+  "folder_name": "当前日期文件夹",
+  "note": "需要手动更新实际的folder_id"
 }
