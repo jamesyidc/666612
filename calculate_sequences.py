@@ -15,6 +15,8 @@ def calculate_sequences(data_points):
 
 def build_sequence(seq):
     data = seq['data']
+    sar_diff = data[-1]['sar_value'] - data[0]['sar_value']
+    price_change = ((data[-1]['price_close'] - data[0]['price_close']) / data[0]['price_close'] * 100) if data[0]['price_close'] else 0
     return {
         'sequence': len(data),
         'position': seq['position'],
@@ -24,9 +26,12 @@ def build_sequence(seq):
         'price': data[-1]['price_close'],
         'start_price': data[0]['price_close'],
         'end_price': data[-1]['price_close'],
+        'sar': data[-1]['sar_value'],
         'sar_value': data[-1]['sar_value'],
         'start_sar': data[0]['sar_value'],
         'end_sar': data[-1]['sar_value'],
-        'sar_diff': data[-1]['sar_value'] - data[0]['sar_value'],
-        'sequence_change_percent': ((data[-1]['price_close'] - data[0]['price_close']) / data[0]['price_close'] * 100) if data[0]['price_close'] else 0
+        'sar_diff': sar_diff,
+        'sequence_change_percent': price_change,
+        'change_1day_percent': price_change,
+        'avg_1day': abs(price_change) / len(data) if len(data) > 0 else 0
     }
