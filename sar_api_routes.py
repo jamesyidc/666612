@@ -216,3 +216,8 @@ def register_sar_routes(app):
                 'traceback': traceback.format_exc()
             }), 500
 
+
+    @app.route('/api/sar-slope/current-cycle/<symbol>')
+    def api_sar_slope_current_cycle(symbol):
+        """获取当前周期数据（兼容旧API）"""
+        return api_sar_slope_symbol(symbol)
