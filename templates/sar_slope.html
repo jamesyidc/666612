@@ -275,8 +275,8 @@
         async function loadData() {
             console.log('[Main] Starting loadData()...');
             try {
-                console.log('[Main] Fetching /api/sar-slope/status...');
-                const response = await fetch('/api/sar-slope/status');
+                console.log('[Main] Fetching /api/sar-slope/latest...');
+                const response = await fetch('/api/sar-slope/latest');
                 const data = await response.json();
                 console.log('[Main] Got response:', data.success, 'data count:', data.data?.length);
                 
