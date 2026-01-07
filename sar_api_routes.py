@@ -178,9 +178,10 @@ def register_sar_routes(app):
             sequences = calculate_sequences(data_points[::-1])  # 反转为时间正序
             sequences = sequences[::-1]  # 再反转，最新序列在前
             
-            # 获取当前（最新）序列信息
+            # 获取当前（最新）数据点信息
             current_seq = sequences[0] if sequences else {}
-            current_seq_number = current_seq.get('seq_number', 1)
+            current_point_number = current_seq.get('point_number', 1)  # 当前数据点在序列中的编号
+            total_points = current_seq.get('total_points', 1)  # 该序列总数据点数
             cycle_start = current_seq.get('start_time', item.get('datetime_beijing', ''))
             cycle_end = current_seq.get('end_time', item.get('datetime_beijing', ''))
             
@@ -204,7 +205,7 @@ def register_sar_routes(app):
                     'position_cn': '多头' if item.get('sar_position') == 'bullish' else '空头',
                     'cycle_info': item.get('datetime_beijing', ''),
                     'oscillation_cn': item.get('sar_position', ''),
-                    'current_sequence': current_seq_number,
+                    'current_sequence': current_point_number,  # 显示数据点编号（如07）
                     'cycle_start': cycle_start,
                     'cycle_end': cycle_end,
                     'duration': duration_str,
