@@ -3,6 +3,9 @@
 加密货币数据分析系统 - 完全仿照参考页面风格
 """
 from flask import Flask, render_template_string, render_template, request, jsonify, send_from_directory, make_response, redirect
+
+# SAR斜率系统 - JSONL存储
+from sar_api_routes import register_sar_routes
 from flask_cors import CORS
 import sqlite3
 from datetime import datetime, timedelta
@@ -15,6 +18,9 @@ import traceback
 import requests
 
 app = Flask(__name__)
+
+# 注册SAR斜率路由
+register_sar_routes(app)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 BEIJING_TZ = pytz.timezone('Asia/Shanghai')
@@ -10335,304 +10341,304 @@ def sar_slope_page():
     """SAR斜率系统页面"""
     return render_template('sar_slope.html')
 
-@app.route('/api/sar-slope/latest')
-def api_sar_slope_latest():
-    """获取所有币种的最新SAR斜率数据"""
-    try:
-        symbol_filter = request.args.get('symbol', '').upper()
-        position_filter = request.args.get('position', '')  # bullish/bearish
+# DEPRECATED: @app.route('/api/sar-slope/latest')
+# def api_sar_slope_latest():
+#     """获取所有币种的最新SAR斜率数据"""
+#     try:
+#         symbol_filter = request.args.get('symbol', '').upper()
+#         position_filter = request.args.get('position', '')  # bullish/bearish
         
-        conn = sqlite3.connect('databases/crypto_data.db')
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('databases/crypto_data.db')
+#         cursor = conn.cursor()
         
-        # 获取每个币种的最新记录
-        query = """
-            SELECT 
-                s.symbol,
-                s.datetime_beijing,
-                s.sar_value,
-                s.sar_position,
-                s.sar_quadrant,
-                s.position_duration,
-                s.slope_value,
-                s.slope_direction,
-                s.price_close,
-                s.timestamp
-            FROM sar_slope_data s
-            INNER JOIN (
-                SELECT symbol, MAX(timestamp) as max_timestamp
-                FROM sar_slope_data
-                GROUP BY symbol
-            ) latest ON s.symbol = latest.symbol AND s.timestamp = latest.max_timestamp
-        """
+#         # 获取每个币种的最新记录
+#         query = """
+#             SELECT 
+#                 s.symbol,
+#                 s.datetime_beijing,
+#                 s.sar_value,
+#                 s.sar_position,
+#                 s.sar_quadrant,
+#                 s.position_duration,
+#                 s.slope_value,
+#                 s.slope_direction,
+#                 s.price_close,
+#                 s.timestamp
+#             FROM sar_slope_data s
+#             INNER JOIN (
+#                 SELECT symbol, MAX(timestamp) as max_timestamp
+#                 FROM sar_slope_data
+#                 GROUP BY symbol
+#             ) latest ON s.symbol = latest.symbol AND s.timestamp = latest.max_timestamp
+#         """
         
-        conditions = []
-        params = []
+#         conditions = []
+#         params = []
         
-        if symbol_filter:
-            conditions.append("s.symbol LIKE ?")
-            params.append(f"%{symbol_filter}%")
+#         if symbol_filter:
+#             conditions.append("s.symbol LIKE ?")
+#             params.append(f"%{symbol_filter}%")
         
-        if position_filter:
-            conditions.append("s.sar_position = ?")
-            params.append(position_filter)
+#         if position_filter:
+#             conditions.append("s.sar_position = ?")
+#             params.append(position_filter)
         
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+#         if conditions:
+#             query += " WHERE " + " AND ".join(conditions)
         
-        query += " ORDER BY s.symbol"
+#         query += " ORDER BY s.symbol"
         
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
+#         cursor.execute(query, params)
+#         rows = cursor.fetchall()
         
-        results = []
-        for row in rows:
-            results.append({
-                'symbol': row[0],
-                'datetime': row[1],
-                'sar_value': round(row[2], 6) if row[2] else None,
-                'sar_position': row[3],
-                'sar_quadrant': row[4],
-                'position_duration': row[5],
-                'slope_value': round(row[6], 4) if row[6] else None,
-                'slope_direction': row[7],
-                'price': round(row[8], 6) if row[8] else None,
-                'timestamp': row[9]
-            })
+#         results = []
+#         for row in rows:
+#             results.append({
+#                 'symbol': row[0],
+#                 'datetime': row[1],
+#                 'sar_value': round(row[2], 6) if row[2] else None,
+#                 'sar_position': row[3],
+#                 'sar_quadrant': row[4],
+#                 'position_duration': row[5],
+#                 'slope_value': round(row[6], 4) if row[6] else None,
+#                 'slope_direction': row[7],
+#                 'price': round(row[8], 6) if row[8] else None,
+#                 'timestamp': row[9]
+#             })
         
-        # 获取统计信息
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN current_position = 'bullish' THEN 1 ELSE 0 END) as bullish_count,
-                SUM(CASE WHEN current_position = 'bearish' THEN 1 ELSE 0 END) as bearish_count,
-                AVG(position_duration) as avg_duration
-            FROM sar_position_stats
-        """)
+#         # 获取统计信息
+#         cursor.execute("""
+#             SELECT 
+#                 COUNT(*) as total,
+#                 SUM(CASE WHEN current_position = 'bullish' THEN 1 ELSE 0 END) as bullish_count,
+#                 SUM(CASE WHEN current_position = 'bearish' THEN 1 ELSE 0 END) as bearish_count,
+#                 AVG(position_duration) as avg_duration
+#             FROM sar_position_stats
+#         """)
         
-        stats_row = cursor.fetchone()
-        stats = {
-            'total_symbols': stats_row[0],
-            'bullish_count': stats_row[1],
-            'bearish_count': stats_row[2],
-            'avg_duration': round(stats_row[3], 1) if stats_row[3] else 0
-        }
+#         stats_row = cursor.fetchone()
+#         stats = {
+#             'total_symbols': stats_row[0],
+#             'bullish_count': stats_row[1],
+#             'bearish_count': stats_row[2],
+#             'avg_duration': round(stats_row[3], 1) if stats_row[3] else 0
+#         }
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'data': results,
-            'stats': stats,
-            'timestamp': datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
-        })
+#         return jsonify({
+#             'success': True,
+#             'data': results,
+#             'stats': stats,
+#             'timestamp': datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
+#         })
         
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         }), 500
 
-@app.route('/api/sar-slope/history/<symbol>')
-def api_sar_slope_history(symbol):
-    """获取指定币种的SAR斜率历史数据（默认48小时）"""
-    try:
-        days = int(request.args.get('days', 2))
-        limit = int(request.args.get('limit', 600))
+# DEPRECATED: @app.route('/api/sar-slope/history/<symbol>')
+# def api_sar_slope_history(symbol):
+#     """获取指定币种的SAR斜率历史数据（默认48小时）"""
+#     try:
+#         days = int(request.args.get('days', 2))
+#         limit = int(request.args.get('limit', 600))
         
-        # 计算起始时间戳
-        start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
+#         # 计算起始时间戳
+#         start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
         
-        conn = sqlite3.connect('databases/crypto_data.db')
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('databases/crypto_data.db')
+#         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT 
-                timestamp,
-                datetime_beijing,
-                sar_value,
-                sar_position,
-                sar_quadrant,
-                position_duration,
-                slope_value,
-                slope_direction,
-                price_open,
-                price_close
-            FROM sar_slope_data
-            WHERE symbol = ? AND timestamp >= ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-        """, (symbol, start_time, limit))
+#         cursor.execute("""
+#             SELECT 
+#                 timestamp,
+#                 datetime_beijing,
+#                 sar_value,
+#                 sar_position,
+#                 sar_quadrant,
+#                 position_duration,
+#                 slope_value,
+#                 slope_direction,
+#                 price_open,
+#                 price_close
+#             FROM sar_slope_data
+#             WHERE symbol = ? AND timestamp >= ?
+#             ORDER BY timestamp DESC
+#             LIMIT ?
+#         """, (symbol, start_time, limit))
         
-        rows = cursor.fetchall()
+#         rows = cursor.fetchall()
         
-        results = []
-        for row in rows:
-            results.append({
-                'timestamp': row[0],
-                'datetime': row[1],
-                'sar_value': round(row[2], 6) if row[2] else None,
-                'sar_position': row[3],
-                'sar_quadrant': row[4],
-                'position_duration': row[5],
-                'slope_value': round(row[6], 4) if row[6] else None,
-                'slope_direction': row[7],
-                'price_open': round(row[8], 6) if row[8] else None,
-                'price': round(row[9], 6) if row[9] else None
-            })
+#         results = []
+#         for row in rows:
+#             results.append({
+#                 'timestamp': row[0],
+#                 'datetime': row[1],
+#                 'sar_value': round(row[2], 6) if row[2] else None,
+#                 'sar_position': row[3],
+#                 'sar_quadrant': row[4],
+#                 'position_duration': row[5],
+#                 'slope_value': round(row[6], 4) if row[6] else None,
+#                 'slope_direction': row[7],
+#                 'price_open': round(row[8], 6) if row[8] else None,
+#                 'price': round(row[9], 6) if row[9] else None
+#             })
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'symbol': symbol,
-            'days': days,
-            'data': results,
-            'count': len(results)
-        })
+#         return jsonify({
+#             'success': True,
+#             'symbol': symbol,
+#             'days': days,
+#             'data': results,
+#             'count': len(results)
+#         })
         
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         }), 500
 
-@app.route('/api/sar-slope/position-changes/<symbol>')
-def api_sar_slope_position_changes(symbol):
-    """获取指定币种的SAR位置变化历史"""
-    try:
-        days = int(request.args.get('days', 7))
-        start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
+# DEPRECATED: @app.route('/api/sar-slope/position-changes/<symbol>')
+# def api_sar_slope_position_changes(symbol):
+#     """获取指定币种的SAR位置变化历史"""
+#     try:
+#         days = int(request.args.get('days', 7))
+#         start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000)
         
-        conn = sqlite3.connect('databases/crypto_data.db')
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('databases/crypto_data.db')
+#         cursor = conn.cursor()
         
-        # 查找位置变化点
-        cursor.execute("""
-            WITH position_changes AS (
-                SELECT 
-                    timestamp,
-                    datetime_beijing,
-                    sar_value,
-                    sar_position,
-                    position_duration,
-                    price_close,
-                    LAG(sar_position) OVER (ORDER BY timestamp) as prev_position
-                FROM sar_slope_data
-                WHERE symbol = ? AND timestamp >= ?
-            )
-            SELECT 
-                timestamp,
-                datetime_beijing,
-                sar_value,
-                sar_position,
-                position_duration,
-                price_close
-            FROM position_changes
-            WHERE prev_position IS NULL OR sar_position != prev_position
-            ORDER BY timestamp DESC
-            LIMIT 100
-        """, (symbol, start_time))
+#         # 查找位置变化点
+#         cursor.execute("""
+#             WITH position_changes AS (
+#                 SELECT 
+#                     timestamp,
+#                     datetime_beijing,
+#                     sar_value,
+#                     sar_position,
+#                     position_duration,
+#                     price_close,
+#                     LAG(sar_position) OVER (ORDER BY timestamp) as prev_position
+#                 FROM sar_slope_data
+#                 WHERE symbol = ? AND timestamp >= ?
+#             )
+#             SELECT 
+#                 timestamp,
+#                 datetime_beijing,
+#                 sar_value,
+#                 sar_position,
+#                 position_duration,
+#                 price_close
+#             FROM position_changes
+#             WHERE prev_position IS NULL OR sar_position != prev_position
+#             ORDER BY timestamp DESC
+#             LIMIT 100
+#         """, (symbol, start_time))
         
-        rows = cursor.fetchall()
+#         rows = cursor.fetchall()
         
-        results = []
-        for row in rows:
-            results.append({
-                'timestamp': row[0],
-                'datetime': row[1],
-                'sar_value': round(row[2], 6) if row[2] else None,
-                'position': row[3],
-                'duration': row[4],
-                'price': round(row[5], 6) if row[5] else None
-            })
+#         results = []
+#         for row in rows:
+#             results.append({
+#                 'timestamp': row[0],
+#                 'datetime': row[1],
+#                 'sar_value': round(row[2], 6) if row[2] else None,
+#                 'position': row[3],
+#                 'duration': row[4],
+#                 'price': round(row[5], 6) if row[5] else None
+#             })
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'symbol': symbol,
-            'days': days,
-            'data': results,
-            'count': len(results)
-        })
+#         return jsonify({
+#             'success': True,
+#             'symbol': symbol,
+#             'days': days,
+#             'data': results,
+#             'count': len(results)
+#         })
         
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         }), 500
 
-@app.route('/api/sar-slope/collector-status')
-def api_sar_slope_collector_status():
-    """获取SAR斜率采集器状态"""
-    try:
-        conn = sqlite3.connect('databases/crypto_data.db')
-        cursor = conn.cursor()
+# DEPRECATED: @app.route('/api/sar-slope/collector-status')
+# def api_sar_slope_collector_status():
+#     """获取SAR斜率采集器状态"""
+#     try:
+#         conn = sqlite3.connect('databases/crypto_data.db')
+#         cursor = conn.cursor()
         
-        # 获取最新数据时间
-        cursor.execute("""
-            SELECT MAX(timestamp) FROM sar_slope_data
-        """)
+#         # 获取最新数据时间
+#         cursor.execute("""
+#             SELECT MAX(timestamp) FROM sar_slope_data
+#         """)
         
-        latest_timestamp = cursor.fetchone()[0]
+#         latest_timestamp = cursor.fetchone()[0]
         
-        if latest_timestamp:
-            latest_dt = datetime.utcfromtimestamp(latest_timestamp / 1000)
-            latest_dt_beijing = latest_dt.replace(tzinfo=pytz.UTC).astimezone(BEIJING_TZ)
-            latest_time = latest_dt_beijing.strftime('%Y-%m-%d %H:%M:%S')
+#         if latest_timestamp:
+#             latest_dt = datetime.utcfromtimestamp(latest_timestamp / 1000)
+#             latest_dt_beijing = latest_dt.replace(tzinfo=pytz.UTC).astimezone(BEIJING_TZ)
+#             latest_time = latest_dt_beijing.strftime('%Y-%m-%d %H:%M:%S')
             
-            # 计算延迟
-            now = datetime.now(BEIJING_TZ)
-            delay_minutes = (now - latest_dt_beijing).total_seconds() / 60
-        else:
-            latest_time = None
-            delay_minutes = None
+#             # 计算延迟
+#             now = datetime.now(BEIJING_TZ)
+#             delay_minutes = (now - latest_dt_beijing).total_seconds() / 60
+#         else:
+#             latest_time = None
+#             delay_minutes = None
         
-        # 获取数据统计
-        cursor.execute("""
-            SELECT COUNT(*) FROM sar_slope_data
-        """)
-        total_records = cursor.fetchone()[0]
+#         # 获取数据统计
+#         cursor.execute("""
+#             SELECT COUNT(*) FROM sar_slope_data
+#         """)
+#         total_records = cursor.fetchone()[0]
         
-        # 获取各币种数据量
-        cursor.execute("""
-            SELECT symbol, COUNT(*) as count
-            FROM sar_slope_data
-            GROUP BY symbol
-            ORDER BY count DESC
-        """)
+#         # 获取各币种数据量
+#         cursor.execute("""
+#             SELECT symbol, COUNT(*) as count
+#             FROM sar_slope_data
+#             GROUP BY symbol
+#             ORDER BY count DESC
+#         """)
         
-        symbol_counts = [{'symbol': row[0], 'count': row[1]} for row in cursor.fetchall()]
+#         symbol_counts = [{'symbol': row[0], 'count': row[1]} for row in cursor.fetchall()]
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'status': {
-                'latest_time': latest_time,
-                'delay_minutes': round(delay_minutes, 1) if delay_minutes else None,
-                'is_delayed': delay_minutes > 10 if delay_minutes else True,
-                'total_records': total_records,
-                'symbol_counts': symbol_counts
-            }
-        })
+#         return jsonify({
+#             'success': True,
+#             'status': {
+#                 'latest_time': latest_time,
+#                 'delay_minutes': round(delay_minutes, 1) if delay_minutes else None,
+#                 'is_delayed': delay_minutes > 10 if delay_minutes else True,
+#                 'total_records': total_records,
+#                 'symbol_counts': symbol_counts
+#             }
+#         })
         
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         }), 500
 
-# ==================== Telegram 配置管理 API ====================
+# # ==================== Telegram 配置管理 API ====================
 
 @app.route('/api/telegram/config', methods=['GET', 'POST'])
 def telegram_config_api():
@@ -11184,1467 +11190,1467 @@ def fund_monitor_history_page():
 
 # ==================== SAR斜率系统路由 ====================
 @app.route('/sar-slope')
-def sar_slope():
-    """SAR斜率系统主页面"""
-    return render_template('sar_slope.html')
+# def sar_slope():
+#     """SAR斜率系统主页面"""
+#     return render_template('sar_slope.html')
 
 @app.route('/sar-slope/<symbol>')
 def sar_slope_detail(symbol):
     """SAR斜率单币详细追踪页面"""
     return render_template('sar_slope_detail.html', symbol=symbol.upper())
 
-@app.route('/api/sar-slope/status')
-def sar_slope_status():
-    """获取所有币种的SAR状态"""
-    # 检查服务器端缓存
-    cache_key = "sar_slope_status:all"
-    cached_data = server_cache.get(cache_key, max_age=30)
-    if cached_data:
-        cached_data['_from_server_cache'] = True
-        cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
-        return jsonify(cached_data)
+# DEPRECATED: @app.route('/api/sar-slope/status')
+# def sar_slope_status():
+#     """获取所有币种的SAR状态"""
+#     # 检查服务器端缓存
+#     cache_key = "sar_slope_status:all"
+#     cached_data = server_cache.get(cache_key, max_age=30)
+#     if cached_data:
+#         cached_data['_from_server_cache'] = True
+#         cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
+#         return jsonify(cached_data)
     
-    try:
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#     try:
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT symbol, last_kline_time, total_klines,
-                   current_position, current_sequence, updated_at
-            FROM system_status
-            ORDER BY symbol
-        ''')
+#         cursor.execute('''
+#             SELECT symbol, last_kline_time, total_klines,
+#                    current_position, current_sequence, updated_at
+#             FROM system_status
+#             ORDER BY symbol
+#         ''')
         
-        rows = cursor.fetchall()
-        conn.close()
+#         rows = cursor.fetchall()
+#         conn.close()
         
-        status_list = []
-        for row in rows:
-            status_list.append({
-                'symbol': row[0],
-                'last_kline_time': row[1],
-                'total_klines': row[2],
-                'current_position': row[3],
-                'current_sequence': row[4],
-                'updated_at': row[5]
-            })
+#         status_list = []
+#         for row in rows:
+#             status_list.append({
+#                 'symbol': row[0],
+#                 'last_kline_time': row[1],
+#                 'total_klines': row[2],
+#                 'current_position': row[3],
+#                 'current_sequence': row[4],
+#                 'updated_at': row[5]
+#             })
         
-        result = {
-            'success': True,
-            'data': status_list,
-            'count': len(status_list)
-        }
+#         result = {
+#             'success': True,
+#             'data': status_list,
+#             'count': len(status_list)
+#         }
         
-        # 保存到服务器端缓存
-        server_cache.set(cache_key, result)
+#         # 保存到服务器端缓存
+#         server_cache.set(cache_key, result)
         
-        return jsonify(result)
+#         return jsonify(result)
     
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/sar-slope/symbol/<symbol>')
-def sar_slope_symbol_data(symbol):
-    """获取单个币种的详细SAR数据"""
-    try:
-        limit = request.args.get('limit', 500, type=int)
+# DEPRECATED: @app.route('/api/sar-slope/symbol/<symbol>')
+# def sar_slope_symbol_data(symbol):
+#     """获取单个币种的详细SAR数据"""
+#     try:
+#         limit = request.args.get('limit', 500, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        # 获取原始SAR数据
-        cursor.execute('''
-            SELECT timestamp, kline_time, open_price, high_price, low_price, 
-                   close_price, sar_value, position, position_sequence, duration_minutes
-            FROM sar_raw_data
-            WHERE symbol = ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-        ''', (symbol, limit))
+#         # 获取原始SAR数据
+#         cursor.execute('''
+#             SELECT timestamp, kline_time, open_price, high_price, low_price, 
+#                    close_price, sar_value, position, position_sequence, duration_minutes
+#             FROM sar_raw_data
+#             WHERE symbol = ?
+#             ORDER BY timestamp DESC
+#             LIMIT ?
+#         ''', (symbol, limit))
         
-        sar_data = []
-        for row in cursor.fetchall():
-            sar_data.append({
-                'timestamp': row[0],
-                'kline_time': row[1],
-                'open': row[2],
-                'high': row[3],
-                'low': row[4],
-                'close': row[5],
-                'sar': row[6],
-                'position': row[7],
-                'sequence': row[8],
-                'duration': row[9]
-            })
+#         sar_data = []
+#         for row in cursor.fetchall():
+#             sar_data.append({
+#                 'timestamp': row[0],
+#                 'kline_time': row[1],
+#                 'open': row[2],
+#                 'high': row[3],
+#                 'low': row[4],
+#                 'close': row[5],
+#                 'sar': row[6],
+#                 'position': row[7],
+#                 'sequence': row[8],
+#                 'duration': row[9]
+#             })
         
-        # 获取变化率数据
-        cursor.execute('''
-            SELECT sequence_num, prev_sar, current_sar, change_value, 
-                   change_percent, kline_time, position
-            FROM sar_consecutive_changes
-            WHERE symbol = ?
-            ORDER BY id DESC
-            LIMIT ?
-        ''', (symbol, limit))
+#         # 获取变化率数据
+#         cursor.execute('''
+#             SELECT sequence_num, prev_sar, current_sar, change_value, 
+#                    change_percent, kline_time, position
+#             FROM sar_consecutive_changes
+#             WHERE symbol = ?
+#             ORDER BY id DESC
+#             LIMIT ?
+#         ''', (symbol, limit))
         
-        changes = []
-        for row in cursor.fetchall():
-            changes.append({
-                'sequence': row[0],
-                'prev_sar': row[1],
-                'current_sar': row[2],
-                'change_value': row[3],
-                'change_percent': row[4],
-                'time': row[5],
-                'position': row[6]
-            })
+#         changes = []
+#         for row in cursor.fetchall():
+#             changes.append({
+#                 'sequence': row[0],
+#                 'prev_sar': row[1],
+#                 'current_sar': row[2],
+#                 'change_value': row[3],
+#                 'change_percent': row[4],
+#                 'time': row[5],
+#                 'position': row[6]
+#             })
         
-        # 获取平均值
-        cursor.execute('''
-            SELECT position, period_type, avg_change_percent, sample_count
-            FROM sar_period_averages
-            WHERE symbol = ?
-        ''', (symbol,))
+#         # 获取平均值
+#         cursor.execute('''
+#             SELECT position, period_type, avg_change_percent, sample_count
+#             FROM sar_period_averages
+#             WHERE symbol = ?
+#         ''', (symbol,))
         
-        averages = {}
-        for row in cursor.fetchall():
-            pos = row[0]
-            if pos not in averages:
-                averages[pos] = {}
-            averages[pos][row[1]] = {
-                'avg': row[2],
-                'samples': row[3]
-            }
+#         averages = {}
+#         for row in cursor.fetchall():
+#             pos = row[0]
+#             if pos not in averages:
+#                 averages[pos] = {}
+#             averages[pos][row[1]] = {
+#                 'avg': row[2],
+#                 'samples': row[3]
+#             }
         
-        # 获取最近异常
-        cursor.execute('''
-            SELECT position, sequence_num, sar_value, change_percent,
-                   deviation_percent, alert_level, is_extreme_point, kline_time
-            FROM sar_anomaly_alerts
-            WHERE symbol = ?
-            ORDER BY created_at DESC
-            LIMIT 100
-        ''', (symbol,))
+#         # 获取最近异常
+#         cursor.execute('''
+#             SELECT position, sequence_num, sar_value, change_percent,
+#                    deviation_percent, alert_level, is_extreme_point, kline_time
+#             FROM sar_anomaly_alerts
+#             WHERE symbol = ?
+#             ORDER BY created_at DESC
+#             LIMIT 100
+#         ''', (symbol,))
         
-        alerts = []
-        for row in cursor.fetchall():
-            alerts.append({
-                'position': row[0],
-                'sequence': row[1],
-                'sar': row[2],
-                'change_percent': row[3],
-                'deviation': row[4],
-                'level': row[5],
-                'is_extreme': row[6],
-                'time': row[7]
-            })
+#         alerts = []
+#         for row in cursor.fetchall():
+#             alerts.append({
+#                 'position': row[0],
+#                 'sequence': row[1],
+#                 'sar': row[2],
+#                 'change_percent': row[3],
+#                 'deviation': row[4],
+#                 'level': row[5],
+#                 'is_extreme': row[6],
+#                 'time': row[7]
+#             })
         
-        # 获取转换点
-        cursor.execute('''
-            SELECT timestamp, kline_time, from_position, to_position,
-                   conversion_sar, conversion_price, previous_duration
-            FROM sar_conversion_points
-            WHERE symbol = ?
-            ORDER BY timestamp DESC
-            LIMIT 50
-        ''', (symbol,))
+#         # 获取转换点
+#         cursor.execute('''
+#             SELECT timestamp, kline_time, from_position, to_position,
+#                    conversion_sar, conversion_price, previous_duration
+#             FROM sar_conversion_points
+#             WHERE symbol = ?
+#             ORDER BY timestamp DESC
+#             LIMIT 50
+#         ''', (symbol,))
         
-        conversions = []
-        for row in cursor.fetchall():
-            conversions.append({
-                'timestamp': row[0],
-                'time': row[1],
-                'from_position': row[2],
-                'to_position': row[3],
-                'sar': row[4],
-                'price': row[5],
-                'prev_duration': row[6]
-            })
+#         conversions = []
+#         for row in cursor.fetchall():
+#             conversions.append({
+#                 'timestamp': row[0],
+#                 'time': row[1],
+#                 'from_position': row[2],
+#                 'to_position': row[3],
+#                 'sar': row[4],
+#                 'price': row[5],
+#                 'prev_duration': row[6]
+#             })
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'symbol': symbol,
-            'sar_data': sar_data,
-            'changes': changes,
-            'averages': averages,
-            'alerts': alerts,
-            'conversions': conversions
-        })
+#         return jsonify({
+#             'success': True,
+#             'symbol': symbol,
+#             'sar_data': sar_data,
+#             'changes': changes,
+#             'averages': averages,
+#             'alerts': alerts,
+#             'conversions': conversions
+#         })
     
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/sar-slope/alerts')
-def sar_slope_alerts():
-    """获取所有异常告警"""
-    try:
-        limit = request.args.get('limit', 50, type=int)
-        symbol = request.args.get('symbol', None)
+# DEPRECATED: @app.route('/api/sar-slope/alerts')
+# def sar_slope_alerts():
+#     """获取所有异常告警"""
+#     try:
+#         limit = request.args.get('limit', 50, type=int)
+#         symbol = request.args.get('symbol', None)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        if symbol:
-            cursor.execute('''
-                SELECT symbol, position, sequence_num, sar_value,
-                       change_percent, deviation_percent, alert_level,
-                       is_extreme_point, extreme_type, kline_time
-                FROM sar_anomaly_alerts
-                WHERE symbol = ?
-                ORDER BY created_at DESC
-                LIMIT ?
-            ''', (symbol, limit))
-        else:
-            cursor.execute('''
-                SELECT symbol, position, sequence_num, sar_value,
-                       change_percent, deviation_percent, alert_level,
-                       is_extreme_point, extreme_type, kline_time
-                FROM sar_anomaly_alerts
-                ORDER BY created_at DESC
-                LIMIT ?
-            ''', (limit,))
+#         if symbol:
+#             cursor.execute('''
+#                 SELECT symbol, position, sequence_num, sar_value,
+#                        change_percent, deviation_percent, alert_level,
+#                        is_extreme_point, extreme_type, kline_time
+#                 FROM sar_anomaly_alerts
+#                 WHERE symbol = ?
+#                 ORDER BY created_at DESC
+#                 LIMIT ?
+#             ''', (symbol, limit))
+#         else:
+#             cursor.execute('''
+#                 SELECT symbol, position, sequence_num, sar_value,
+#                        change_percent, deviation_percent, alert_level,
+#                        is_extreme_point, extreme_type, kline_time
+#                 FROM sar_anomaly_alerts
+#                 ORDER BY created_at DESC
+#                 LIMIT ?
+#             ''', (limit,))
         
-        alerts = []
-        for row in cursor.fetchall():
-            alerts.append({
-                'symbol': row[0],
-                'position': row[1],
-                'sequence': row[2],
-                'sar': row[3],
-                'change_percent': row[4],
-                'deviation': row[5],
-                'level': row[6],
-                'is_extreme': row[7],
-                'extreme_type': row[8],
-                'time': row[9]
-            })
+#         alerts = []
+#         for row in cursor.fetchall():
+#             alerts.append({
+#                 'symbol': row[0],
+#                 'position': row[1],
+#                 'sequence': row[2],
+#                 'sar': row[3],
+#                 'change_percent': row[4],
+#                 'deviation': row[5],
+#                 'level': row[6],
+#                 'is_extreme': row[7],
+#                 'extreme_type': row[8],
+#                 'time': row[9]
+#             })
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'data': alerts,
-            'count': len(alerts)
-        })
+#         return jsonify({
+#             'success': True,
+#             'data': alerts,
+#             'count': len(alerts)
+#         })
     
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/sar-slope/conversions')
-def sar_slope_conversions():
-    """获取多空转换点"""
-    try:
-        limit = request.args.get('limit', 50, type=int)
-        symbol = request.args.get('symbol', None)
+# DEPRECATED: @app.route('/api/sar-slope/conversions')
+# def sar_slope_conversions():
+#     """获取多空转换点"""
+#     try:
+#         limit = request.args.get('limit', 50, type=int)
+#         symbol = request.args.get('symbol', None)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        if symbol:
-            cursor.execute('''
-                SELECT symbol, timestamp, kline_time, from_position, to_position,
-                       conversion_sar, conversion_price, previous_duration
-                FROM sar_conversion_points
-                WHERE symbol = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            ''', (symbol, limit))
-        else:
-            cursor.execute('''
-                SELECT symbol, timestamp, kline_time, from_position, to_position,
-                       conversion_sar, conversion_price, previous_duration
-                FROM sar_conversion_points
-                ORDER BY timestamp DESC
-                LIMIT ?
-            ''', (limit,))
+#         if symbol:
+#             cursor.execute('''
+#                 SELECT symbol, timestamp, kline_time, from_position, to_position,
+#                        conversion_sar, conversion_price, previous_duration
+#                 FROM sar_conversion_points
+#                 WHERE symbol = ?
+#                 ORDER BY timestamp DESC
+#                 LIMIT ?
+#             ''', (symbol, limit))
+#         else:
+#             cursor.execute('''
+#                 SELECT symbol, timestamp, kline_time, from_position, to_position,
+#                        conversion_sar, conversion_price, previous_duration
+#                 FROM sar_conversion_points
+#                 ORDER BY timestamp DESC
+#                 LIMIT ?
+#             ''', (limit,))
         
-        conversions = []
-        for row in cursor.fetchall():
-            conversions.append({
-                'symbol': row[0],
-                'timestamp': row[1],
-                'time': row[2],
-                'from_position': row[3],
-                'to_position': row[4],
-                'sar': row[5],
-                'price': row[6],
-                'prev_duration': row[7]
-            })
+#         conversions = []
+#         for row in cursor.fetchall():
+#             conversions.append({
+#                 'symbol': row[0],
+#                 'timestamp': row[1],
+#                 'time': row[2],
+#                 'from_position': row[3],
+#                 'to_position': row[4],
+#                 'sar': row[5],
+#                 'price': row[6],
+#                 'prev_duration': row[7]
+#             })
         
-        conn.close()
+#         conn.close()
         
-        return jsonify({
-            'success': True,
-            'data': conversions,
-            'count': len(conversions)
-        })
+#         return jsonify({
+#             'success': True,
+#             'data': conversions,
+#             'count': len(conversions)
+#         })
     
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/sar-slope/query/<symbol>')
-def sar_slope_query_symbol(symbol):
-    """
-    完整的单币查询接口
-    查询参数:
-    - start_time: 开始时间 (格式: YYYY-MM-DD HH:MM:SS)
-    - end_time: 结束时间 (格式: YYYY-MM-DD HH:MM:SS)
-    - limit: 返回数量限制 (默认: 1000)
-    - position: 筛选多空状态 (long/short)
-    - include_changes: 是否包含变化率 (true/false, 默认: true)
-    - include_alerts: 是否包含异常告警 (true/false, 默认: true)
-    - include_conversions: 是否包含多空转换 (true/false, 默认: true)
-    - include_averages: 是否包含周期平均值 (true/false, 默认: true)
-    """
-    try:
-        # 获取查询参数
-        start_time = request.args.get('start_time', None)
-        end_time = request.args.get('end_time', None)
-        limit = request.args.get('limit', 1000, type=int)
-        position = request.args.get('position', None)  # long/short
+# DEPRECATED: @app.route('/api/sar-slope/query/<symbol>')
+# def sar_slope_query_symbol(symbol):
+#     """
+#     完整的单币查询接口
+#     查询参数:
+#     - start_time: 开始时间 (格式: YYYY-MM-DD HH:MM:SS)
+#     - end_time: 结束时间 (格式: YYYY-MM-DD HH:MM:SS)
+#     - limit: 返回数量限制 (默认: 1000)
+#     - position: 筛选多空状态 (long/short)
+#     - include_changes: 是否包含变化率 (true/false, 默认: true)
+#     - include_alerts: 是否包含异常告警 (true/false, 默认: true)
+#     - include_conversions: 是否包含多空转换 (true/false, 默认: true)
+#     - include_averages: 是否包含周期平均值 (true/false, 默认: true)
+#     """
+#     try:
+#         # 获取查询参数
+#         start_time = request.args.get('start_time', None)
+#         end_time = request.args.get('end_time', None)
+#         limit = request.args.get('limit', 1000, type=int)
+#         position = request.args.get('position', None)  # long/short
         
-        include_changes = request.args.get('include_changes', 'true').lower() == 'true'
-        include_alerts = request.args.get('include_alerts', 'true').lower() == 'true'
-        include_conversions = request.args.get('include_conversions', 'true').lower() == 'true'
-        include_averages = request.args.get('include_averages', 'true').lower() == 'true'
+#         include_changes = request.args.get('include_changes', 'true').lower() == 'true'
+#         include_alerts = request.args.get('include_alerts', 'true').lower() == 'true'
+#         include_conversions = request.args.get('include_conversions', 'true').lower() == 'true'
+#         include_averages = request.args.get('include_averages', 'true').lower() == 'true'
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        result = {
-            'success': True,
-            'symbol': symbol.upper(),
-            'query_params': {
-                'start_time': start_time,
-                'end_time': end_time,
-                'limit': limit,
-                'position': position
-            }
-        }
+#         result = {
+#             'success': True,
+#             'symbol': symbol.upper(),
+#             'query_params': {
+#                 'start_time': start_time,
+#                 'end_time': end_time,
+#                 'limit': limit,
+#                 'position': position
+#             }
+#         }
         
-        # 1. 获取系统状态
-        cursor.execute('''
-            SELECT last_update_time, last_kline_time, total_klines,
-                   current_position, current_sequence, status, updated_at
-            FROM system_status
-            WHERE symbol = ?
-        ''', (symbol.upper(),))
+#         # 1. 获取系统状态
+#         cursor.execute('''
+#             SELECT last_update_time, last_kline_time, total_klines,
+#                    current_position, current_sequence, status, updated_at
+#             FROM system_status
+#             WHERE symbol = ?
+#         ''', (symbol.upper(),))
         
-        status_row = cursor.fetchone()
-        if status_row:
-            result['system_status'] = {
-                'last_update_time': status_row[0],
-                'last_kline_time': status_row[1],
-                'total_klines': status_row[2],
-                'current_position': status_row[3],
-                'current_sequence': status_row[4],
-                'status': status_row[5],
-                'updated_at': status_row[6]
-            }
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'Symbol {symbol.upper()} not found in system'
-            })
+#         status_row = cursor.fetchone()
+#         if status_row:
+#             result['system_status'] = {
+#                 'last_update_time': status_row[0],
+#                 'last_kline_time': status_row[1],
+#                 'total_klines': status_row[2],
+#                 'current_position': status_row[3],
+#                 'current_sequence': status_row[4],
+#                 'status': status_row[5],
+#                 'updated_at': status_row[6]
+#             }
+#         else:
+#             return jsonify({
+#                 'success': False,
+#                 'error': f'Symbol {symbol.upper()} not found in system'
+#             })
         
-        # 2. 构建原始数据查询SQL
-        sql_conditions = ["symbol = ?"]
-        sql_params = [symbol.upper()]
+#         # 2. 构建原始数据查询SQL
+#         sql_conditions = ["symbol = ?"]
+#         sql_params = [symbol.upper()]
         
-        if start_time:
-            # 转换时间字符串为时间戳
-            from datetime import datetime
-            import pytz
-            beijing_tz = pytz.timezone('Asia/Shanghai')
-            dt = beijing_tz.localize(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S'))
-            timestamp = int(dt.timestamp() * 1000)
-            sql_conditions.append("timestamp >= ?")
-            sql_params.append(timestamp)
+#         if start_time:
+#             # 转换时间字符串为时间戳
+#             from datetime import datetime
+#             import pytz
+#             beijing_tz = pytz.timezone('Asia/Shanghai')
+#             dt = beijing_tz.localize(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S'))
+#             timestamp = int(dt.timestamp() * 1000)
+#             sql_conditions.append("timestamp >= ?")
+#             sql_params.append(timestamp)
         
-        if end_time:
-            from datetime import datetime
-            import pytz
-            beijing_tz = pytz.timezone('Asia/Shanghai')
-            dt = beijing_tz.localize(datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S'))
-            timestamp = int(dt.timestamp() * 1000)
-            sql_conditions.append("timestamp <= ?")
-            sql_params.append(timestamp)
+#         if end_time:
+#             from datetime import datetime
+#             import pytz
+#             beijing_tz = pytz.timezone('Asia/Shanghai')
+#             dt = beijing_tz.localize(datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S'))
+#             timestamp = int(dt.timestamp() * 1000)
+#             sql_conditions.append("timestamp <= ?")
+#             sql_params.append(timestamp)
         
-        if position:
-            sql_conditions.append("position = ?")
-            sql_params.append(position)
+#         if position:
+#             sql_conditions.append("position = ?")
+#             sql_params.append(position)
         
-        # 获取原始SAR数据
-        cursor.execute(f'''
-            SELECT timestamp, kline_time, open_price, high_price, low_price,
-                   close_price, sar_value, position, position_sequence, duration_minutes
-            FROM sar_raw_data
-            WHERE {' AND '.join(sql_conditions)}
-            ORDER BY timestamp DESC
-            LIMIT ?
-        ''', sql_params + [limit])
+#         # 获取原始SAR数据
+#         cursor.execute(f'''
+#             SELECT timestamp, kline_time, open_price, high_price, low_price,
+#                    close_price, sar_value, position, position_sequence, duration_minutes
+#             FROM sar_raw_data
+#             WHERE {' AND '.join(sql_conditions)}
+#             ORDER BY timestamp DESC
+#             LIMIT ?
+#         ''', sql_params + [limit])
         
-        sar_data = []
-        for row in cursor.fetchall():
-            sar_data.append({
-                'timestamp': row[0],
-                'kline_time': row[1],
-                'open': row[2],
-                'high': row[3],
-                'low': row[4],
-                'close': row[5],
-                'sar': row[6],
-                'position': row[7],
-                'sequence': row[8],
-                'duration': row[9]
-            })
+#         sar_data = []
+#         for row in cursor.fetchall():
+#             sar_data.append({
+#                 'timestamp': row[0],
+#                 'kline_time': row[1],
+#                 'open': row[2],
+#                 'high': row[3],
+#                 'low': row[4],
+#                 'close': row[5],
+#                 'sar': row[6],
+#                 'position': row[7],
+#                 'sequence': row[8],
+#                 'duration': row[9]
+#             })
         
-        result['sar_data'] = {
-            'count': len(sar_data),
-            'data': sar_data
-        }
+#         result['sar_data'] = {
+#             'count': len(sar_data),
+#             'data': sar_data
+#         }
         
-        # 3. 获取变化率数据（如果需要）
-        if include_changes:
-            change_conditions = ["symbol = ?"]
-            change_params = [symbol.upper()]
+#         # 3. 获取变化率数据（如果需要）
+#         if include_changes:
+#             change_conditions = ["symbol = ?"]
+#             change_params = [symbol.upper()]
             
-            if position:
-                change_conditions.append("position = ?")
-                change_params.append(position)
+#             if position:
+#                 change_conditions.append("position = ?")
+#                 change_params.append(position)
             
-            cursor.execute(f'''
-                SELECT sequence_num, prev_sar, current_sar, change_value,
-                       change_percent, kline_time, position
-                FROM sar_consecutive_changes
-                WHERE {' AND '.join(change_conditions)}
-                ORDER BY id DESC
-                LIMIT ?
-            ''', change_params + [limit])
+#             cursor.execute(f'''
+#                 SELECT sequence_num, prev_sar, current_sar, change_value,
+#                        change_percent, kline_time, position
+#                 FROM sar_consecutive_changes
+#                 WHERE {' AND '.join(change_conditions)}
+#                 ORDER BY id DESC
+#                 LIMIT ?
+#             ''', change_params + [limit])
             
-            changes = []
-            for row in cursor.fetchall():
-                changes.append({
-                    'sequence': row[0],
-                    'prev_sar': row[1],
-                    'current_sar': row[2],
-                    'change_value': row[3],
-                    'change_percent': row[4],
-                    'time': row[5],
-                    'position': row[6]
-                })
+#             changes = []
+#             for row in cursor.fetchall():
+#                 changes.append({
+#                     'sequence': row[0],
+#                     'prev_sar': row[1],
+#                     'current_sar': row[2],
+#                     'change_value': row[3],
+#                     'change_percent': row[4],
+#                     'time': row[5],
+#                     'position': row[6]
+#                 })
             
-            result['changes'] = {
-                'count': len(changes),
-                'data': changes
-            }
+#             result['changes'] = {
+#                 'count': len(changes),
+#                 'data': changes
+#             }
         
-        # 4. 获取周期平均值（如果需要）
-        if include_averages:
-            cursor.execute('''
-                SELECT position, period_type, avg_change_percent, 
-                       sample_count, calculated_at
-                FROM sar_period_averages
-                WHERE symbol = ?
-                ORDER BY position, period_type
-            ''', (symbol.upper(),))
+#         # 4. 获取周期平均值（如果需要）
+#         if include_averages:
+#             cursor.execute('''
+#                 SELECT position, period_type, avg_change_percent, 
+#                        sample_count, calculated_at
+#                 FROM sar_period_averages
+#                 WHERE symbol = ?
+#                 ORDER BY position, period_type
+#             ''', (symbol.upper(),))
             
-            averages = {
-                'long': {},
-                'short': {}
-            }
+#             averages = {
+#                 'long': {},
+#                 'short': {}
+#             }
             
-            for row in cursor.fetchall():
-                pos = row[0]
-                period = row[1]
-                averages[pos][period] = {
-                    'avg_change_percent': row[2],
-                    'sample_count': row[3],
-                    'calculated_at': row[4]
-                }
+#             for row in cursor.fetchall():
+#                 pos = row[0]
+#                 period = row[1]
+#                 averages[pos][period] = {
+#                     'avg_change_percent': row[2],
+#                     'sample_count': row[3],
+#                     'calculated_at': row[4]
+#                 }
             
-            result['averages'] = averages
+#             result['averages'] = averages
         
-        # 5. 获取异常告警（如果需要）
-        if include_alerts:
-            alert_conditions = ["symbol = ?"]
-            alert_params = [symbol.upper()]
+#         # 5. 获取异常告警（如果需要）
+#         if include_alerts:
+#             alert_conditions = ["symbol = ?"]
+#             alert_params = [symbol.upper()]
             
-            if position:
-                alert_conditions.append("position = ?")
-                alert_params.append(position)
+#             if position:
+#                 alert_conditions.append("position = ?")
+#                 alert_params.append(position)
             
-            cursor.execute(f'''
-                SELECT position, sequence_num, sar_value, change_percent,
-                       period_avg, deviation_percent, alert_level,
-                       is_extreme_point, extreme_type, kline_time, created_at
-                FROM sar_anomaly_alerts
-                WHERE {' AND '.join(alert_conditions)}
-                ORDER BY created_at DESC
-                LIMIT ?
-            ''', alert_params + [min(limit, 200)])
+#             cursor.execute(f'''
+#                 SELECT position, sequence_num, sar_value, change_percent,
+#                        period_avg, deviation_percent, alert_level,
+#                        is_extreme_point, extreme_type, kline_time, created_at
+#                 FROM sar_anomaly_alerts
+#                 WHERE {' AND '.join(alert_conditions)}
+#                 ORDER BY created_at DESC
+#                 LIMIT ?
+#             ''', alert_params + [min(limit, 200)])
             
-            alerts = []
-            for row in cursor.fetchall():
-                alerts.append({
-                    'position': row[0],
-                    'sequence': row[1],
-                    'sar': row[2],
-                    'change_percent': row[3],
-                    'period_avg': row[4],
-                    'deviation': row[5],
-                    'level': row[6],
-                    'is_extreme': row[7],
-                    'extreme_type': row[8],
-                    'time': row[9],
-                    'created_at': row[10]
-                })
+#             alerts = []
+#             for row in cursor.fetchall():
+#                 alerts.append({
+#                     'position': row[0],
+#                     'sequence': row[1],
+#                     'sar': row[2],
+#                     'change_percent': row[3],
+#                     'period_avg': row[4],
+#                     'deviation': row[5],
+#                     'level': row[6],
+#                     'is_extreme': row[7],
+#                     'extreme_type': row[8],
+#                     'time': row[9],
+#                     'created_at': row[10]
+#                 })
             
-            result['alerts'] = {
-                'count': len(alerts),
-                'data': alerts
-            }
+#             result['alerts'] = {
+#                 'count': len(alerts),
+#                 'data': alerts
+#             }
         
-        # 6. 获取多空转换点（如果需要）
-        if include_conversions:
-            cursor.execute('''
-                SELECT timestamp, kline_time, from_position, to_position,
-                       conversion_sar, conversion_price, previous_duration, created_at
-                FROM sar_conversion_points
-                WHERE symbol = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            ''', (symbol.upper(), min(limit, 100)))
+#         # 6. 获取多空转换点（如果需要）
+#         if include_conversions:
+#             cursor.execute('''
+#                 SELECT timestamp, kline_time, from_position, to_position,
+#                        conversion_sar, conversion_price, previous_duration, created_at
+#                 FROM sar_conversion_points
+#                 WHERE symbol = ?
+#                 ORDER BY timestamp DESC
+#                 LIMIT ?
+#             ''', (symbol.upper(), min(limit, 100)))
             
-            conversions = []
-            for row in cursor.fetchall():
-                conversions.append({
-                    'timestamp': row[0],
-                    'time': row[1],
-                    'from_position': row[2],
-                    'to_position': row[3],
-                    'sar': row[4],
-                    'price': row[5],
-                    'prev_duration': row[6],
-                    'created_at': row[7]
-                })
+#             conversions = []
+#             for row in cursor.fetchall():
+#                 conversions.append({
+#                     'timestamp': row[0],
+#                     'time': row[1],
+#                     'from_position': row[2],
+#                     'to_position': row[3],
+#                     'sar': row[4],
+#                     'price': row[5],
+#                     'prev_duration': row[6],
+#                     'created_at': row[7]
+#                 })
             
-            result['conversions'] = {
-                'count': len(conversions),
-                'data': conversions
-            }
+#             result['conversions'] = {
+#                 'count': len(conversions),
+#                 'data': conversions
+#             }
         
-        # 7. 统计信息
-        result['statistics'] = {
-            'total_records': len(sar_data),
-            'date_range': {
-                'earliest': sar_data[-1]['kline_time'] if sar_data else None,
-                'latest': sar_data[0]['kline_time'] if sar_data else None
-            }
-        }
+#         # 7. 统计信息
+#         result['statistics'] = {
+#             'total_records': len(sar_data),
+#             'date_range': {
+#                 'earliest': sar_data[-1]['kline_time'] if sar_data else None,
+#                 'latest': sar_data[0]['kline_time'] if sar_data else None
+#             }
+#         }
         
-        # 计算多空分布
-        if sar_data:
-            long_count = sum(1 for d in sar_data if d['position'] == 'long')
-            short_count = sum(1 for d in sar_data if d['position'] == 'short')
-            result['statistics']['position_distribution'] = {
-                'long': long_count,
-                'short': short_count,
-                'long_percent': round(long_count / len(sar_data) * 100, 2),
-                'short_percent': round(short_count / len(sar_data) * 100, 2)
-            }
+#         # 计算多空分布
+#         if sar_data:
+#             long_count = sum(1 for d in sar_data if d['position'] == 'long')
+#             short_count = sum(1 for d in sar_data if d['position'] == 'short')
+#             result['statistics']['position_distribution'] = {
+#                 'long': long_count,
+#                 'short': short_count,
+#                 'long_percent': round(long_count / len(sar_data) * 100, 2),
+#                 'short_percent': round(short_count / len(sar_data) * 100, 2)
+#             }
         
-        conn.close()
+#         conn.close()
         
-        return jsonify(result)
+#         return jsonify(result)
     
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         })
 
-@app.route('/api/sar-slope/sequence-compare/<symbol>')
-def sar_slope_sequence_compare(symbol):
-    """
-    序列号对比接口 - 用户需求
-    对比当前序列号的变化率与该序列号的历史平均值
+# DEPRECATED: @app.route('/api/sar-slope/sequence-compare/<symbol>')
+# def sar_slope_sequence_compare(symbol):
+#     """
+#     序列号对比接口 - 用户需求
+#     对比当前序列号的变化率与该序列号的历史平均值
     
-    例如：当前是空头02→空头03，变化率是0.05%
-    查询所有历史上"空头02→空头03"这一步的平均变化率是0.04%
-    得出结论：当前比平均值增加了0.01%
+#     例如：当前是空头02→空头03，变化率是0.05%
+#     查询所有历史上"空头02→空头03"这一步的平均变化率是0.04%
+#     得出结论：当前比平均值增加了0.01%
     
-    参数:
-    - position: long/short (可选，不填则返回两个方向)
-    - sequence: 序列号 (可选，不填则返回所有序列号)
-    """
-    try:
-        position_filter = request.args.get('position', None)
-        sequence_filter = request.args.get('sequence', None, type=int)
+#     参数:
+#     - position: long/short (可选，不填则返回两个方向)
+#     - sequence: 序列号 (可选，不填则返回所有序列号)
+#     """
+#     try:
+#         position_filter = request.args.get('position', None)
+#         sequence_filter = request.args.get('sequence', None, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        result = {
-            'success': True,
-            'symbol': symbol.upper(),
-            'comparisons': []
-        }
+#         result = {
+#             'success': True,
+#             'symbol': symbol.upper(),
+#             'comparisons': []
+#         }
         
-        # 获取当前状态
-        cursor.execute('''
-            SELECT current_position, current_sequence
-            FROM system_status
-            WHERE symbol = ?
-        ''', (symbol.upper(),))
+#         # 获取当前状态
+#         cursor.execute('''
+#             SELECT current_position, current_sequence
+#             FROM system_status
+#             WHERE symbol = ?
+#         ''', (symbol.upper(),))
         
-        status = cursor.fetchone()
-        if not status:
-            return jsonify({'success': False, 'error': 'Symbol not found'})
+#         status = cursor.fetchone()
+#         if not status:
+#             return jsonify({'success': False, 'error': 'Symbol not found'})
         
-        result['current_status'] = {
-            'position': status[0],
-            'sequence': status[1]
-        }
+#         result['current_status'] = {
+#             'position': status[0],
+#             'sequence': status[1]
+#         }
         
-        # 获取当前最新的变化率
-        cursor.execute('''
-            SELECT sequence_num, change_percent, kline_time, position
-            FROM sar_consecutive_changes
-            WHERE symbol = ?
-            ORDER BY id DESC
-            LIMIT 50
-        ''', (symbol.upper(),))
+#         # 获取当前最新的变化率
+#         cursor.execute('''
+#             SELECT sequence_num, change_percent, kline_time, position
+#             FROM sar_consecutive_changes
+#             WHERE symbol = ?
+#             ORDER BY id DESC
+#             LIMIT 50
+#         ''', (symbol.upper(),))
         
-        recent_changes = cursor.fetchall()
+#         recent_changes = cursor.fetchall()
         
-        # 获取序列号平均值
-        cursor.execute('''
-            SELECT position, period_type, avg_change_percent, sample_count
-            FROM sar_period_averages
-            WHERE symbol = ? AND period_type LIKE 'seq_%'
-            ORDER BY position, period_type
-        ''', (symbol.upper(),))
+#         # 获取序列号平均值
+#         cursor.execute('''
+#             SELECT position, period_type, avg_change_percent, sample_count
+#             FROM sar_period_averages
+#             WHERE symbol = ? AND period_type LIKE 'seq_%'
+#             ORDER BY position, period_type
+#         ''', (symbol.upper(),))
         
-        seq_averages = {}
-        for row in cursor.fetchall():
-            pos = row[0]
-            period = row[1]  # 格式: seq_01, seq_02, seq_03
-            seq_num = int(period.split('_')[1])
+#         seq_averages = {}
+#         for row in cursor.fetchall():
+#             pos = row[0]
+#             period = row[1]  # 格式: seq_01, seq_02, seq_03
+#             seq_num = int(period.split('_')[1])
             
-            if pos not in seq_averages:
-                seq_averages[pos] = {}
+#             if pos not in seq_averages:
+#                 seq_averages[pos] = {}
             
-            seq_averages[pos][seq_num] = {
-                'avg': row[2],
-                'samples': row[3]
-            }
+#             seq_averages[pos][seq_num] = {
+#                 'avg': row[2],
+#                 'samples': row[3]
+#             }
         
-        # 对比分析
-        for change in recent_changes:
-            seq_num = change[0]
-            current_change = change[1]
-            kline_time = change[2]
-            pos = change[3]
+#         # 对比分析
+#         for change in recent_changes:
+#             seq_num = change[0]
+#             current_change = change[1]
+#             kline_time = change[2]
+#             pos = change[3]
             
-            # 过滤条件
-            if position_filter and pos != position_filter:
-                continue
-            if sequence_filter and seq_num != sequence_filter:
-                continue
+#             # 过滤条件
+#             if position_filter and pos != position_filter:
+#                 continue
+#             if sequence_filter and seq_num != sequence_filter:
+#                 continue
             
-            # 获取该序列号的历史平均值
-            if pos in seq_averages and seq_num in seq_averages[pos]:
-                avg_data = seq_averages[pos][seq_num]
-                avg_change = avg_data['avg']
-                samples = avg_data['samples']
+#             # 获取该序列号的历史平均值
+#             if pos in seq_averages and seq_num in seq_averages[pos]:
+#                 avg_data = seq_averages[pos][seq_num]
+#                 avg_change = avg_data['avg']
+#                 samples = avg_data['samples']
                 
-                # 计算差异
-                difference = current_change - avg_change
-                difference_percent = (difference / avg_change * 100) if avg_change != 0 else 0
+#                 # 计算差异
+#                 difference = current_change - avg_change
+#                 difference_percent = (difference / avg_change * 100) if avg_change != 0 else 0
                 
-                # 判断增加还是减小
-                trend = 'increase' if difference > 0 else 'decrease' if difference < 0 else 'equal'
+#                 # 判断增加还是减小
+#                 trend = 'increase' if difference > 0 else 'decrease' if difference < 0 else 'equal'
                 
-                result['comparisons'].append({
-                    'position': pos,
-                    'sequence': seq_num,
-                    'time': kline_time,
-                    'current_change': round(current_change, 6),
-                    'average_change': round(avg_change, 6),
-                    'difference': round(difference, 6),
-                    'difference_percent': round(difference_percent, 2),
-                    'trend': trend,
-                    'sample_count': samples,
-                    'description': f'{"多头" if pos == "long" else "空头"}{seq_num:02d}→{seq_num+1:02d}'
-                })
+#                 result['comparisons'].append({
+#                     'position': pos,
+#                     'sequence': seq_num,
+#                     'time': kline_time,
+#                     'current_change': round(current_change, 6),
+#                     'average_change': round(avg_change, 6),
+#                     'difference': round(difference, 6),
+#                     'difference_percent': round(difference_percent, 2),
+#                     'trend': trend,
+#                     'sample_count': samples,
+#                     'description': f'{"多头" if pos == "long" else "空头"}{seq_num:02d}→{seq_num+1:02d}'
+#                 })
         
-        result['total_comparisons'] = len(result['comparisons'])
+#         result['total_comparisons'] = len(result['comparisons'])
         
-        conn.close()
+#         conn.close()
         
-        return jsonify(result)
+#         return jsonify(result)
     
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         })
 
-@app.route('/api/sar-slope/duration-signal/<symbol>')
-def sar_slope_duration_signal(symbol):
-    """
-    按持续时间段分析信号 - 用户最新需求
+# DEPRECATED: @app.route('/api/sar-slope/duration-signal/<symbol>')
+# def sar_slope_duration_signal(symbol):
+#     """
+#     按持续时间段分析信号 - 用户最新需求
     
-    对比逻辑：
-    - 多头区间：
-      * 1天平均 < 3天平均（比值减小）→ 强势多头信号（偏多）
-      * 1天平均 > 3天平均（比值增大）→ 加速赶顶信号（偏空）
-    - 空头区间：
-      * 1天平均 < 3天平均（比值减小）→ 强势空头信号（偏空）
-      * 1天平均 > 3天平均（比值增大）→ 加速赶底信号（偏多）
+#     对比逻辑：
+#     - 多头区间：
+#       * 1天平均 < 3天平均（比值减小）→ 强势多头信号（偏多）
+#       * 1天平均 > 3天平均（比值增大）→ 加速赶顶信号（偏空）
+#     - 空头区间：
+#       * 1天平均 < 3天平均（比值减小）→ 强势空头信号（偏空）
+#       * 1天平均 > 3天平均（比值增大）→ 加速赶底信号（偏多）
     
-    参数:
-    - position: long/short (可选，不填则返回两个方向)
-    - duration: 持续时间（分钟，可选）
-    """
-    try:
-        position_filter = request.args.get('position', None)
-        duration_filter = request.args.get('duration', None, type=int)
+#     参数:
+#     - position: long/short (可选，不填则返回两个方向)
+#     - duration: 持续时间（分钟，可选）
+#     """
+#     try:
+#         position_filter = request.args.get('position', None)
+#         duration_filter = request.args.get('duration', None, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        result = {
-            'success': True,
-            'symbol': symbol.upper(),
-            'signals': []
-        }
+#         result = {
+#             'success': True,
+#             'symbol': symbol.upper(),
+#             'signals': []
+#         }
         
-        # 获取当前状态
-        cursor.execute('''
-            SELECT current_position, current_sequence
-            FROM system_status
-            WHERE symbol = ?
-        ''', (symbol.upper(),))
+#         # 获取当前状态
+#         cursor.execute('''
+#             SELECT current_position, current_sequence
+#             FROM system_status
+#             WHERE symbol = ?
+#         ''', (symbol.upper(),))
         
-        status = cursor.fetchone()
-        if not status:
-            return jsonify({'success': False, 'error': 'Symbol not found'})
+#         status = cursor.fetchone()
+#         if not status:
+#             return jsonify({'success': False, 'error': 'Symbol not found'})
         
-        result['current_status'] = {
-            'position': status[0],
-            'sequence': status[1]
-        }
+#         result['current_status'] = {
+#             'position': status[0],
+#             'sequence': status[1]
+#         }
         
-        # 构建查询条件
-        conditions = ["symbol = ?", "period_type LIKE 'dur_%'"]
-        params = [symbol.upper()]
+#         # 构建查询条件
+#         conditions = ["symbol = ?", "period_type LIKE 'dur_%'"]
+#         params = [symbol.upper()]
         
-        if position_filter:
-            conditions.append("position = ?")
-            params.append(position_filter)
+#         if position_filter:
+#             conditions.append("position = ?")
+#             params.append(position_filter)
         
-        # 获取所有 duration 的平均值数据
-        cursor.execute(f'''
-            SELECT position, period_type, avg_change_percent, sample_count
-            FROM sar_period_averages
-            WHERE {' AND '.join(conditions)}
-            ORDER BY position, period_type
-        ''', params)
+#         # 获取所有 duration 的平均值数据
+#         cursor.execute(f'''
+#             SELECT position, period_type, avg_change_percent, sample_count
+#             FROM sar_period_averages
+#             WHERE {' AND '.join(conditions)}
+#             ORDER BY position, period_type
+#         ''', params)
         
-        # 组织数据结构: {position: {duration: {period: avg}}}
-        duration_data = {}
-        for row in cursor.fetchall():
-            pos = row[0]
-            period_type = row[1]  # 格式: dur_15_1day
-            avg_pct = row[2]
-            sample_count = row[3]
+#         # 组织数据结构: {position: {duration: {period: avg}}}
+#         duration_data = {}
+#         for row in cursor.fetchall():
+#             pos = row[0]
+#             period_type = row[1]  # 格式: dur_15_1day
+#             avg_pct = row[2]
+#             sample_count = row[3]
             
-            # 解析 period_type
-            parts = period_type.split('_')
-            if len(parts) != 3:
-                continue
+#             # 解析 period_type
+#             parts = period_type.split('_')
+#             if len(parts) != 3:
+#                 continue
             
-            duration = int(parts[1])
-            period = parts[2]  # 1day, 3day, 7day, 15day
+#             duration = int(parts[1])
+#             period = parts[2]  # 1day, 3day, 7day, 15day
             
-            # 过滤 duration
-            if duration_filter and duration != duration_filter:
-                continue
+#             # 过滤 duration
+#             if duration_filter and duration != duration_filter:
+#                 continue
             
-            if pos not in duration_data:
-                duration_data[pos] = {}
-            if duration not in duration_data[pos]:
-                duration_data[pos][duration] = {}
+#             if pos not in duration_data:
+#                 duration_data[pos] = {}
+#             if duration not in duration_data[pos]:
+#                 duration_data[pos][duration] = {}
             
-            duration_data[pos][duration][period] = {
-                'avg': avg_pct,
-                'samples': sample_count
-            }
+#             duration_data[pos][duration][period] = {
+#                 'avg': avg_pct,
+#                 'samples': sample_count
+#             }
         
-        # 分析每个 position 和 duration 的信号
-        for pos in duration_data:
-            for duration in sorted(duration_data[pos].keys()):
-                periods = duration_data[pos][duration]
+#         # 分析每个 position 和 duration 的信号
+#         for pos in duration_data:
+#             for duration in sorted(duration_data[pos].keys()):
+#                 periods = duration_data[pos][duration]
                 
-                # 必须有 1day 和 3day 数据才能对比
-                if '1day' not in periods or '3day' not in periods:
-                    continue
+#                 # 必须有 1day 和 3day 数据才能对比
+#                 if '1day' not in periods or '3day' not in periods:
+#                     continue
                 
-                avg_1day = periods['1day']['avg']
-                avg_3day = periods['3day']['avg']
-                avg_7day = periods.get('7day', {}).get('avg', None)
-                avg_15day = periods.get('15day', {}).get('avg', None)
+#                 avg_1day = periods['1day']['avg']
+#                 avg_3day = periods['3day']['avg']
+#                 avg_7day = periods.get('7day', {}).get('avg', None)
+#                 avg_15day = periods.get('15day', {}).get('avg', None)
                 
-                # 计算比值
-                ratio = (avg_1day / avg_3day) if avg_3day != 0 else 1.0
-                ratio_change = avg_1day - avg_3day
-                ratio_change_percent = ((avg_1day - avg_3day) / avg_3day * 100) if avg_3day != 0 else 0
+#                 # 计算比值
+#                 ratio = (avg_1day / avg_3day) if avg_3day != 0 else 1.0
+#                 ratio_change = avg_1day - avg_3day
+#                 ratio_change_percent = ((avg_1day - avg_3day) / avg_3day * 100) if avg_3day != 0 else 0
                 
-                # 根据用户逻辑判断信号
-                if pos == 'long':
-                    if avg_1day < avg_3day:  # 比值减小
-                        signal_type = 'strong_long'
-                        signal_desc = '强势多头'
-                        bias = 'bullish'  # 偏多
-                        interpretation = '当天平均 < 3天平均，变化率减小，趋势强劲'
-                    else:  # 比值增大
-                        signal_type = 'top_acceleration'
-                        signal_desc = '加速赶顶'
-                        bias = 'bearish'  # 偏空
-                        interpretation = '当天平均 > 3天平均，变化率增大，可能见顶'
-                else:  # short
-                    if avg_1day < avg_3day:  # 比值减小
-                        signal_type = 'strong_short'
-                        signal_desc = '强势空头'
-                        bias = 'bearish'  # 偏空
-                        interpretation = '当天平均 < 3天平均，变化率减小，趋势强劲'
-                    else:  # 比值增大
-                        signal_type = 'bottom_acceleration'
-                        signal_desc = '加速赶底'
-                        bias = 'bullish'  # 偏多
-                        interpretation = '当天平均 > 3天平均，变化率增大，可能见底'
+#                 # 根据用户逻辑判断信号
+#                 if pos == 'long':
+#                     if avg_1day < avg_3day:  # 比值减小
+#                         signal_type = 'strong_long'
+#                         signal_desc = '强势多头'
+#                         bias = 'bullish'  # 偏多
+#                         interpretation = '当天平均 < 3天平均，变化率减小，趋势强劲'
+#                     else:  # 比值增大
+#                         signal_type = 'top_acceleration'
+#                         signal_desc = '加速赶顶'
+#                         bias = 'bearish'  # 偏空
+#                         interpretation = '当天平均 > 3天平均，变化率增大，可能见顶'
+#                 else:  # short
+#                     if avg_1day < avg_3day:  # 比值减小
+#                         signal_type = 'strong_short'
+#                         signal_desc = '强势空头'
+#                         bias = 'bearish'  # 偏空
+#                         interpretation = '当天平均 < 3天平均，变化率减小，趋势强劲'
+#                     else:  # 比值增大
+#                         signal_type = 'bottom_acceleration'
+#                         signal_desc = '加速赶底'
+#                         bias = 'bullish'  # 偏多
+#                         interpretation = '当天平均 > 3天平均，变化率增大，可能见底'
                 
-                signal = {
-                    'position': pos,
-                    'duration_minutes': duration,
-                    'averages': {
-                        '1day': round(avg_1day, 6),
-                        '3day': round(avg_3day, 6),
-                        '7day': round(avg_7day, 6) if avg_7day else None,
-                        '15day': round(avg_15day, 6) if avg_15day else None
-                    },
-                    'comparison': {
-                        'ratio': round(ratio, 4),
-                        'change': round(ratio_change, 6),
-                        'change_percent': round(ratio_change_percent, 2)
-                    },
-                    'signal': {
-                        'type': signal_type,
-                        'description': signal_desc,
-                        'bias': bias,
-                        'interpretation': interpretation
-                    },
-                    'sample_counts': {
-                        '1day': periods['1day']['samples'],
-                        '3day': periods['3day']['samples'],
-                        '7day': periods.get('7day', {}).get('samples', None),
-                        '15day': periods.get('15day', {}).get('samples', None)
-                    }
-                }
+#                 signal = {
+#                     'position': pos,
+#                     'duration_minutes': duration,
+#                     'averages': {
+#                         '1day': round(avg_1day, 6),
+#                         '3day': round(avg_3day, 6),
+#                         '7day': round(avg_7day, 6) if avg_7day else None,
+#                         '15day': round(avg_15day, 6) if avg_15day else None
+#                     },
+#                     'comparison': {
+#                         'ratio': round(ratio, 4),
+#                         'change': round(ratio_change, 6),
+#                         'change_percent': round(ratio_change_percent, 2)
+#                     },
+#                     'signal': {
+#                         'type': signal_type,
+#                         'description': signal_desc,
+#                         'bias': bias,
+#                         'interpretation': interpretation
+#                     },
+#                     'sample_counts': {
+#                         '1day': periods['1day']['samples'],
+#                         '3day': periods['3day']['samples'],
+#                         '7day': periods.get('7day', {}).get('samples', None),
+#                         '15day': periods.get('15day', {}).get('samples', None)
+#                     }
+#                 }
                 
-                result['signals'].append(signal)
+#                 result['signals'].append(signal)
         
-        result['total_signals'] = len(result['signals'])
+#         result['total_signals'] = len(result['signals'])
         
-        conn.close()
+#         conn.close()
         
-        return jsonify(result)
+#         return jsonify(result)
     
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         })
 
-@app.route('/api/sar-slope/transition-analysis/<symbol>')
-def sar_slope_transition_analysis(symbol):
-    """
-    多空转换分析接口 - 用户最新需求
+# DEPRECATED: @app.route('/api/sar-slope/transition-analysis/<symbol>')
+# def sar_slope_transition_analysis(symbol):
+#     """
+#     多空转换分析接口 - 用户最新需求
     
-    核心逻辑:
-    1. 记录每个5分钟的多空转换点（保留16天数据）
-    2. 多头关注 sequence_num=2 (01→02，相当于03→02的变化)
-    3. 空头关注 sequence_num=2 (01→02，相当于02→03的变化)
-    4. 计算 当天/3天/7天/15天 平均值
-    5. 对比当前值与平均值的差值百分比
-    6. 判断偏多/偏空状态
+#     核心逻辑:
+#     1. 记录每个5分钟的多空转换点（保留16天数据）
+#     2. 多头关注 sequence_num=2 (01→02，相当于03→02的变化)
+#     3. 空头关注 sequence_num=2 (01→02，相当于02→03的变化)
+#     4. 计算 当天/3天/7天/15天 平均值
+#     5. 对比当前值与平均值的差值百分比
+#     6. 判断偏多/偏空状态
     
-    参数:
-    - position: long/short (可选)
-    """
-    try:
-        position_filter = request.args.get('position', None)
+#     参数:
+#     - position: long/short (可选)
+#     """
+#     try:
+#         position_filter = request.args.get('position', None)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        result = {
-            'success': True,
-            'symbol': symbol.upper(),
-            'analysis': {}
-        }
+#         result = {
+#             'success': True,
+#             'symbol': symbol.upper(),
+#             'analysis': {}
+#         }
         
-        # 获取当前状态
-        cursor.execute('''
-            SELECT current_position, current_sequence, last_kline_time
-            FROM system_status
-            WHERE symbol = ?
-        ''', (symbol.upper(),))
+#         # 获取当前状态
+#         cursor.execute('''
+#             SELECT current_position, current_sequence, last_kline_time
+#             FROM system_status
+#             WHERE symbol = ?
+#         ''', (symbol.upper(),))
         
-        status = cursor.fetchone()
-        if not status:
-            return jsonify({'success': False, 'error': 'Symbol not found'})
+#         status = cursor.fetchone()
+#         if not status:
+#             return jsonify({'success': False, 'error': 'Symbol not found'})
         
-        # 获取当前价格和持续时间
-        cursor.execute('''
-            SELECT close_price, duration_minutes
-            FROM sar_raw_data
-            WHERE symbol = ?
-            ORDER BY timestamp DESC
-            LIMIT 1
-        ''', (symbol.upper(),))
+#         # 获取当前价格和持续时间
+#         cursor.execute('''
+#             SELECT close_price, duration_minutes
+#             FROM sar_raw_data
+#             WHERE symbol = ?
+#             ORDER BY timestamp DESC
+#             LIMIT 1
+#         ''', (symbol.upper(),))
         
-        price_data = cursor.fetchone()
-        current_price = price_data[0] if price_data else None
-        current_duration = price_data[1] if price_data else None
+#         price_data = cursor.fetchone()
+#         current_price = price_data[0] if price_data else None
+#         current_duration = price_data[1] if price_data else None
         
-        result['current_status'] = {
-            'position': status[0],
-            'sequence': status[1],
-            'last_update': status[2],
-            'current_price': round(current_price, 2) if current_price else None,
-            'duration_minutes': current_duration
-        }
+#         result['current_status'] = {
+#             'position': status[0],
+#             'sequence': status[1],
+#             'last_update': status[2],
+#             'current_price': round(current_price, 2) if current_price else None,
+#             'duration_minutes': current_duration
+#         }
         
-        # 对每个方向进行分析
-        positions = [position_filter] if position_filter else ['long', 'short']
+#         # 对每个方向进行分析
+#         positions = [position_filter] if position_filter else ['long', 'short']
         
-        for pos in positions:
-            # 获取该方向 sequence_num=2 的所有变化率数据（按时间降序）
-            cursor.execute('''
-                SELECT change_percent, kline_time, id
-                FROM sar_consecutive_changes
-                WHERE symbol = ? AND position = ? AND sequence_num = 2
-                ORDER BY id DESC
-            ''', (symbol.upper(), pos))
+#         for pos in positions:
+#             # 获取该方向 sequence_num=2 的所有变化率数据（按时间降序）
+#             cursor.execute('''
+#                 SELECT change_percent, kline_time, id
+#                 FROM sar_consecutive_changes
+#                 WHERE symbol = ? AND position = ? AND sequence_num = 2
+#                 ORDER BY id DESC
+#             ''', (symbol.upper(), pos))
             
-            changes = cursor.fetchall()
+#             changes = cursor.fetchall()
             
-            if not changes:
-                continue
+#             if not changes:
+#                 continue
             
-            # 当前最新值
-            current_value = changes[0][0]
-            current_time = changes[0][1]
+#             # 当前最新值
+#             current_value = changes[0][0]
+#             current_time = changes[0][1]
             
-            # 提取所有变化率（从旧到新）
-            all_changes = [c[0] for c in reversed(changes)]
+#             # 提取所有变化率（从旧到新）
+#             all_changes = [c[0] for c in reversed(changes)]
             
-            # 计算各周期平均值
-            periods = {
-                '1day': 288,   # 24小时 * 12个5分钟
-                '3day': 864,   # 3 * 24 * 12
-                '7day': 2016,  # 7 * 24 * 12
-                '15day': 4320  # 15 * 24 * 12
-            }
+#             # 计算各周期平均值
+#             periods = {
+#                 '1day': 288,   # 24小时 * 12个5分钟
+#                 '3day': 864,   # 3 * 24 * 12
+#                 '7day': 2016,  # 7 * 24 * 12
+#                 '15day': 4320  # 15 * 24 * 12
+#             }
             
-            period_averages = {}
-            for period_name, period_count in periods.items():
-                if len(all_changes) >= period_count:
-                    period_changes = all_changes[-period_count:]
-                else:
-                    period_changes = all_changes
+#             period_averages = {}
+#             for period_name, period_count in periods.items():
+#                 if len(all_changes) >= period_count:
+#                     period_changes = all_changes[-period_count:]
+#                 else:
+#                     period_changes = all_changes
                 
-                if period_changes:
-                    avg = sum(period_changes) / len(period_changes)
-                    period_averages[period_name] = {
-                        'average': avg,
-                        'sample_count': len(period_changes)
-                    }
+#                 if period_changes:
+#                     avg = sum(period_changes) / len(period_changes)
+#                     period_averages[period_name] = {
+#                         'average': avg,
+#                         'sample_count': len(period_changes)
+#                     }
             
-            # 对比当前值与各周期平均值
-            comparisons = {}
-            for period_name, period_data in period_averages.items():
-                avg = period_data['average']
-                diff = current_value - avg
-                diff_percent = (diff / avg * 100) if avg != 0 else 0
+#             # 对比当前值与各周期平均值
+#             comparisons = {}
+#             for period_name, period_data in period_averages.items():
+#                 avg = period_data['average']
+#                 diff = current_value - avg
+#                 diff_percent = (diff / avg * 100) if avg != 0 else 0
                 
-                # 判断趋势
-                if diff > 0:
-                    trend = 'increased'  # 增加
-                    trend_cn = '增加'
-                elif diff < 0:
-                    trend = 'decreased'  # 减少
-                    trend_cn = '减少'
-                else:
-                    trend = 'unchanged'
-                    trend_cn = '持平'
+#                 # 判断趋势
+#                 if diff > 0:
+#                     trend = 'increased'  # 增加
+#                     trend_cn = '增加'
+#                 elif diff < 0:
+#                     trend = 'decreased'  # 减少
+#                     trend_cn = '减少'
+#                 else:
+#                     trend = 'unchanged'
+#                     trend_cn = '持平'
                 
-                comparisons[period_name] = {
-                    'period_average': round(avg, 6),
-                    'current_value': round(current_value, 6),
-                    'difference': round(diff, 6),
-                    'difference_percent': round(diff_percent, 2),
-                    'trend': trend,
-                    'trend_cn': trend_cn,
-                    'sample_count': period_data['sample_count']
-                }
+#                 comparisons[period_name] = {
+#                     'period_average': round(avg, 6),
+#                     'current_value': round(current_value, 6),
+#                     'difference': round(diff, 6),
+#                     'difference_percent': round(diff_percent, 2),
+#                     'trend': trend,
+#                     'trend_cn': trend_cn,
+#                     'sample_count': period_data['sample_count']
+#                 }
             
-            # 综合判断偏多/偏空状态
-            # 使用 1天 和 3天 的对比结果
-            bias = None
-            bias_reason = []
+#             # 综合判断偏多/偏空状态
+#             # 使用 1天 和 3天 的对比结果
+#             bias = None
+#             bias_reason = []
             
-            if '1day' in comparisons and '3day' in comparisons:
-                day1_diff = comparisons['1day']['difference_percent']
-                day3_diff = comparisons['3day']['difference_percent']
+#             if '1day' in comparisons and '3day' in comparisons:
+#                 day1_diff = comparisons['1day']['difference_percent']
+#                 day3_diff = comparisons['3day']['difference_percent']
                 
-                # 如果当前值高于平均值，说明变化率在增大
-                # 如果当前值低于平均值，说明变化率在减小
+#                 # 如果当前值高于平均值，说明变化率在增大
+#                 # 如果当前值低于平均值，说明变化率在减小
                 
-                if pos == 'long':
-                    # 多头区间：变化率增大 → 偏空（可能赶顶）
-                    #          变化率减小 → 偏多（趋势稳健）
-                    if day1_diff > 0 and day3_diff > 0:
-                        bias = 'bearish'
-                        bias_cn = '偏空'
-                        bias_reason.append('多头变化率增大，可能加速赶顶')
-                    elif day1_diff < 0 and day3_diff < 0:
-                        bias = 'bullish'
-                        bias_cn = '偏多'
-                        bias_reason.append('多头变化率减小，趋势稳健')
-                    else:
-                        bias = 'neutral'
-                        bias_cn = '中性'
-                        bias_reason.append('多头信号不明确')
-                else:  # short
-                    # 空头区间：变化率增大 → 偏多（可能赶底）
-                    #          变化率减小 → 偏空（趋势稳健）
-                    if day1_diff > 0 and day3_diff > 0:
-                        bias = 'bullish'
-                        bias_cn = '偏多'
-                        bias_reason.append('空头变化率增大，可能加速赶底')
-                    elif day1_diff < 0 and day3_diff < 0:
-                        bias = 'bearish'
-                        bias_cn = '偏空'
-                        bias_reason.append('空头变化率减小，趋势稳健')
-                    else:
-                        bias = 'neutral'
-                        bias_cn = '中性'
-                        bias_reason.append('空头信号不明确')
+#                 if pos == 'long':
+#                     # 多头区间：变化率增大 → 偏空（可能赶顶）
+#                     #          变化率减小 → 偏多（趋势稳健）
+#                     if day1_diff > 0 and day3_diff > 0:
+#                         bias = 'bearish'
+#                         bias_cn = '偏空'
+#                         bias_reason.append('多头变化率增大，可能加速赶顶')
+#                     elif day1_diff < 0 and day3_diff < 0:
+#                         bias = 'bullish'
+#                         bias_cn = '偏多'
+#                         bias_reason.append('多头变化率减小，趋势稳健')
+#                     else:
+#                         bias = 'neutral'
+#                         bias_cn = '中性'
+#                         bias_reason.append('多头信号不明确')
+#                 else:  # short
+#                     # 空头区间：变化率增大 → 偏多（可能赶底）
+#                     #          变化率减小 → 偏空（趋势稳健）
+#                     if day1_diff > 0 and day3_diff > 0:
+#                         bias = 'bullish'
+#                         bias_cn = '偏多'
+#                         bias_reason.append('空头变化率增大，可能加速赶底')
+#                     elif day1_diff < 0 and day3_diff < 0:
+#                         bias = 'bearish'
+#                         bias_cn = '偏空'
+#                         bias_reason.append('空头变化率减小，趋势稳健')
+#                     else:
+#                         bias = 'neutral'
+#                         bias_cn = '中性'
+#                         bias_reason.append('空头信号不明确')
             
-            result['analysis'][pos] = {
-                'position': pos,
-                'position_cn': '多头' if pos == 'long' else '空头',
-                'sequence_info': '01→02 (序列2)',
-                'current_value': round(current_value, 6),
-                'current_time': current_time,
-                'total_samples': len(all_changes),
-                'period_comparisons': comparisons,
-                'bias': {
-                    'type': bias,
-                    'type_cn': bias_cn,
-                    'reason': bias_reason
-                }
-            }
+#             result['analysis'][pos] = {
+#                 'position': pos,
+#                 'position_cn': '多头' if pos == 'long' else '空头',
+#                 'sequence_info': '01→02 (序列2)',
+#                 'current_value': round(current_value, 6),
+#                 'current_time': current_time,
+#                 'total_samples': len(all_changes),
+#                 'period_comparisons': comparisons,
+#                 'bias': {
+#                     'type': bias,
+#                     'type_cn': bias_cn,
+#                     'reason': bias_reason
+#                 }
+#             }
         
-        conn.close()
+#         conn.close()
         
-        return jsonify(result)
+#         return jsonify(result)
     
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         })
 
-@app.route('/api/sar-slope/current-cycle/<symbol>')
-def sar_slope_current_cycle(symbol):
-    """
-    获取当前完整周期的所有序列数据
+# DEPRECATED: @app.route('/api/sar-slope/current-cycle/<symbol>')
+# def sar_slope_current_cycle(symbol):
+#     """
+#     获取当前完整周期的所有序列数据
     
-    用户需求:
-    - 空头01开始显示，一直到空头转多头
-    - 多头01开始显示，一直到多头转空头
-    - 不显示持续时间字段
+#     用户需求:
+#     - 空头01开始显示，一直到空头转多头
+#     - 多头01开始显示，一直到多头转空头
+#     - 不显示持续时间字段
     
-    返回当前周期从序列01到当前序列的完整数据
-    """
-    # 检查服务器端缓存
-    cache_key = f"sar_slope_current_cycle:{symbol.upper()}"
-    cached_data = server_cache.get(cache_key, max_age=30)
-    if cached_data:
-        cached_data['_from_server_cache'] = True
-        cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
-        response = jsonify(cached_data)
-        # 添加防缓存头
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
+#     返回当前周期从序列01到当前序列的完整数据
+#     """
+#     # 检查服务器端缓存
+#     cache_key = f"sar_slope_current_cycle:{symbol.upper()}"
+#     cached_data = server_cache.get(cache_key, max_age=30)
+#     if cached_data:
+#         cached_data['_from_server_cache'] = True
+#         cached_data['_cache_age'] = int(time.time() - server_cache.timestamps.get(cache_key, 0))
+#         response = jsonify(cached_data)
+#         # 添加防缓存头
+#         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+#         response.headers['Pragma'] = 'no-cache'
+#         response.headers['Expires'] = '0'
+#         return response
     
-    try:
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#     try:
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        # 获取当前状态
-        cursor.execute('''
-            SELECT current_position, current_sequence, last_kline_time
-            FROM system_status
-            WHERE symbol = ?
-        ''', (symbol.upper(),))
+#         # 获取当前状态
+#         cursor.execute('''
+#             SELECT current_position, current_sequence, last_kline_time
+#             FROM system_status
+#             WHERE symbol = ?
+#         ''', (symbol.upper(),))
         
-        status = cursor.fetchone()
-        if not status:
-            return jsonify({'success': False, 'error': 'Symbol not found'})
+#         status = cursor.fetchone()
+#         if not status:
+#             return jsonify({'success': False, 'error': 'Symbol not found'})
         
-        current_position = status[0]
-        current_sequence = status[1]
-        last_update = status[2]
+#         current_position = status[0]
+#         current_sequence = status[1]
+#         last_update = status[2]
         
-        # 获取所有可用的连续数据（不限制周期，显示16天或所有可用数据）
-        # 计算16天需要的记录数：16天 * 288条/天 = 4608条
-        max_records = 4608  # 16天的数据
-        cursor.execute('''
-            SELECT position_sequence, close_price, kline_time, 
-                   open_price, high_price, low_price, sar_value, position
-            FROM sar_raw_data
-            WHERE symbol = ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-        ''', (symbol.upper(), max_records))
+#         # 获取所有可用的连续数据（不限制周期，显示16天或所有可用数据）
+#         # 计算16天需要的记录数：16天 * 288条/天 = 4608条
+#         max_records = 4608  # 16天的数据
+#         cursor.execute('''
+#             SELECT position_sequence, close_price, kline_time, 
+#                    open_price, high_price, low_price, sar_value, position
+#             FROM sar_raw_data
+#             WHERE symbol = ?
+#             ORDER BY timestamp DESC
+#             LIMIT ?
+#         ''', (symbol.upper(), max_records))
         
-        raw_sequences = []
-        rows = cursor.fetchall()  # 从新到旧
-        for row in rows:  # 不反转，保持最新的在前
-            seq, close, kline_time, open_p, high, low, sar, pos = row
-            raw_sequences.append({
-                'sequence': seq,
-                'price': round(close, 2),
-                'time': kline_time,
-                'open': round(open_p, 2),
-                'high': round(high, 2),
-                'low': round(low, 2),
-                'sar': sar,  # 保留完整精度用于计算
-                'position': pos  # 记录该条数据的position（long/short）
-            })
+#         raw_sequences = []
+#         rows = cursor.fetchall()  # 从新到旧
+#         for row in rows:  # 不反转，保持最新的在前
+#             seq, close, kline_time, open_p, high, low, sar, pos = row
+#             raw_sequences.append({
+#                 'sequence': seq,
+#                 'price': round(close, 2),
+#                 'time': kline_time,
+#                 'open': round(open_p, 2),
+#                 'high': round(high, 2),
+#                 'low': round(low, 2),
+#                 'sar': sar,  # 保留完整精度用于计算
+#                 'position': pos  # 记录该条数据的position（long/short）
+#             })
         
-        # 【性能优化】一次性批量查询所有历史数据，避免在循环中重复查询
-        # 获取所有需要的历史平均数据
-        cursor.execute('''
-            SELECT position, sequence_num, change_percent
-            FROM sar_consecutive_changes
-            WHERE symbol = ?
-            ORDER BY id DESC
-            LIMIT 4320
-        ''', (symbol.upper(),))
+#         # 【性能优化】一次性批量查询所有历史数据，避免在循环中重复查询
+#         # 获取所有需要的历史平均数据
+#         cursor.execute('''
+#             SELECT position, sequence_num, change_percent
+#             FROM sar_consecutive_changes
+#             WHERE symbol = ?
+#             ORDER BY id DESC
+#             LIMIT 4320
+#         ''', (symbol.upper(),))
         
-        # 构建历史数据字典：{(position, seq_num): [change_percent, ...]}
-        historical_data_dict = {}
-        for row in cursor.fetchall():
-            pos, seq_num, change_pct = row
-            key = (pos, seq_num)
-            if key not in historical_data_dict:
-                historical_data_dict[key] = []
-            historical_data_dict[key].append(change_pct)
+#         # 构建历史数据字典：{(position, seq_num): [change_percent, ...]}
+#         historical_data_dict = {}
+#         for row in cursor.fetchall():
+#             pos, seq_num, change_pct = row
+#             key = (pos, seq_num)
+#             if key not in historical_data_dict:
+#                 historical_data_dict[key] = []
+#             historical_data_dict[key].append(change_pct)
         
-        # 计算每个序列相对于前一个序列的变化率
-        # 注意：现在raw_sequences[0]是最新的，raw_sequences[-1]是最早的
-        sequences_with_changes = []
-        for i, seq_data in enumerate(raw_sequences):
-            seq_num = seq_data['sequence']
+#         # 计算每个序列相对于前一个序列的变化率
+#         # 注意：现在raw_sequences[0]是最新的，raw_sequences[-1]是最早的
+#         sequences_with_changes = []
+#         for i, seq_data in enumerate(raw_sequences):
+#             seq_num = seq_data['sequence']
             
-            # 获取当前行的position
-            row_position = seq_data['position']
+#             # 获取当前行的position
+#             row_position = seq_data['position']
             
-            # 添加基础数据
-            result_data = {
-                'sequence': seq_num,
-                'price': seq_data['price'],
-                'time': seq_data['time'],
-                'open': seq_data['open'],
-                'high': seq_data['high'],
-                'low': seq_data['low'],
-                'sar': round(seq_data['sar'], 4),
-                'position': row_position,  # 添加position字段用于前端判断
-                'position_cn': '多头' if row_position == 'long' else '空头'
-            }
+#             # 添加基础数据
+#             result_data = {
+#                 'sequence': seq_num,
+#                 'price': seq_data['price'],
+#                 'time': seq_data['time'],
+#                 'open': seq_data['open'],
+#                 'high': seq_data['high'],
+#                 'low': seq_data['low'],
+#                 'sar': round(seq_data['sar'], 4),
+#                 'position': row_position,  # 添加position字段用于前端判断
+#                 'position_cn': '多头' if row_position == 'long' else '空头'
+#             }
             
-            # 如果有下一个序列（时间更早的），且position相同才计算变化率
-            if i < len(raw_sequences) - 1:
-                next_position = raw_sequences[i+1]['position']
+#             # 如果有下一个序列（时间更早的），且position相同才计算变化率
+#             if i < len(raw_sequences) - 1:
+#                 next_position = raw_sequences[i+1]['position']
                 
-                # 只有当前后两条数据的position相同时才计算变化率
-                # 如果position不同，说明发生了多空转换，跳过计算
-                if row_position == next_position:
-                    next_sar = raw_sequences[i+1]['sar']  # 下一个（时间更早）
-                    curr_sar = seq_data['sar']  # 当前（时间更新）
+#                 # 只有当前后两条数据的position相同时才计算变化率
+#                 # 如果position不同，说明发生了多空转换，跳过计算
+#                 if row_position == next_position:
+#                     next_sar = raw_sequences[i+1]['sar']  # 下一个（时间更早）
+#                     curr_sar = seq_data['sar']  # 当前（时间更新）
                     
-                    # 用户需求的计算公式:
-                    # 当前是较新的序列号，next是较旧的序列号
-                    # 例如：curr=空03, next=空02
-                    # 多头: (当前SAR - 前一个SAR) / 当前SAR
-                    # 空头: (前一个SAR - 当前SAR) / 前一个SAR
-                    if row_position == 'long':
-                        # 多头: (curr - next) / curr
-                        seq_change_percent = ((curr_sar - next_sar) / curr_sar) * 100 if curr_sar != 0 else 0
-                        sar_absolute_diff = curr_sar - next_sar  # SAR绝对差值
-                    else:  # short
-                        # 空头: (next - curr) / next
-                        # 注意：这里next是旧序列（序列号小），curr是新序列（序列号大）
-                        # 但SAR值计算时，next的SAR应该比curr的SAR大
-                        seq_change_percent = ((next_sar - curr_sar) / next_sar) * 100 if next_sar != 0 else 0
-                        sar_absolute_diff = next_sar - curr_sar  # SAR绝对差值
+#                     # 用户需求的计算公式:
+#                     # 当前是较新的序列号，next是较旧的序列号
+#                     # 例如：curr=空03, next=空02
+#                     # 多头: (当前SAR - 前一个SAR) / 当前SAR
+#                     # 空头: (前一个SAR - 当前SAR) / 前一个SAR
+#                     if row_position == 'long':
+#                         # 多头: (curr - next) / curr
+#                         seq_change_percent = ((curr_sar - next_sar) / curr_sar) * 100 if curr_sar != 0 else 0
+#                         sar_absolute_diff = curr_sar - next_sar  # SAR绝对差值
+#                     else:  # short
+#                         # 空头: (next - curr) / next
+#                         # 注意：这里next是旧序列（序列号小），curr是新序列（序列号大）
+#                         # 但SAR值计算时，next的SAR应该比curr的SAR大
+#                         seq_change_percent = ((next_sar - curr_sar) / next_sar) * 100 if next_sar != 0 else 0
+#                         sar_absolute_diff = next_sar - curr_sar  # SAR绝对差值
                     
-                    result_data['sequence_change_percent'] = round(seq_change_percent, 4)
-                    result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
+#                     result_data['sequence_change_percent'] = round(seq_change_percent, 4)
+#                     result_data['sar_diff'] = round(sar_absolute_diff, 4)  # SAR值的绝对差值
                     
-                    # 【性能优化】从预加载的字典中获取历史数据，而不是重复查询数据库
-                    lookup_key = (row_position, seq_num)
-                    historical_changes = historical_data_dict.get(lookup_key, [])[:288]  # 最多取288条（1天）
-                    if historical_changes:
-                        avg_1day = sum(historical_changes) / len(historical_changes)
-                        avg_3day = sum(historical_changes[:min(864, len(historical_changes))]) / min(864, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
-                        avg_7day = sum(historical_changes[:min(2016, len(historical_changes))]) / min(2016, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
-                        avg_15day = sum(historical_changes[:min(4320, len(historical_changes))]) / min(4320, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+#                     # 【性能优化】从预加载的字典中获取历史数据，而不是重复查询数据库
+#                     lookup_key = (row_position, seq_num)
+#                     historical_changes = historical_data_dict.get(lookup_key, [])[:288]  # 最多取288条（1天）
+#                     if historical_changes:
+#                         avg_1day = sum(historical_changes) / len(historical_changes)
+#                         avg_3day = sum(historical_changes[:min(864, len(historical_changes))]) / min(864, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+#                         avg_7day = sum(historical_changes[:min(2016, len(historical_changes))]) / min(2016, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
+#                         avg_15day = sum(historical_changes[:min(4320, len(historical_changes))]) / min(4320, len(historical_changes)) if len(historical_changes) >= 1 else avg_1day
                         
-                        result_data['avg_1day'] = round(avg_1day, 6)
-                        result_data['avg_3day'] = round(avg_3day, 6)
-                        result_data['avg_7day'] = round(avg_7day, 6)
-                        result_data['avg_15day'] = round(avg_15day, 6)
+#                         result_data['avg_1day'] = round(avg_1day, 6)
+#                         result_data['avg_3day'] = round(avg_3day, 6)
+#                         result_data['avg_7day'] = round(avg_7day, 6)
+#                         result_data['avg_15day'] = round(avg_15day, 6)
                         
-                        # 计算相对变化百分比：(当前 - 平均) / 平均 × 100
-                        # 例: 当前0.0613%, 平均0.083284%, 变化 = (0.0613-0.083284)/0.083284*100 = -26.40%
-                        if avg_1day != 0:
-                            change_1day_percent = ((seq_change_percent - avg_1day) / avg_1day) * 100
-                        else:
-                            change_1day_percent = 0
+#                         # 计算相对变化百分比：(当前 - 平均) / 平均 × 100
+#                         # 例: 当前0.0613%, 平均0.083284%, 变化 = (0.0613-0.083284)/0.083284*100 = -26.40%
+#                         if avg_1day != 0:
+#                             change_1day_percent = ((seq_change_percent - avg_1day) / avg_1day) * 100
+#                         else:
+#                             change_1day_percent = 0
                         
-                        if avg_3day != 0:
-                            change_3day_percent = ((seq_change_percent - avg_3day) / avg_3day) * 100
-                        else:
-                            change_3day_percent = 0
+#                         if avg_3day != 0:
+#                             change_3day_percent = ((seq_change_percent - avg_3day) / avg_3day) * 100
+#                         else:
+#                             change_3day_percent = 0
                         
-                        if avg_7day != 0:
-                            change_7day_percent = ((seq_change_percent - avg_7day) / avg_7day) * 100
-                        else:
-                            change_7day_percent = 0
+#                         if avg_7day != 0:
+#                             change_7day_percent = ((seq_change_percent - avg_7day) / avg_7day) * 100
+#                         else:
+#                             change_7day_percent = 0
                         
-                        if avg_15day != 0:
-                            change_15day_percent = ((seq_change_percent - avg_15day) / avg_15day) * 100
-                        else:
-                            change_15day_percent = 0
+#                         if avg_15day != 0:
+#                             change_15day_percent = ((seq_change_percent - avg_15day) / avg_15day) * 100
+#                         else:
+#                             change_15day_percent = 0
                         
-                        # 同时保留绝对差值（用于偏向判断）
-                        diff_1day = seq_change_percent - avg_1day
+#                         # 同时保留绝对差值（用于偏向判断）
+#                         diff_1day = seq_change_percent - avg_1day
                         
-                        result_data['change_1day_percent'] = round(change_1day_percent, 2)
-                        result_data['change_3day_percent'] = round(change_3day_percent, 2)
-                        result_data['change_7day_percent'] = round(change_7day_percent, 2)
-                        result_data['change_15day_percent'] = round(change_15day_percent, 2)
+#                         result_data['change_1day_percent'] = round(change_1day_percent, 2)
+#                         result_data['change_3day_percent'] = round(change_3day_percent, 2)
+#                         result_data['change_7day_percent'] = round(change_7day_percent, 2)
+#                         result_data['change_15day_percent'] = round(change_15day_percent, 2)
                         
-                        # 判断偏向（使用当前行的position）
-                        if row_position == 'long':
-                            bias = '偏多' if diff_1day < 0 else '偏空'
-                        else:
-                            bias = '偏空' if diff_1day < 0 else '偏多'
+#                         # 判断偏向（使用当前行的position）
+#                         if row_position == 'long':
+#                             bias = '偏多' if diff_1day < 0 else '偏空'
+#                         else:
+#                             bias = '偏空' if diff_1day < 0 else '偏多'
                         
-                        result_data['bias'] = bias
+#                         result_data['bias'] = bias
             
-            sequences_with_changes.append(result_data)
+#             sequences_with_changes.append(result_data)
         
-        # 计算最近2小时的偏多/偏空比例
-        # 2小时 = 24条数据（每5分钟一条）
-        recent_2hours = sequences_with_changes[:24]  # 取最新的24条数据
+#         # 计算最近2小时的偏多/偏空比例
+#         # 2小时 = 24条数据（每5分钟一条）
+#         recent_2hours = sequences_with_changes[:24]  # 取最新的24条数据
         
-        bias_bullish_count = 0  # 偏多数量
-        bias_bearish_count = 0  # 偏空数量
-        bias_neutral_count = 0  # 中性（无偏向或"-"）
+#         bias_bullish_count = 0  # 偏多数量
+#         bias_bearish_count = 0  # 偏空数量
+#         bias_neutral_count = 0  # 中性（无偏向或"-"）
         
-        for seq in recent_2hours:
-            if 'bias' in seq and seq['bias']:
-                if seq['bias'] == '偏多':
-                    bias_bullish_count += 1
-                elif seq['bias'] == '偏空':
-                    bias_bearish_count += 1
-                else:
-                    bias_neutral_count += 1
-            else:
-                bias_neutral_count += 1
+#         for seq in recent_2hours:
+#             if 'bias' in seq and seq['bias']:
+#                 if seq['bias'] == '偏多':
+#                     bias_bullish_count += 1
+#                 elif seq['bias'] == '偏空':
+#                     bias_bearish_count += 1
+#                 else:
+#                     bias_neutral_count += 1
+#             else:
+#                 bias_neutral_count += 1
         
-        total_with_bias = bias_bullish_count + bias_bearish_count
-        bias_stats = {
-            'period': '2小时',
-            'total_records': len(recent_2hours),
-            'bullish_count': bias_bullish_count,
-            'bearish_count': bias_bearish_count,
-            'neutral_count': bias_neutral_count,
-            'bullish_ratio': round((bias_bullish_count / total_with_bias * 100), 2) if total_with_bias > 0 else 0,
-            'bearish_ratio': round((bias_bearish_count / total_with_bias * 100), 2) if total_with_bias > 0 else 0
-        }
+#         total_with_bias = bias_bullish_count + bias_bearish_count
+#         bias_stats = {
+#             'period': '2小时',
+#             'total_records': len(recent_2hours),
+#             'bullish_count': bias_bullish_count,
+#             'bearish_count': bias_bearish_count,
+#             'neutral_count': bias_neutral_count,
+#             'bullish_ratio': round((bias_bullish_count / total_with_bias * 100), 2) if total_with_bias > 0 else 0,
+#             'bearish_ratio': round((bias_bearish_count / total_with_bias * 100), 2) if total_with_bias > 0 else 0
+#         }
         
-        result = {
-            'success': True,
-            'symbol': symbol.upper(),
-            'current_status': {
-                'position': current_position,
-                'position_cn': '多头' if current_position == 'long' else '空头',
-                'current_sequence': current_sequence,
-                'last_update': last_update,
-                'cycle_info': f"{current_position}01 → {current_position}{current_sequence:02d}"
-            },
-            'bias_statistics': bias_stats,  # 新增：2小时偏向统计
-            'sequences': sequences_with_changes,
-            'total_sequences': len(sequences_with_changes)
-        }
+#         result = {
+#             'success': True,
+#             'symbol': symbol.upper(),
+#             'current_status': {
+#                 'position': current_position,
+#                 'position_cn': '多头' if current_position == 'long' else '空头',
+#                 'current_sequence': current_sequence,
+#                 'last_update': last_update,
+#                 'cycle_info': f"{current_position}01 → {current_position}{current_sequence:02d}"
+#             },
+#             'bias_statistics': bias_stats,  # 新增：2小时偏向统计
+#             'sequences': sequences_with_changes,
+#             'total_sequences': len(sequences_with_changes)
+#         }
         
-        # 保存到服务器端缓存
-        server_cache.set(cache_key, result)
+#         # 保存到服务器端缓存
+#         server_cache.set(cache_key, result)
         
-        conn.close()
-        response = jsonify(result)
-        # 添加防缓存头，避免外部代理缓存旧的500错误
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
+#         conn.close()
+#         response = jsonify(result)
+#         # 添加防缓存头，避免外部代理缓存旧的500错误
+#         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+#         response.headers['Pragma'] = 'no-cache'
+#         response.headers['Expires'] = '0'
+#         return response
     
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         })
 
-# ============================================
-# SAR偏向趋势API
-# ============================================
+# # ============================================
+# # SAR偏向趋势API
+# # ============================================
 @app.route('/sar-bias-trend')
 def sar_bias_trend_page():
     """SAR偏向趋势图页面"""
     return render_template('sar_bias_trend.html')
 
-@app.route('/api/sar-slope/bias-trend')
-def sar_slope_bias_trend():
-    """获取SAR偏向趋势数据（12小时分页）"""
-    try:
-        from datetime import datetime, timezone, timedelta
-        import json
+# DEPRECATED: @app.route('/api/sar-slope/bias-trend')
+# def sar_slope_bias_trend():
+#     """获取SAR偏向趋势数据（12小时分页）"""
+#     try:
+#         from datetime import datetime, timezone, timedelta
+#         import json
         
-        # 获取分页参数
-        page = request.args.get('page', 1, type=int)
+#         # 获取分页参数
+#         page = request.args.get('page', 1, type=int)
         
-        conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
-        cursor = conn.cursor()
+#         conn = sqlite3.connect('/home/user/webapp/sar_slope_data.db', timeout=10.0)
+#         cursor = conn.cursor()
         
-        # 北京时区
-        beijing_tz = timezone(timedelta(hours=8))
+#         # 北京时区
+#         beijing_tz = timezone(timedelta(hours=8))
         
-        # 计算时间范围（每页12小时）
-        # page=1: 最近12小时
-        # page=2: 12-24小时前
-        # page=3: 24-36小时前
-        hours_end = (page - 1) * 12
-        hours_start = page * 12
+#         # 计算时间范围（每页12小时）
+#         # page=1: 最近12小时
+#         # page=2: 12-24小时前
+#         # page=3: 24-36小时前
+#         hours_end = (page - 1) * 12
+#         hours_start = page * 12
         
-        # 获取指定页的12小时数据（数据库存储的是北京时间，需要+8小时来匹配）
-        cursor.execute('''
-        SELECT 
-            timestamp,
-            bullish_count,
-            bearish_count,
-            total_symbols,
-            bullish_symbols,
-            bearish_symbols
-        FROM sar_bias_trend
-        WHERE datetime(timestamp) >= datetime('now', '+8 hours', '-' || ? || ' hours')
-          AND datetime(timestamp) < datetime('now', '+8 hours', '-' || ? || ' hours')
-        ORDER BY timestamp ASC
-        ''', (hours_start, hours_end))
+#         # 获取指定页的12小时数据（数据库存储的是北京时间，需要+8小时来匹配）
+#         cursor.execute('''
+#         SELECT 
+#             timestamp,
+#             bullish_count,
+#             bearish_count,
+#             total_symbols,
+#             bullish_symbols,
+#             bearish_symbols
+#         FROM sar_bias_trend
+#         WHERE datetime(timestamp) >= datetime('now', '+8 hours', '-' || ? || ' hours')
+#           AND datetime(timestamp) < datetime('now', '+8 hours', '-' || ? || ' hours')
+#         ORDER BY timestamp ASC
+#         ''', (hours_start, hours_end))
         
-        rows = cursor.fetchall()
+#         rows = cursor.fetchall()
         
-        # 获取总页数（基于所有数据）
-        cursor.execute('SELECT MIN(timestamp) FROM sar_bias_trend')
-        min_timestamp = cursor.fetchone()[0]
+#         # 获取总页数（基于所有数据）
+#         cursor.execute('SELECT MIN(timestamp) FROM sar_bias_trend')
+#         min_timestamp = cursor.fetchone()[0]
         
-        total_pages = 1
-        if min_timestamp:
-            # 计算最早数据距今的小时数（使用北京时间）
-            cursor.execute("SELECT (julianday('now', '+8 hours') - julianday(?)) * 24", (min_timestamp,))
-            hours_diff = cursor.fetchone()[0]
-            total_pages = max(1, int(hours_diff / 12) + 1)
+#         total_pages = 1
+#         if min_timestamp:
+#             # 计算最早数据距今的小时数（使用北京时间）
+#             cursor.execute("SELECT (julianday('now', '+8 hours') - julianday(?)) * 24", (min_timestamp,))
+#             hours_diff = cursor.fetchone()[0]
+#             total_pages = max(1, int(hours_diff / 12) + 1)
         
-        conn.close()
+#         conn.close()
         
-        data = []
-        for row in rows:
-            # 将时间戳转换为北京时间（如果需要）
-            timestamp_str = row[0]
-            data.append({
-                'timestamp': timestamp_str,
-                'bullish_count': row[1],
-                'bearish_count': row[2],
-                'total_symbols': row[3],
-                'bullish_symbols': json.loads(row[4]) if row[4] else [],
-                'bearish_symbols': json.loads(row[5]) if row[5] else []
-            })
+#         data = []
+#         for row in rows:
+#             # 将时间戳转换为北京时间（如果需要）
+#             timestamp_str = row[0]
+#             data.append({
+#                 'timestamp': timestamp_str,
+#                 'bullish_count': row[1],
+#                 'bearish_count': row[2],
+#                 'total_symbols': row[3],
+#                 'bullish_symbols': json.loads(row[4]) if row[4] else [],
+#                 'bearish_symbols': json.loads(row[5]) if row[5] else []
+#             })
         
-        # 获取当前页的时间范围（用于显示）
-        time_range = {
-            'start': '',
-            'end': ''
-        }
-        if data:
-            time_range['start'] = data[0]['timestamp']
-            time_range['end'] = data[-1]['timestamp']
+#         # 获取当前页的时间范围（用于显示）
+#         time_range = {
+#             'start': '',
+#             'end': ''
+#         }
+#         if data:
+#             time_range['start'] = data[0]['timestamp']
+#             time_range['end'] = data[-1]['timestamp']
         
-        return jsonify({
-            'success': True,
-            'data': data,
-            'total': len(data),
-            'page': page,
-            'total_pages': total_pages,
-            'time_range': time_range,
-            'has_prev': page < total_pages,
-            'has_next': page > 1
-        })
+#         return jsonify({
+#             'success': True,
+#             'data': data,
+#             'total': len(data),
+#             'page': page,
+#             'total_pages': total_pages,
+#             'time_range': time_range,
+#             'has_prev': page < total_pages,
+#             'has_next': page > 1
+#         })
     
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        })
+#     except Exception as e:
+#         import traceback
+#         return jsonify({
+#             'success': False,
+#             'error': str(e),
+#             'traceback': traceback.format_exc()
+#         })
 
 
-# ============================================
-# 缓存管理API
-# ============================================
+# # ============================================
+# # 缓存管理API
+# # ============================================
 @app.route('/api/cache/stats')
 def cache_stats():
     """获取缓存统计信息"""
