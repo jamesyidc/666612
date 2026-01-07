@@ -8,17 +8,18 @@ def calculate_sequences(data_points):
         if data_points[i]['sar_position'] == current_seq['position']:
             current_seq['data'].append(data_points[i])
         else:
-            sequences.append(build_sequence(current_seq))
+            sequences.append(build_sequence(current_seq, len(sequences) + 1))
             current_seq = {'position': data_points[i]['sar_position'], 'data': [data_points[i]]}
-    sequences.append(build_sequence(current_seq))
+    sequences.append(build_sequence(current_seq, len(sequences) + 1))
     return sequences
 
-def build_sequence(seq):
+def build_sequence(seq, seq_number):
     data = seq['data']
     sar_diff = data[-1]['sar_value'] - data[0]['sar_value']
     price_change = ((data[-1]['price_close'] - data[0]['price_close']) / data[0]['price_close'] * 100) if data[0]['price_close'] else 0
     avg_change = abs(price_change) / len(data) if len(data) > 0 else 0
     return {
+        'seq_number': seq_number,
         'sequence': len(data),
         'position': seq['position'],
         'time': data[-1]['datetime_beijing'],
