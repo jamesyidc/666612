@@ -176,6 +176,7 @@ def register_sar_routes(app):
             return jsonify({
                 'success': True,
                 'sequences': [],
+                'total_sequences': 0,
                 'bias_statistics': {'slope_30m': 0, 'slope_1h': 0, 'slope_4h': 0},
                 'current_status': {
                     'position': 'long' if item.get('sar_position') == 'bullish' else 'short',
@@ -185,7 +186,8 @@ def register_sar_routes(app):
                     'current_sequence': 1,
                     'cycle_start': item.get('datetime_beijing', ''),
                     'cycle_end': item.get('datetime_beijing', ''),
-                    'duration': '0小时'
+                    'duration': '0小时',
+                    'last_update': item.get('datetime_beijing', '')
                 },
                 'data': {
                     'symbol': item['symbol'].replace('-USDT-SWAP', ''),
