@@ -36,3 +36,5 @@ pm2/
 
 # 依赖包
 node_modules/
+data/db_jsonl/
+backup/old_databases/
