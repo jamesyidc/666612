@@ -178,6 +178,22 @@ def register_sar_routes(app):
             sequences = calculate_sequences(data_points[::-1])  # 反转为时间正序
             sequences = sequences[::-1]  # 再反转，最新序列在前
             
+            # 获取当前（最新）序列信息
+            current_seq = sequences[0] if sequences else {}
+            current_seq_number = current_seq.get('seq_number', 1)
+            cycle_start = current_seq.get('start_time', item.get('datetime_beijing', ''))
+            cycle_end = current_seq.get('end_time', item.get('datetime_beijing', ''))
+            
+            # 计算持续时间
+            try:
+                from datetime import datetime
+                start_dt = datetime.strptime(cycle_start, '%Y-%m-%d %H:%M:%S')
+                end_dt = datetime.strptime(cycle_end, '%Y-%m-%d %H:%M:%S')
+                duration_hours = round((end_dt - start_dt).total_seconds() / 3600, 1)
+                duration_str = f"{duration_hours}小时"
+            except:
+                duration_str = '0小时'
+            
             return jsonify({
                 'success': True,
                 'sequences': sequences,
@@ -188,10 +204,10 @@ def register_sar_routes(app):
                     'position_cn': '多头' if item.get('sar_position') == 'bullish' else '空头',
                     'cycle_info': item.get('datetime_beijing', ''),
                     'oscillation_cn': item.get('sar_position', ''),
-                    'current_sequence': 1,
-                    'cycle_start': item.get('datetime_beijing', ''),
-                    'cycle_end': item.get('datetime_beijing', ''),
-                    'duration': '0小时',
+                    'current_sequence': current_seq_number,
+                    'cycle_start': cycle_start,
+                    'cycle_end': cycle_end,
+                    'duration': duration_str,
                     'last_update': item.get('datetime_beijing', '')
                 },
                 'data': {
