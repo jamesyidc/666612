@@ -172,8 +172,15 @@ def register_sar_routes(app):
             
             item = data_points[0]
             
+            item = data_points[0]
             return jsonify({
                 'success': True,
+                'sequences': [],
+                'current_status': {
+                    'position_cn': '多头' if item.get('sar_position') == 'bullish' else '空头',
+                    'cycle_info': item.get('datetime_beijing', ''),
+                    'oscillation_cn': item.get('sar_position', '')
+                },
                 'data': {
                     'symbol': item['symbol'].replace('-USDT-SWAP', ''),
                     'datetime': item.get('datetime_beijing'),
