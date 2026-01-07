@@ -3,6 +3,7 @@
 加密货币数据分析系统 - 完全仿照参考页面风格
 """
 from flask import Flask, render_template_string, render_template, request, jsonify, send_from_directory, make_response, redirect
+from panic_api_routes import register_panic_routes
 
 # SAR斜率系统 - JSONL存储
 from sar_api_routes import register_sar_routes
@@ -18,6 +19,9 @@ import traceback
 import requests
 
 app = Flask(__name__)
+
+# 注册 panic JSONL 路由
+register_panic_routes(app)
 
 # 注册SAR斜率路由
 register_sar_routes(app)
