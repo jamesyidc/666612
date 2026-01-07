@@ -17,6 +17,7 @@ def build_sequence(seq):
     data = seq['data']
     sar_diff = data[-1]['sar_value'] - data[0]['sar_value']
     price_change = ((data[-1]['price_close'] - data[0]['price_close']) / data[0]['price_close'] * 100) if data[0]['price_close'] else 0
+    avg_change = abs(price_change) / len(data) if len(data) > 0 else 0
     return {
         'sequence': len(data),
         'position': seq['position'],
@@ -33,5 +34,11 @@ def build_sequence(seq):
         'sar_diff': sar_diff,
         'sequence_change_percent': price_change,
         'change_1day_percent': price_change,
-        'avg_1day': abs(price_change) / len(data) if len(data) > 0 else 0
+        'avg_1day': avg_change,
+        'change_3day_percent': price_change,
+        'avg_3day': avg_change,
+        'change_7day_percent': price_change,
+        'avg_7day': avg_change,
+        'change_15day_percent': price_change,
+        'avg_15day': avg_change
     }
