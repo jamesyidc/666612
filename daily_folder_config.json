@@ -1,10 +1,10 @@
 {
   "root_folder_odd": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "root_folder_even": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
+  "root_folder_even": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV", 
   "current_date": "2026-01-07",
   "folder_id": "1jFGGlGP5KEVhAxpCNxFIYEFI5-cDOBjM",
   "parent_folder_id": "1j8YV6KysUCmgcmASFOxztWWIE1Vq-kYV",
-  "updated_at": "2026-01-07 13:50:00",
-  "folder_name": "当前日期文件夹",
-  "note": "需要手动更新实际的folder_id"
+  "updated_at": "2026-01-07 13:55:00",
+  "folder_name": "2026-01-07",
+  "note": "从爷爷文件夹1U5VjRis2FYnBJvtR_8mmPrmFcJCMPGrH找到首页数据文件夹后需更新parent_folder_id"
 }
