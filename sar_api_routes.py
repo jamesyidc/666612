@@ -178,9 +178,14 @@ def register_sar_routes(app):
                 'sequences': [],
                 'bias_statistics': {'slope_30m': 0, 'slope_1h': 0, 'slope_4h': 0},
                 'current_status': {
+                    'position': 'long' if item.get('sar_position') == 'bullish' else 'short',
                     'position_cn': '多头' if item.get('sar_position') == 'bullish' else '空头',
                     'cycle_info': item.get('datetime_beijing', ''),
-                    'oscillation_cn': item.get('sar_position', '')
+                    'oscillation_cn': item.get('sar_position', ''),
+                    'current_sequence': 1,
+                    'cycle_start': item.get('datetime_beijing', ''),
+                    'cycle_end': item.get('datetime_beijing', ''),
+                    'duration': '0小时'
                 },
                 'data': {
                     'symbol': item['symbol'].replace('-USDT-SWAP', ''),
