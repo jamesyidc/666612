@@ -19879,3 +19879,24 @@ def liquidation_stats_page():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
+
+@app.route('/api/gdrive-detector/snapshots')
+def gdrive_detector_snapshots():
+    """从JSONL获取快照数据"""
+    try:
+        from gdrive_jsonl_storage import storage as jsonl_storage
+        import pytz
+        beijing_tz = pytz.timezone('Asia/Shanghai')
+        today = datetime.now(beijing_tz).strftime('%Y-%m-%d')
+        
+        # 读取今天的数据
+        snapshots = jsonl_storage.get_latest(limit=100)
+        
+        return jsonify({
+            'success': True,
+            'date': today,
+            'total': len(snapshots),
+            'snapshots': snapshots
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
