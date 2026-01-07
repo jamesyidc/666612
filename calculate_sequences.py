@@ -18,12 +18,15 @@ def build_sequence(seq):
     return {
         'sequence': len(data),
         'position': seq['position'],
+        'time': data[-1]['datetime_beijing'],
         'start_time': data[0]['datetime_beijing'],
         'end_time': data[-1]['datetime_beijing'],
+        'price': data[-1]['price_close'],
         'start_price': data[0]['price_close'],
         'end_price': data[-1]['price_close'],
+        'sar_value': data[-1]['sar_value'],
         'start_sar': data[0]['sar_value'],
         'end_sar': data[-1]['sar_value'],
         'sar_diff': data[-1]['sar_value'] - data[0]['sar_value'],
-        'price_change_percent': ((data[-1]['price_close'] - data[0]['price_close']) / data[0]['price_close'] * 100) if data[0]['price_close'] else 0
+        'sequence_change_percent': ((data[-1]['price_close'] - data[0]['price_close']) / data[0]['price_close'] * 100) if data[0]['price_close'] else 0
     }
