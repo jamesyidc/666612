@@ -10,7 +10,22 @@ Google Drive TXT文件智能检测器 - 最终版本
 import requests
 import re
 import time
-import sqlite3
+import sqlite3  # 保留用于旧代码兼容
+from gdrive_jsonl_storage import storage as jsonl_storage
+from gdrive_jsonl_storage import storage as jsonl_storage
+
+def import_to_jsonl(data, content):
+    """导入到JSONL"""
+    try:
+        if jsonl_storage.check_exists(data["snapshot_time"]):
+            return False
+        jsonl_storage.save_snapshot(data)
+        log(f"   ✅ JSONL保存成功")
+        return True
+    except Exception as e:
+        log(f"   ❌ JSONL错误: {e}")
+        return False
+
 from datetime import datetime
 import pytz
 import sys
@@ -453,6 +468,8 @@ def parse_coin_data(content):
         return []
 
 def import_to_database(data, content):
+
+
     """导入数据到数据库（首页监控系统）"""
     import time
     max_retries = 5
@@ -944,7 +961,7 @@ def main():
             
             # 导入到数据库
             log(f"💾 开始导入到首页数据监控系统...")
-            import_success = import_to_database(data, result['content'])
+            import_success = import_to_jsonl(data, result['content'])
             
             if import_success:
                 last_data_timestamp = result['file_timestamp']
@@ -974,3 +991,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
